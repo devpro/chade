@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "ConsoleApp": {
+      "commandName": "Project",
+      "commandLineArgs": "C:\\Users\\bertrand.thomas\\Downloads"
+    }
+  }
+}
