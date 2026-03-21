@@ -15,4 +15,5 @@
     <File Path=".github/workflows/reusable-git-check.yml" />
   </Folder>
   <Project Path="src/ConsoleApp/ConsoleApp.csproj" />
+  <Project Path="test/ConsoleApp.IntegrationTests/ConsoleApp.IntegrationTests.csproj" />
 </Solution>
