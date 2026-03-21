@@ -249,10 +249,6 @@ paket-files/
 # FAKE - F# Make
 .fake/
 
-# JetBrains Rider
-.idea/
-*.sln.iml
-
 # CodeRush
 .cr/
 
@@ -262,3 +258,6 @@ __pycache__/
 
 # Local development files
 appsettings.Development.json
+
+# JetBrains IDE (Rider)
+.idea/
