@@ -37,13 +37,13 @@ jobs:
 
   markup-lint:
     name: Markup
-    uses: devpro/github-workflow-parts/.github/workflows/reusable-markup-lint.yml@c90ba46a93ca90123f57744b47e49c1a73962cea
+    uses: devpro/github-workflow-parts/.github/workflows/reusable-markup-lint.yml@defde40cfcaa2dc67c1cc47a27d20605f76d74b0
 
   code-quality:
     name: Code
     needs: git-check
     if: needs.git-check.outputs.app_changed == 'true' || (github.event_name == 'workflow_dispatch' && inputs.run-code-quality)
-    uses: devpro/github-workflow-parts/.github/workflows/reusable-dotnet-quality.yml@c90ba46a93ca90123f57744b47e49c1a73962cea
+    uses: devpro/github-workflow-parts/.github/workflows/reusable-dotnet-quality.yml@defde40cfcaa2dc67c1cc47a27d20605f76d74b0
     with:
       dotnet-test-args: "--report-xunit-trx --coverage --coverage-output-format cobertura"
       sonar-enabled: true
@@ -51,7 +51,7 @@ jobs:
       sonar-organization: ${{ vars.SONAR_ORG }}
       sonar-project-key: ${{ vars.SONAR_PROJECT_KEY }}
       sonar-project-name: Chade
-      workflow-parts-version: c90ba46a93ca90123f57744b47e49c1a73962cea
+      workflow-parts-version: defde40cfcaa2dc67c1cc47a27d20605f76d74b0
     secrets:
       sonar-token: ${{ secrets.SONAR_TOKEN }}
     permissions:
@@ -68,7 +68,7 @@ jobs:
           - name: "Console App"
             image-name: "chade-console"
             image-definition: "src/ConsoleApp/Dockerfile"
-    uses: devpro/github-workflow-parts/.github/workflows/reusable-container-scan.yml@c90ba46a93ca90123f57744b47e49c1a73962cea
+    uses: devpro/github-workflow-parts/.github/workflows/reusable-container-scan.yml@defde40cfcaa2dc67c1cc47a27d20605f76d74b0
     with:
       image-definition: ${{ matrix.image-definition }}
       image-name: ${{ matrix.image-name }}
@@ -76,3 +76,4 @@ jobs:
       image-tag: "${{ needs.git-check.outputs.version_major_minor }}.${{ github.run_id }}"
       max-high-cves: 0
       max-medium-cves: 0
+      workflow-parts-version: defde40cfcaa2dc67c1cc47a27d20605f76d74b0
