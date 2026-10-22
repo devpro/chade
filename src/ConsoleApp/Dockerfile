@@ -1,4 +1,4 @@
-﻿FROM registry.suse.com/bci/dotnet-runtime:10.0 AS base
+FROM registry.suse.com/bci/dotnet-runtime:10.0 AS base
 USER $APP_UID
 WORKDIR /app
 
