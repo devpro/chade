@@ -31,20 +31,20 @@ permissions:
 jobs:
   git-check:
     name: Git
-    uses: devpro/github-workflow-parts/.github/workflows/reusable-git-check.yml@1407a4bb9c27be25216e3ab69865c3895d862107
+    uses: devpro/github-workflow-parts/.github/workflows/reusable-git-check.yml@13ac7ccf4ba593797f8c80a75f2559ce0fc2d09e
     with:
       version-file: Directory.Build.props
-      workflow-parts-version: 1407a4bb9c27be25216e3ab69865c3895d862107
+      workflow-parts-version: 13ac7ccf4ba593797f8c80a75f2559ce0fc2d09e
 
   markup-lint:
     name: Markup
-    uses: devpro/github-workflow-parts/.github/workflows/reusable-markup-lint.yml@1407a4bb9c27be25216e3ab69865c3895d862107
+    uses: devpro/github-workflow-parts/.github/workflows/reusable-markup-lint.yml@13ac7ccf4ba593797f8c80a75f2559ce0fc2d09e
 
   code-quality:
     name: Code
     needs: git-check
     if: needs.git-check.outputs.changed == 'true' || (github.event_name == 'workflow_dispatch' && inputs.run-code-quality)
-    uses: devpro/github-workflow-parts/.github/workflows/reusable-dotnet-quality.yml@1407a4bb9c27be25216e3ab69865c3895d862107
+    uses: devpro/github-workflow-parts/.github/workflows/reusable-dotnet-quality.yml@13ac7ccf4ba593797f8c80a75f2559ce0fc2d09e
     with:
       dotnet-test-args: "--report-xunit-trx --coverage --coverage-output-format cobertura"
       sonar-enabled: true
@@ -52,7 +52,7 @@ jobs:
       sonar-organization: ${{ vars.SONAR_ORG }}
       sonar-project-key: ${{ vars.SONAR_PROJECT_KEY }}
       sonar-project-name: Chade
-      workflow-parts-version: 1407a4bb9c27be25216e3ab69865c3895d862107
+      workflow-parts-version: 13ac7ccf4ba593797f8c80a75f2559ce0fc2d09e
     secrets:
       sonar-token: ${{ secrets.SONAR_TOKEN }}
     permissions:
@@ -69,12 +69,10 @@ jobs:
           - name: "Console App"
             image-name: "chade-console"
             image-definition: "src/ConsoleApp/Dockerfile"
-    uses: devpro/github-workflow-parts/.github/workflows/reusable-container-scan.yml@1407a4bb9c27be25216e3ab69865c3895d862107
+    uses: devpro/github-workflow-parts/.github/workflows/reusable-container-scan.yml@13ac7ccf4ba593797f8c80a75f2559ce0fc2d09e
     with:
       image-definition: ${{ matrix.image-definition }}
       image-name: ${{ matrix.image-name }}
       image-path: ${{ vars.CONTAINER_REGISTRY_PATH }}
       image-tag: "${{ needs.git-check.outputs.version-major-minor }}.${{ github.run_id }}"
-      max-high-cves: 0
-      max-medium-cves: 0
-      workflow-parts-version: 1407a4bb9c27be25216e3ab69865c3895d862107
+      workflow-parts-version: 13ac7ccf4ba593797f8c80a75f2559ce0fc2d09e

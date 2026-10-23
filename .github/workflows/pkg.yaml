@@ -1,4 +1,4 @@
-﻿name: PKG
+name: PKG
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 # purpose: Continuous Delivery (aka Packaging & Shipping)
 
@@ -10,10 +10,10 @@ on:
 jobs:
   git-check:
     name: Git
-    uses: devpro/github-workflow-parts/.github/workflows/reusable-git-check.yml@1407a4bb9c27be25216e3ab69865c3895d862107
+    uses: devpro/github-workflow-parts/.github/workflows/reusable-git-check.yml@13ac7ccf4ba593797f8c80a75f2559ce0fc2d09e
     with:
       version-file: Directory.Build.props
-      workflow-parts-version: 1407a4bb9c27be25216e3ab69865c3895d862107
+      workflow-parts-version: 13ac7ccf4ba593797f8c80a75f2559ce0fc2d09e
 
   image-publication:
     name: "Image ${{ matrix.name }}"
@@ -28,7 +28,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    uses: devpro/github-workflow-parts/.github/workflows/reusable-container-publication.yml@1407a4bb9c27be25216e3ab69865c3895d862107
+    uses: devpro/github-workflow-parts/.github/workflows/reusable-container-publication.yml@13ac7ccf4ba593797f8c80a75f2559ce0fc2d09e
     with:
       create-latest: ${{ github.ref_name == 'main' }}
       image-definition: ${{ matrix.image-definition }}
@@ -36,7 +36,7 @@ jobs:
       image-path: ${{ vars.CONTAINER_REGISTRY_PATH }}
       image-tag: "${{ needs.git-check.outputs.version-major-minor }}.${{ github.run_id }}"
       image-platform: linux/amd64
-      workflow-parts-version: 1407a4bb9c27be25216e3ab69865c3895d862107
+      workflow-parts-version: 13ac7ccf4ba593797f8c80a75f2559ce0fc2d09e
     secrets:
       container-registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
       container-registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
