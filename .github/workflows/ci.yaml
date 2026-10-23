@@ -49,6 +49,8 @@ jobs:
       dotnet-test-args: "--report-xunit-trx --coverage --coverage-output-format cobertura"
       sonar-enabled: true
       sonar-exclusions: "samples/**"
+      # SonarCloud by default, or the SonarQube SONAR_HOST_URL names, as IstarCI gives a local run.
+      sonar-host-url: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
       sonar-organization: ${{ vars.SONAR_ORG }}
       sonar-project-key: ${{ vars.SONAR_PROJECT_KEY }}
       sonar-project-name: Chade
