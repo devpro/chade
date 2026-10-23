@@ -1,4 +1,4 @@
-﻿# Contributor guide
+# Contributor guide
 
 ## Run the pipeline locally
 
