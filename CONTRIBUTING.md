@@ -13,6 +13,8 @@
 ├── .github/workflows/
 │   ├── ci.yaml             markup lint, build and tests
 │   └── pkg.yaml            publication of chade to npmjs.org
+├── docs/
+│   └── cleanup.md          clean-up steps the report links to
 ├── packages/
 │   └── cli/                chade, the published package
 │       ├── bin/chade.js    entry point of the chade command
@@ -86,7 +88,7 @@ A fake command runner stands in for the Windows tools (`cmd.exe`, `wslpath`, `wi
 task test:pkg
 ```
 
-`packages/cli/smoke.sh` packs the tarball, installs it into an empty project and runs the installed `chade` command: init, snapshot, redaction, diff.
+`packages/cli/smoke.sh` packs the tarball, installs it into an empty project and runs the installed `chade` command: init, snapshot, redaction, diff and report.
 It catches what the unit tests cannot see, such as a file missing from `files` in `package.json` or a dependency missing from the bundle.
 It uses a home folder of its own and a Linux section only, so it never reads the configuration of the machine, nor reaches Windows.
 

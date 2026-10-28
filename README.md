@@ -12,6 +12,7 @@ A snapshot holds configuration files (`/etc/wsl.conf`, `C:\Users\<user>\.wslconf
 and inventories: installed applications, VS Code extensions, services, scheduled tasks and git repositories.
 
 chade only reads the system, it never changes it.
+`chade report` measures what takes disk and memory, the space WSL takes on C: above all, and gives the command that gets each one back.
 It is the tool, the snapshots live in the store, a folder of a git repository chosen at `chade init`.
 The store is a dedicated repository, or a subfolder of a repository that holds other things, such as personal notes.
 
@@ -157,6 +158,22 @@ A snapshot is meant for a git repository, so chade masks secrets before writing 
 - gitleaks scans the staged snapshot before the commit, and a finding stops it, with nothing committed.
 - `--no-secret-scan` commits without the scan, and a missing gitleaks gives a warning.
 
+## Clean-up
+
+```bash
+chade report
+```
+
+The report measures, and changes nothing:
+
+- on WSL, the free space of C:, the size of each disk image against what Linux uses in it, and the memory settings of `.wslconfig`
+- the memory, swap and largest processes
+- the timers that trim the disk, Docker data and what of it is unused, the systemd journal, snap revisions kept for a rollback
+- the caches of the tools, the Claude Code sessions, and the size of the repositories under `repos`
+
+Each finding comes with the command or setting that fixes it, and a link to [docs/cleanup.md](docs/cleanup.md), which explains each step.
+`--json` prints the report as JSON.
+
 ## Commands
 
 Command                     | Effect
@@ -164,13 +181,14 @@ Command                     | Effect
 `chade init --store <path>` | Writes the configuration, creates the store folder, and a git repository when the folder is in none, `--force` overwrites an existing configuration
 `chade discover`            | Prints the known configuration files present on the system and missing from the configuration, and the Debian configuration files changed since their installation
 `chade snapshot`            | Collects, redacts, writes and commits, `--dry-run` lists only, `--push` pushes the repository of the store after the commit, `--no-secret-scan` skips gitleaks
+`chade report`              | Measures disk and memory and suggests what to clean, without changing anything, `--json` prints JSON
 `chade diff [rev]`          | Compares the last snapshot with the previous one, or with `rev`, `--since <date>` with the last one before that date, `--stat` lists the files, `--machine <name>` reads another machine folder
 
 `--config <path>` applies to every command.
 
 ## Roadmap
 
-- Clean-up of the system, the disk and the memory WSL takes from Windows above all
+- `chade clean`, running the clean-up steps the configuration lists, after a confirmation
 - Web viewer of the store: machines, snapshots, files and differences
 - Restore scripts generated from a snapshot, `winget import` and `code --install-extension` for instance
 - Native Windows, without WSL

@@ -19,6 +19,7 @@ chade init --store ~/system-snapshots   # configuration in ~/.chade/config.yml, 
 chade discover                          # configuration files present and not configured yet
 chade snapshot                          # collect, redact secrets, commit
 chade diff                              # what changed since the previous snapshot
+chade report                            # disk and memory taken, and how to get them back
 ```
 
 ## Documentation

@@ -229,7 +229,7 @@ async function gitRepos(context: Context, kind: Kind): Promise<string> {
   return lines.join('\n')
 }
 
-async function findRepositories(folder: string, relative: string[], depth: number): Promise<string[][]> {
+export async function findRepositories(folder: string, relative: string[], depth: number): Promise<string[][]> {
   const entries = await readdir(join(folder, ...relative), { withFileTypes: true }).catch(() => [])
   if (entries.some((entry) => entry.name === '.git')) return [relative]
   if (depth === 0) return []

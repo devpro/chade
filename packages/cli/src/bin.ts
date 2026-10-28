@@ -9,6 +9,7 @@ import { diff } from './diff.js'
 import { discover } from './discover.js'
 import { run } from './exec.js'
 import { expandHome } from './paths.js'
+import { renderReport, report } from './report.js'
 import { snapshot, type Logger } from './snapshot.js'
 import { git, repositoryRoot } from './store.js'
 import { detectHost, isWsl } from './system.js'
@@ -117,6 +118,18 @@ program
       log.info(`${system.kind}:\n  files:`)
       for (const file of files) log.info(`    - ${system.kind === 'windows' ? `'${file}'` : file}`)
     }
+  })
+
+program
+  .command('report')
+  .description('Measure what takes disk and memory on this system, and suggest how to get it back, without changing anything')
+  .option('--json', 'print the report as JSON')
+  .action(async (options: { json?: boolean }) => {
+    // The report needs no store, so it also runs before chade init.
+    const config = existsSync(configFile()) ? await loadConfig() : undefined
+    const host = await detectHost({ machine: config?.machine })
+    const result = await report(config, host)
+    log.info(options.json ? JSON.stringify(result, null, 2) : renderReport(result))
   })
 
 program.parseAsync().catch((error: unknown) => {
