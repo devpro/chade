@@ -20,6 +20,7 @@ chade discover                          # configuration files present and not co
 chade snapshot                          # collect, redact secrets, commit
 chade diff                              # what changed since the previous snapshot
 chade report                            # disk and memory taken, and how to get them back
+chade clean                             # run the clean-up steps of the configuration, after a confirmation
 ```
 
 ## Documentation

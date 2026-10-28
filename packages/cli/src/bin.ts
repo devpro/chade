@@ -3,13 +3,15 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
 import { dirname, resolve } from 'node:path'
+import { createInterface } from 'node:readline/promises'
 import { Command } from 'commander'
+import { planCleanup, renderPlan, runCleanup } from './clean.js'
 import { configPath, initialConfig, parseConfig, type Config } from './config.js'
 import { diff } from './diff.js'
 import { discover } from './discover.js'
-import { run } from './exec.js'
+import { run, runInherit } from './exec.js'
 import { expandHome } from './paths.js'
-import { renderReport, report } from './report.js'
+import { formatBytes, renderReport, report } from './report.js'
 import { snapshot, type Logger } from './snapshot.js'
 import { git, repositoryRoot } from './store.js'
 import { detectHost, isWsl } from './system.js'
@@ -131,6 +133,41 @@ program
     const result = await report(config, host)
     log.info(options.json ? JSON.stringify(result, null, 2) : renderReport(result))
   })
+
+program
+  .command('clean')
+  .description('Run the clean-up steps the configuration lists, after showing them and a confirmation')
+  .option('--dry-run', 'show the steps and their commands, without running them')
+  .option('--yes', 'run without asking, for a timer or a script')
+  .action(async (options: { dryRun?: boolean; yes?: boolean }) => {
+    const config = await loadConfig()
+    if (config.cleanup.length === 0) throw new Error(`cleanup in ${configFile()} lists no step, chade report says which ones are worth it`)
+    const host = await detectHost({ machine: config.machine })
+    const planned = await planCleanup(config.cleanup, host, process.getuid?.() === 0)
+    log.info(`Clean-up of ${host.machine}:\n${renderPlan(planned)}`)
+    const runnable = planned.filter((step) => !step.skipped)
+    if (options.dryRun || runnable.length === 0) return
+    if (!options.yes) {
+      // A script without a terminal cannot answer, and a step that removes data never runs on a guess.
+      if (!process.stdin.isTTY) throw new Error('no terminal to confirm the clean-up, --yes runs it without asking')
+      const prompt = createInterface({ input: process.stdin, output: process.stdout })
+      const answer = await prompt.question(`Run ${runnable.length} step(s)? [y/N] `)
+      prompt.close()
+      if (!/^y(es)?$/i.test(answer.trim())) return log.info('Nothing was run')
+    }
+    const before = await freeSpace()
+    const result = await runCleanup(planned, runInherit, log.info)
+    const after = await freeSpace()
+    log.info(`\n${result.ran.length} step(s) ran${result.failed.length > 0 ? `, ${result.failed.join(', ')} failed` : ''}`)
+    if (before !== undefined && after !== undefined) log.info(`Free space on /: ${formatBytes(before)} before, ${formatBytes(after)} after`)
+    if (result.failed.length > 0) process.exitCode = 1
+  })
+
+async function freeSpace(): Promise<number | undefined> {
+  const result = await run('df', ['-B1', '--output=avail', '/'])
+  const value = Number(result.stdout.trim().split('\n')[1])
+  return Number.isFinite(value) ? value : undefined
+}
 
 program.parseAsync().catch((error: unknown) => {
   console.error(`chade: ${error instanceof Error ? error.message : String(error)}`)

@@ -110,6 +110,12 @@ windows:
     - '%USERPROFILE%\projects'
 redact:
   - ^license$
+cleanup:
+  - docker-images
+  - journal
+  - name: jetbrains-cache
+    command: rm -rf ~/.cache/JetBrains
+  - fstrim
 ```
 
 Key                | Content
@@ -121,6 +127,7 @@ Key                | Content
 `inventories`      | Built-in inventory names, or a custom one with a `name` and a `command`
 `repos`            | Folders scanned for git repositories, three levels deep, into the `git-repos` inventory
 `redact`           | Regular expressions of key names whose values are masked, on top of the defaults
+`cleanup`          | Steps `chade clean` runs, built-in names or a custom one with a `name` and a `command`
 
 A Linux path starts with `/` or `~`.
 A Windows path starts with a drive letter or a variable such as `%USERPROFILE%`, and is written between single quotes, where YAML keeps backslashes as they are.
@@ -174,6 +181,31 @@ The report measures, and changes nothing:
 Each finding comes with the command or setting that fixes it, and a link to [docs/cleanup.md](docs/cleanup.md), which explains each step.
 `--json` prints the report as JSON.
 
+```bash
+chade clean
+```
+
+The clean-up runs the steps listed under `cleanup` in the configuration, and only those.
+It shows each step with its commands, asks for a confirmation, then runs them one after the other, with their output.
+
+Step                 | Command
+---------------------|----------------------------------------------------------------------------
+`docker-images`      | `docker image prune -a --filter until=168h -f`
+`docker-volumes`     | `docker volume prune -f`
+`docker-build-cache` | `docker builder prune -f`
+`npm-cache`          | `npm cache clean --force`
+`nuget-cache`        | `dotnet nuget locals all --clear`
+`pnpm-store`         | `pnpm store prune`
+`journal`            | `sudo journalctl --vacuum-size=500M`
+`snap-revisions`     | `sudo snap remove <name> --revision=<revision>`, for each disabled revision
+`fstrim`             | `sudo fstrim -av`
+
+The steps run in this order, the custom ones before `fstrim`, so the trim covers the space the others free.
+A step whose tool is not installed is skipped, a failed step is reported and the next ones still run.
+`--dry-run` shows the steps without running them, and `--yes` runs them without asking, for a timer or a script.
+
+The compaction of the WSL disk image runs on Windows with WSL shut down, so it stays a manual step of [docs/cleanup.md](docs/cleanup.md#disk-image-compaction).
+
 ## Commands
 
 Command                     | Effect
@@ -181,6 +213,7 @@ Command                     | Effect
 `chade init --store <path>` | Writes the configuration, creates the store folder, and a git repository when the folder is in none, `--force` overwrites an existing configuration
 `chade discover`            | Prints the known configuration files present on the system and missing from the configuration, and the Debian configuration files changed since their installation
 `chade snapshot`            | Collects, redacts, writes and commits, `--dry-run` lists only, `--push` pushes the repository of the store after the commit, `--no-secret-scan` skips gitleaks
+`chade clean`               | Runs the `cleanup` steps of the configuration after a confirmation, `--dry-run` shows them only, `--yes` skips the confirmation
 `chade report`              | Measures disk and memory and suggests what to clean, without changing anything, `--json` prints JSON
 `chade diff [rev]`          | Compares the last snapshot with the previous one, or with `rev`, `--since <date>` with the last one before that date, `--stat` lists the files, `--machine <name>` reads another machine folder
 
@@ -188,7 +221,6 @@ Command                     | Effect
 
 ## Roadmap
 
-- `chade clean`, running the clean-up steps the configuration lists, after a confirmation
 - Web viewer of the store: machines, snapshots, files and differences
 - Restore scripts generated from a snapshot, `winget import` and `code --install-extension` for instance
 - Native Windows, without WSL

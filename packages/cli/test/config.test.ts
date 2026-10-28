@@ -27,6 +27,15 @@ test('a mistake names what is wrong', () => {
   assert.throws(() => parseConfig('store: /s\nredact: ["("]\n', home), /not a valid regular expression/)
 })
 
+test('cleanup lists built-in steps, and custom ones with a name and a command', () => {
+  const config = parseConfig('store: /s\ncleanup:\n  - journal\n  - name: jetbrains\n    command: rm -rf ~/.cache/JetBrains\n', home)
+  assert.deepEqual(config.cleanup, ['journal', { name: 'jetbrains', command: 'rm -rf ~/.cache/JetBrains' }])
+  assert.deepEqual(parseConfig('store: /s\n', home).cleanup, [])
+  assert.throws(() => parseConfig('store: /s\ncleanup: [everything]\n', home), /everything is not one of/)
+  assert.throws(() => parseConfig('store: /s\ncleanup: [journal, journal]\n', home), /listed twice/)
+  assert.throws(() => parseConfig('store: /s\ncleanup: [{name: journal, command: ls}]\n', home), /different from the built-in ones/)
+})
+
 test('a Windows file is a drive path or starts with a variable', () => {
   const config = parseConfig("store: /s\nwindows:\n  files: ['%USERPROFILE%\\.wslconfig', 'C:\\tools\\a.json']\n", home)
   assert.deepEqual(config.windows?.files, ['%USERPROFILE%\\.wslconfig', 'C:\\tools\\a.json'])
@@ -37,6 +46,7 @@ test('the configuration written by init reads back', () => {
   assert.ok(config.linux?.inventories.includes('apt-manual'))
   assert.ok(config.windows?.inventories.includes('winget'))
   assert.equal(parseConfig(initialConfig('/s', false), home).windows, undefined)
+  assert.deepEqual(parseConfig(initialConfig('/s', false), home).cleanup, [])
 })
 
 test('CHADE_CONFIG moves the configuration file', () => {

@@ -67,7 +67,7 @@ beforeEach(async () => {
 })
 
 test('a snapshot writes the files and inventories of the machine, redacted, in one commit', async () => {
-  const config: Config = { store, linux: { files: ['~/.app/config.yml'], inventories: ['apt-manual', 'snap'], repos: [] }, redact: [] }
+  const config: Config = { store, linux: { files: ['~/.app/config.yml'], inventories: ['apt-manual', 'snap'], repos: [] }, redact: [], cleanup: [] }
   const result = await snapshot(config, host(), log, { secretScan: false })
   assert.ok(result.commit)
   const file = join(store, 'TEST-PC', 'linux', 'files', root.slice(1), 'home', '.app', 'config.yml')
@@ -80,7 +80,7 @@ test('a snapshot writes the files and inventories of the machine, redacted, in o
 })
 
 test('an unchanged system commits nothing', async () => {
-  const config: Config = { store, linux: { files: ['~/.app/config.yml'], inventories: [], repos: [] }, redact: [] }
+  const config: Config = { store, linux: { files: ['~/.app/config.yml'], inventories: [], repos: [] }, redact: [], cleanup: [] }
   await snapshot(config, host(), log, { secretScan: false })
   const second = await snapshot(config, host(), log, { secretScan: false })
   assert.equal(second.commit, undefined)
@@ -88,7 +88,7 @@ test('an unchanged system commits nothing', async () => {
 })
 
 test('a file taken out of the configuration leaves the snapshot, and diff compares the last two', async () => {
-  const config: Config = { store, linux: { files: ['~/.app/config.yml'], inventories: ['apt-manual'], repos: [] }, redact: [] }
+  const config: Config = { store, linux: { files: ['~/.app/config.yml'], inventories: ['apt-manual'], repos: [] }, redact: [], cleanup: [] }
   await snapshot(config, host(), log, { secretScan: false })
   await snapshot({ ...config, linux: { ...config.linux!, files: [] } }, host(), log, { secretScan: false })
   assert.ok(!existsSync(join(store, 'TEST-PC', 'linux', 'files')))
@@ -100,14 +100,14 @@ test('a file taken out of the configuration leaves the snapshot, and diff compar
 })
 
 test('a missing file is a warning, and the rest of the snapshot is still taken', async () => {
-  const config: Config = { store, linux: { files: ['/no/such/file', '~/.app'], inventories: [], repos: [] }, redact: [] }
+  const config: Config = { store, linux: { files: ['/no/such/file', '~/.app'], inventories: [], repos: [] }, redact: [], cleanup: [] }
   const result = await snapshot(config, host(), log, { secretScan: false })
   assert.ok(result.commit)
   assert.deepEqual(warnings, ['linux: /no/such/file: does not exist'])
 })
 
 test('a dry run writes and commits nothing', async () => {
-  const config: Config = { store, linux: { files: ['~/.app/config.yml'], inventories: [], repos: [] }, redact: [] }
+  const config: Config = { store, linux: { files: ['~/.app/config.yml'], inventories: [], repos: [] }, redact: [], cleanup: [] }
   const result = await snapshot(config, host(), log, { dryRun: true })
   assert.equal(result.entries.size, 1)
   assert.ok(!existsSync(join(store, 'TEST-PC')))
@@ -121,6 +121,7 @@ test('on WSL, the Windows files and winget land in a windows folder beside the d
     linux: { files: [], inventories: ['apt-manual'], repos: [] },
     windows: { files: ['%USERPROFILE%\\.wslconfig'], inventories: ['winget'], repos: [] },
     redact: [],
+    cleanup: [],
   }
   await snapshot(config, host(true), log, { secretScan: false })
   assert.equal(await readFile(join(store, 'TEST-PC', 'windows', 'files', 'C', 'Users', 'me', '.wslconfig'), 'utf8'), '[wsl2]\nmemory=8GB\n')
@@ -140,7 +141,7 @@ test('git-repos lists every repository under the folders and their remotes', asy
     await run('git', ['-C', join(repos, name), 'init', '--quiet'])
   }
   await run('git', ['-C', join(repos, 'one'), 'remote', 'add', 'origin', 'https://me:token@example.test/one.git'])
-  const config: Config = { store, linux: { files: [], inventories: [], repos: ['~/repos', '~/missing'] }, redact: [] }
+  const config: Config = { store, linux: { files: [], inventories: [], repos: ['~/repos', '~/missing'] }, redact: [], cleanup: [] }
   await snapshot(config, host(), log, { secretScan: false })
   const listing = await readFile(join(store, 'TEST-PC', 'linux', 'inventories', 'git-repos.txt'), 'utf8')
   assert.equal(listing, '~/repos/group/two\t-\n~/repos/one\torigin\thttps://me:***@example.test/one.git\n')
@@ -149,7 +150,7 @@ test('git-repos lists every repository under the folders and their remotes', asy
 
 test('a store outside of any git repository is refused', async () => {
   await rm(join(store, '.git'), { recursive: true })
-  const config: Config = { store, linux: { files: [], inventories: [], repos: [] }, redact: [] }
+  const config: Config = { store, linux: { files: [], inventories: [], repos: [] }, redact: [], cleanup: [] }
   await assert.rejects(snapshot(config, host(), log), /not a folder of a git repository, chade init creates it/)
 })
 
@@ -159,7 +160,7 @@ test('a secret no redact key masks stops the commit', { skip: !gitleaks && 'gitl
   // The key is put together at run time, so the scan of this repository never finds it in the source.
   const key = ['AKIA', 'Z3MZKLQRE6OJBN7X'].join('')
   await writeFile(join(root, 'home', '.app', 'aws'), `[default]\naws_access_key_id = ${key}\n`)
-  const config: Config = { store, linux: { files: ['~/.app/aws'], inventories: [], repos: [] }, redact: [] }
+  const config: Config = { store, linux: { files: ['~/.app/aws'], inventories: [], repos: [] }, redact: [], cleanup: [] }
   await assert.rejects(snapshot(config, host(), log), /gitleaks found a secret in the snapshot, nothing was committed/)
   assert.equal((await run('git', ['-C', store, 'rev-list', '--count', 'HEAD'])).code, 128)
   assert.equal((await run('git', ['-C', store, 'diff', '--cached', '--name-only'])).stdout, '')
@@ -172,7 +173,7 @@ test('a store in a subfolder of a repository commits only its machine folder, an
   await run('git', ['-C', repository, 'init', '--quiet', '--initial-branch=main'])
   await writeFile(join(repository, 'todo.md'), '# Todo\n')
   await run('git', ['-C', repository, 'add', 'todo.md'])
-  const config: Config = { store: subfolder, linux: { files: ['~/.app/config.yml'], inventories: [], repos: [] }, redact: [] }
+  const config: Config = { store: subfolder, linux: { files: ['~/.app/config.yml'], inventories: [], repos: [] }, redact: [], cleanup: [] }
   const result = await snapshot(config, host(), log, { secretScan: false })
   assert.ok(result.commit)
   const committed = (await run('git', ['-C', repository, 'show', '--name-only', '--format=', 'HEAD'])).stdout.trim().split('\n')

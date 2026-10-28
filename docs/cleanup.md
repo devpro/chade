@@ -1,7 +1,8 @@
 # System clean-up
 
 `chade report` measures what takes disk and memory, and changes nothing.
-Each finding of the report links to one of the steps below, which are run by hand.
+Each finding of the report links to one of the steps below.
+`chade clean` runs those that work from inside Linux, listed under `cleanup` in the configuration, and the others are run by hand.
 
 On WSL, Linux lives in a virtual disk image on C:, which grows with what Linux writes and never shrinks on its own,
 and in a virtual machine that takes memory from Windows.

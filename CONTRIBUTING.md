@@ -88,7 +88,7 @@ A fake command runner stands in for the Windows tools (`cmd.exe`, `wslpath`, `wi
 task test:pkg
 ```
 
-`packages/cli/smoke.sh` packs the tarball, installs it into an empty project and runs the installed `chade` command: init, snapshot, redaction, diff and report.
+`packages/cli/smoke.sh` packs the tarball, installs it into an empty project and runs the installed `chade` command: init, snapshot, redaction, diff, clean-up and report.
 It catches what the unit tests cannot see, such as a file missing from `files` in `package.json` or a dependency missing from the bundle.
 It uses a home folder of its own and a Linux section only, so it never reads the configuration of the machine, nor reaches Windows.
 

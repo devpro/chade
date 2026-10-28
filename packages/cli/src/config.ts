@@ -1,9 +1,15 @@
 import { isAbsolute, join, resolve } from 'node:path'
 import { parse } from 'yaml'
+import { STEP_NAMES } from './clean.js'
 import { INVENTORIES, type Kind } from './inventories.js'
 import { expandHome, isSegment } from './paths.js'
 
 export interface CustomInventory {
+  name: string
+  command: string
+}
+
+export interface CustomStep {
   name: string
   command: string
 }
@@ -20,6 +26,7 @@ export interface Config {
   linux?: SystemConfig
   windows?: SystemConfig
   redact: string[]
+  cleanup: (string | CustomStep)[]
 }
 
 export function configPath(env: NodeJS.ProcessEnv, home: string): string {
@@ -29,7 +36,7 @@ export function configPath(env: NodeJS.ProcessEnv, home: string): string {
 export function parseConfig(text: string, home: string): Config {
   const raw: unknown = parse(text) ?? {}
   if (!isObject(raw)) throw new Error('the configuration is not a YAML mapping')
-  checkKeys(raw, ['store', 'machine', 'linux', 'windows', 'redact'], 'the configuration')
+  checkKeys(raw, ['store', 'machine', 'linux', 'windows', 'redact', 'cleanup'], 'the configuration')
   if (typeof raw.store !== 'string' || raw.store === '') throw new Error('store is required, the path of the git repository snapshots are written to')
   const store = expandHome(raw.store, home)
   if (!isAbsolute(store)) throw new Error(`store ${raw.store} is not an absolute path`)
@@ -50,7 +57,27 @@ export function parseConfig(text: string, home: string): Config {
     linux: parseSystem(raw.linux, 'linux'),
     windows: parseSystem(raw.windows, 'windows'),
     redact,
+    cleanup: parseCleanup(raw.cleanup),
   }
+}
+
+function parseCleanup(raw: unknown): (string | CustomStep)[] {
+  const names = new Set<string>()
+  return list(raw, 'cleanup').map((entry): string | CustomStep => {
+    const name = typeof entry === 'string' ? entry : isObject(entry) ? entry.name : undefined
+    if (typeof name !== 'string') throw new Error('cleanup: a custom step is a mapping with a name and a command')
+    if (names.has(name)) throw new Error(`cleanup: ${name} is listed twice`)
+    names.add(name)
+    if (typeof entry === 'string') {
+      if (!STEP_NAMES.includes(entry)) throw new Error(`cleanup: ${entry} is not one of ${STEP_NAMES.join(', ')}, and a custom one needs a name and a command`)
+      return entry
+    }
+    const step = entry as Record<string, unknown>
+    if (typeof step.command !== 'string' || STEP_NAMES.includes(name)) {
+      throw new Error(`cleanup: ${name} must have a command and a name different from the built-in ones`)
+    }
+    return { name, command: step.command }
+  })
 }
 
 function parseSystem(raw: unknown, kind: Kind): SystemConfig | undefined {
@@ -100,7 +127,7 @@ export function initialConfig(store: string, wsl: boolean): string {
       '  repos: []',
     )
   }
-  lines.push('redact: []', '')
+  lines.push('redact: []', `# chade clean runs the steps listed here, among ${STEP_NAMES.join(', ')}`, 'cleanup: []', '')
   return lines.join('\n')
 }
 

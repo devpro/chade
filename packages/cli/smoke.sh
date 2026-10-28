@@ -49,6 +49,9 @@ machine: smoke
 linux:
   files: [~/.app.conf]
   inventories: [{ name: kernel, command: uname -s }]
+cleanup:
+  - name: hello
+    command: echo cleaned by the smoke test
 CONFIG
 
 "$chade" snapshot --no-secret-scan >/dev/null || fail 'chade snapshot failed'
@@ -62,8 +65,12 @@ stored="$tmp/store/smoke/$system/files${HOME}/.app.conf"
 "$chade" snapshot --no-secret-scan | grep -q 'No change' || fail 'a second snapshot of an unchanged system should commit nothing'
 "$chade" diff --stat | grep -q 'kernel.txt' || fail 'chade diff does not show the first snapshot'
 
+# A custom step only, which removes nothing, and --yes, since stdin is no terminal here.
+"$chade" clean --dry-run | grep -q 'echo cleaned by the smoke test' || fail 'chade clean --dry-run does not show the custom step'
+"$chade" clean --yes | grep -q '^cleaned by the smoke test$' || fail 'chade clean --yes did not run the custom step'
+
 # The report reads the machine as it is, the Windows host included on WSL, and changes nothing.
 "$chade" report --json | node -e 'const r = JSON.parse(require("fs").readFileSync(0, "utf8")); if (!r.sections.some((s) => s.title === "Memory")) process.exit(1)' \
   || fail 'chade report --json does not give a report with a Memory section'
 
-echo "smoke: $tarball installs, links chade, initializes a store, snapshots, redacts, diffs and reports (v$version)"
+echo "smoke: $tarball installs, links chade, initializes a store, snapshots, redacts, diffs, cleans and reports (v$version)"
