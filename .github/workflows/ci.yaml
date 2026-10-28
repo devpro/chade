@@ -22,3 +22,30 @@ jobs:
   markup-lint:
     name: Markup
     uses: devpro/github-workflow-parts/.github/workflows/reusable-markup-lint.yml@591b0c7bfba6fbc7b0cab7d896447e0732b819de
+
+  # A change to the documentation alone needs the markup checked, not the build and the tests.
+  git-check:
+    name: Git
+    uses: devpro/github-workflow-parts/.github/workflows/reusable-git-check.yml@591b0c7bfba6fbc7b0cab7d896447e0732b819de
+    with:
+      paths: ". :(exclude)*.md :(exclude)docs"
+      workflow-parts-version: 591b0c7bfba6fbc7b0cab7d896447e0732b819de
+
+  build-test:
+    name: Build & Test
+    needs: git-check
+    if: needs.git-check.outputs.changed == 'true'
+    uses: devpro/github-workflow-parts/.github/workflows/reusable-node-quality.yml@591b0c7bfba6fbc7b0cab7d896447e0732b819de
+    with:
+      custom-tests: npm run test:pkg
+      job-name: Build & Test
+      sonar-enabled: true
+      sonar-host-url: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
+      sonar-organization: ${{ vars.SONAR_ORG }}
+      sonar-project-key: ${{ vars.SONAR_PROJECT_KEY }}
+      sonar-project-name: Chade
+      # The unit tests, with the lcov report the Sonar analysis reads.
+      test-script: test:coverage
+      workflow-parts-version: 591b0c7bfba6fbc7b0cab7d896447e0732b819de
+    secrets:
+      sonar-token: ${{ secrets.SONAR_TOKEN }}

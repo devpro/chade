@@ -1,0 +1,18 @@
+{
+  "name": "chade-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/cli"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=packages/cli",
+    "typecheck": "npm run typecheck --workspace=packages/cli",
+    "test:unit": "npm run test --workspace=packages/cli",
+    "test:coverage": "mkdir -p packages/cli/coverage && scripts/with_test_tmpdir.sh node --import tsx --experimental-test-coverage --test-coverage-include=\"packages/cli/src/**\" --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=packages/cli/coverage/lcov.info --test packages/cli/test/*.test.ts",
+    "test:pkg": "npm run smoke --workspace=packages/cli"
+  },
+  "allowScripts": {
+    "esbuild": true
+  }
+}

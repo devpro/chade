@@ -1,6 +1,8 @@
 # chade: agent context
 
-Gather system information.
+CLI (`chade` on npmjs.org) that snapshots the configuration of a system into a git repository, the store, one folder per machine.
+chade is the tool, never the store: the snapshots live in a repository the user chooses, and nothing in this repository holds them.
+CONTRIBUTING.md lists the tasks, `task check` runs what CI runs.
 
 ## Working rules
 
