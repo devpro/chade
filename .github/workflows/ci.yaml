@@ -21,21 +21,21 @@ permissions:
 jobs:
   markup-lint:
     name: Markup
-    uses: devpro/github-workflow-parts/.github/workflows/reusable-markup-lint.yml@8c856cd16adc8a0ca01c7889a9c7d98ad8593818
+    uses: devpro/github-workflow-parts/.github/workflows/reusable-markup-lint.yml@5379b9d0052e3b233ec2e56ba8678e827361b89e
 
   # A change to the documentation alone needs the markup checked, not the build and the tests.
   git-check:
     name: Git
-    uses: devpro/github-workflow-parts/.github/workflows/reusable-git-check.yml@8c856cd16adc8a0ca01c7889a9c7d98ad8593818
+    uses: devpro/github-workflow-parts/.github/workflows/reusable-git-check.yml@5379b9d0052e3b233ec2e56ba8678e827361b89e
     with:
       paths: ". :(exclude)*.md :(exclude)docs"
-      workflow-parts-version: 8c856cd16adc8a0ca01c7889a9c7d98ad8593818
+      workflow-parts-version: 5379b9d0052e3b233ec2e56ba8678e827361b89e
 
   build-test:
     name: Build & Test
     needs: git-check
     if: needs.git-check.outputs.changed == 'true'
-    uses: devpro/github-workflow-parts/.github/workflows/reusable-node-quality.yml@8c856cd16adc8a0ca01c7889a9c7d98ad8593818
+    uses: devpro/github-workflow-parts/.github/workflows/reusable-node-quality.yml@5379b9d0052e3b233ec2e56ba8678e827361b89e
     with:
       custom-tests: npm run test:pkg
       job-name: Build & Test
@@ -46,6 +46,6 @@ jobs:
       sonar-project-name: Chade
       # The unit tests, with the lcov report the Sonar analysis reads.
       test-script: test:coverage
-      workflow-parts-version: 8c856cd16adc8a0ca01c7889a9c7d98ad8593818
+      workflow-parts-version: 5379b9d0052e3b233ec2e56ba8678e827361b89e
     secrets:
       sonar-token: ${{ secrets.SONAR_TOKEN }}
