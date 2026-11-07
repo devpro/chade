@@ -51,3 +51,26 @@ test('a failed step is reported, and the next steps still run', async () => {
   assert.deepEqual(result, { ran: ['fine'], failed: ['broken'] })
   assert.deepEqual(calls, ['sh -c exit 3', 'sh -c true'])
 })
+
+test('from Windows, the Linux steps are skipped and the others run through cmd.exe', async () => {
+  const windowsRun: Run = async (command, args) => {
+    if (command === 'where') return { code: args[1] === 'dotnet' ? 1 : 0, stdout: '', stderr: '' }
+    throw new Error(`${command} is not a Windows tool`)
+  }
+  const windowsHost: Host = { machine: 'TEST-PC', home: 'C:\\Users\\me', run: windowsRun, systems: [{ kind: 'windows', id: 'windows' }] }
+  const planned = await planCleanup(['npm-cache', 'nuget-cache', 'journal', 'snap-revisions', 'fstrim', { name: 'temp', command: 'del /q "%TEMP%\\*.log"' }], windowsHost, false)
+  assert.deepEqual(
+    planned.map((step) => [step.name, step.skipped]),
+    [
+      ['npm-cache', undefined],
+      ['nuget-cache', 'dotnet is not installed'],
+      ['journal', 'for Linux only'],
+      ['snap-revisions', 'for Linux only'],
+      ['temp', undefined],
+      ['fstrim', 'for Linux only'],
+    ],
+  )
+  assert.deepEqual(planned[0].commands, [['cmd.exe', '/d', '/s', '/c', '"npm cache clean --force"']])
+  assert.deepEqual(planned[4].commands, [['cmd.exe', '/d', '/s', '/c', '"del /q "%TEMP%\\*.log""']])
+  assert.match(renderPlan(planned), /\$ del \/q "%TEMP%\\\*\.log"\n/)
+})

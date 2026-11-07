@@ -37,7 +37,8 @@ function exitCode(error: (Error & { code?: unknown }) | null): number {
 
 export function runInherit(command: string, args: string[]): Promise<number> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: 'inherit' })
+    // cmd.exe parses its command line itself, so the line goes as written, without the quoting of Node.
+    const child = spawn(command, args, { stdio: 'inherit', windowsVerbatimArguments: command === 'cmd.exe' })
     child.on('error', reject)
     child.on('close', (code) => resolve(code ?? 1))
   })

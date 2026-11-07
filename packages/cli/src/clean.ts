@@ -1,7 +1,7 @@
 import type { CustomStep } from './config.js'
 import type { Run } from './exec.js'
 import { disabledSnaps } from './report.js'
-import type { Host } from './system.js'
+import { isNativeWindows, type Host } from './system.js'
 
 export interface Step {
   name: string
@@ -9,6 +9,8 @@ export interface Step {
   // The commands of the step, a list since snap removes one revision per call.
   commands: (host: Host) => Promise<string[][]>
   sudo?: boolean
+  // A step for a Linux system, skipped by a run from Windows.
+  linux?: boolean
 }
 
 const fixed = (...commands: string[][]) => async () => commands
@@ -21,15 +23,16 @@ export const STEPS: Step[] = [
   { name: 'npm-cache', description: 'npm cache, downloaded again on the next install', commands: fixed(['npm', 'cache', 'clean', '--force']) },
   { name: 'nuget-cache', description: 'NuGet caches, restored again on the next build', commands: fixed(['dotnet', 'nuget', 'locals', 'all', '--clear']) },
   { name: 'pnpm-store', description: 'pnpm store packages no project references', commands: fixed(['pnpm', 'store', 'prune']) },
-  { name: 'journal', description: 'systemd journal beyond its last 500 MB', sudo: true, commands: fixed(['journalctl', '--vacuum-size=500M']) },
+  { name: 'journal', description: 'systemd journal beyond its last 500 MB', sudo: true, linux: true, commands: fixed(['journalctl', '--vacuum-size=500M']) },
   {
     name: 'snap-revisions',
     description: 'snap revisions kept for a rollback',
     sudo: true,
+    linux: true,
     commands: async (host) =>
       disabledSnaps((await host.run('snap', ['list', '--all'])).stdout).map((snap) => ['snap', 'remove', snap.name, `--revision=${snap.revision}`]),
   },
-  { name: 'fstrim', description: 'trim of the free blocks, which a compaction of the WSL disk image then gives back to Windows', sudo: true, commands: fixed(['fstrim', '-av']) },
+  { name: 'fstrim', description: 'trim of the free blocks, which a compaction of the WSL disk image then gives back to Windows', sudo: true, linux: true, commands: fixed(['fstrim', '-av']) },
 ]
 
 export const STEP_NAMES = STEPS.map((step) => step.name)
@@ -42,8 +45,14 @@ export interface Planned {
   skipped?: string
 }
 
-async function installed(run: Run, program: string): Promise<boolean> {
+async function installed(run: Run, program: string, native: boolean): Promise<boolean> {
+  if (native) return (await run('where', ['/q', program])).code === 0
   return (await run('sh', ['-c', 'command -v "$1"', 'sh', program])).code === 0
+}
+
+// npm and pnpm are .cmd scripts on Windows, which only cmd.exe starts, and it reads its command line as written, quotes included.
+function cmd(line: string): string[] {
+  return ['cmd.exe', '/d', '/s', '/c', `"${line}"`]
 }
 
 export async function planCleanup(entries: (string | CustomStep)[], host: Host, root: boolean): Promise<Planned[]> {
@@ -54,21 +63,26 @@ export async function planCleanup(entries: (string | CustomStep)[], host: Host, 
     ...custom,
     ...STEPS.filter((step) => step.name === 'fstrim' && entries.includes(step.name)),
   ]
+  const native = isNativeWindows(host)
   const planned: Planned[] = []
   for (const step of ordered) {
     if ('command' in step) {
-      planned.push({ name: step.name, description: 'custom step', commands: [['sh', '-c', step.command]] })
+      planned.push({ name: step.name, description: 'custom step', commands: [native ? cmd(step.command) : ['sh', '-c', step.command]] })
+      continue
+    }
+    if (native && step.linux) {
+      planned.push({ name: step.name, description: step.description, commands: [], skipped: 'for Linux only' })
       continue
     }
     const commands = await step.commands(host)
     const program = commands[0]?.[0] ?? (step.name === 'snap-revisions' ? 'snap' : '')
     let skipped: string | undefined
-    if (!(await installed(host.run, program))) skipped = `${program} is not installed`
+    if (!(await installed(host.run, program, native))) skipped = `${program} is not installed`
     else if (commands.length === 0) skipped = 'nothing to remove'
     planned.push({
       name: step.name,
       description: step.description,
-      commands: step.sudo && !root ? commands.map((command) => ['sudo', ...command]) : commands,
+      commands: native ? commands.map((command) => cmd(command.join(' '))) : step.sudo && !root ? commands.map((command) => ['sudo', ...command]) : commands,
       skipped,
     })
   }
@@ -102,9 +116,11 @@ export async function runCleanup(planned: Planned[], inherit: Inherit, log: (mes
   return result
 }
 
-// A custom step runs through sh -c, and reads best as its command as written.
+// A command run through a shell reads best as its line as written.
 function shown(command: string[]): string {
-  return command[0] === 'sh' && command[1] === '-c' ? command[2] : command.join(' ')
+  if (command[0] === 'sh' && command[1] === '-c') return command[2]
+  if (command[0] === 'cmd.exe') return command[4].slice(1, -1)
+  return command.join(' ')
 }
 
 export function renderPlan(planned: Planned[]): string {

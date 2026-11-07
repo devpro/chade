@@ -11,6 +11,9 @@ import { snapshot, type Logger } from '../src/snapshot.js'
 import type { Host } from '../src/system.js'
 import { Windows } from '../src/windows.js'
 
+// A Linux host stores its files under their Linux path, which a path of Windows is not.
+const linuxOnly = process.platform === 'win32' && 'a Linux host on Windows'
+
 // The store commits with an identity of its own, whatever the global git configuration of the machine running the tests holds: signing, hooks, a missing name.
 process.env.GIT_CONFIG_GLOBAL = '/dev/null'
 process.env.GIT_CONFIG_NOSYSTEM = '1'
@@ -66,7 +69,7 @@ beforeEach(async () => {
   await writeFile(join(root, 'home', '.app', 'config.yml'), 'url: https://example.test\ntoken: abc123\n')
 })
 
-test('a snapshot writes the files and inventories of the machine, redacted, in one commit', async () => {
+test('a snapshot writes the files and inventories of the machine, redacted, in one commit', { skip: linuxOnly }, async () => {
   const config: Config = { store, linux: { files: ['~/.app/config.yml'], inventories: ['apt-manual', 'snap'], repos: [] }, redact: [], cleanup: [] }
   const result = await snapshot(config, host(), log, { secretScan: false })
   assert.ok(result.commit)
@@ -79,7 +82,7 @@ test('a snapshot writes the files and inventories of the machine, redacted, in o
   assert.equal(await commits(), 1)
 })
 
-test('an unchanged system commits nothing', async () => {
+test('an unchanged system commits nothing', { skip: linuxOnly }, async () => {
   const config: Config = { store, linux: { files: ['~/.app/config.yml'], inventories: [], repos: [] }, redact: [], cleanup: [] }
   await snapshot(config, host(), log, { secretScan: false })
   const second = await snapshot(config, host(), log, { secretScan: false })
@@ -87,7 +90,7 @@ test('an unchanged system commits nothing', async () => {
   assert.equal(await commits(), 1)
 })
 
-test('a file taken out of the configuration leaves the snapshot, and diff compares the last two', async () => {
+test('a file taken out of the configuration leaves the snapshot, and diff compares the last two', { skip: linuxOnly }, async () => {
   const config: Config = { store, linux: { files: ['~/.app/config.yml'], inventories: ['apt-manual'], repos: [] }, redact: [], cleanup: [] }
   await snapshot(config, host(), log, { secretScan: false })
   await snapshot({ ...config, linux: { ...config.linux!, files: [] } }, host(), log, { secretScan: false })
@@ -99,7 +102,7 @@ test('a file taken out of the configuration leaves the snapshot, and diff compar
   assert.doesNotMatch(output, /apt-manual/)
 })
 
-test('a missing file is a warning, and the rest of the snapshot is still taken', async () => {
+test('a missing file is a warning, and the rest of the snapshot is still taken', { skip: linuxOnly }, async () => {
   const config: Config = { store, linux: { files: ['/no/such/file', '~/.app'], inventories: [], repos: [] }, redact: [], cleanup: [] }
   const result = await snapshot(config, host(), log, { secretScan: false })
   assert.ok(result.commit)
@@ -166,7 +169,7 @@ test('a secret no redact key masks stops the commit', { skip: !gitleaks && 'gitl
   assert.equal((await run('git', ['-C', store, 'diff', '--cached', '--name-only'])).stdout, '')
 })
 
-test('a store in a subfolder of a repository commits only its machine folder, and leaves the rest of the repository alone', async () => {
+test('a store in a subfolder of a repository commits only its machine folder, and leaves the rest of the repository alone', { skip: linuxOnly }, async () => {
   const repository = join(root, 'notes')
   const subfolder = join(repository, 'systems')
   await mkdir(subfolder, { recursive: true })

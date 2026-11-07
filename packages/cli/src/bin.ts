@@ -11,7 +11,7 @@ import { diff } from './diff.js'
 import { discover } from './discover.js'
 import { run, runInherit } from './exec.js'
 import { expandHome } from './paths.js'
-import { formatBytes, renderReport, report } from './report.js'
+import { diskUsage, formatBytes, renderReport, report } from './report.js'
 import { snapshot, type Logger } from './snapshot.js'
 import { git, repositoryRoot } from './store.js'
 import { detectHost, systemKinds } from './system.js'
@@ -155,19 +155,14 @@ program
       prompt.close()
       if (!/^y(es)?$/i.test(answer.trim())) return log.info('Nothing was run')
     }
-    const before = await freeSpace()
+    const disk = process.platform === 'win32' ? 'C:\\' : '/'
+    const before = await diskUsage(disk)
     const result = await runCleanup(planned, runInherit, log.info)
-    const after = await freeSpace()
+    const after = await diskUsage(disk)
     log.info(`\n${result.ran.length} step(s) ran${result.failed.length > 0 ? `, ${result.failed.join(', ')} failed` : ''}`)
-    if (before !== undefined && after !== undefined) log.info(`Free space on /: ${formatBytes(before)} before, ${formatBytes(after)} after`)
+    if (before && after) log.info(`Free space on ${disk}: ${formatBytes(before.available)} before, ${formatBytes(after.available)} after`)
     if (result.failed.length > 0) process.exitCode = 1
   })
-
-async function freeSpace(): Promise<number | undefined> {
-  const result = await run('df', ['-B1', '--output=avail', '/'])
-  const value = Number(result.stdout.trim().split('\n')[1])
-  return Number.isFinite(value) ? value : undefined
-}
 
 program.parseAsync().catch((error: unknown) => {
   console.error(`chade: ${error instanceof Error ? error.message : String(error)}`)

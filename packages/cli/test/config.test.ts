@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { join, resolve } from 'node:path'
 import { test } from 'node:test'
 import { configPath, initialConfig, parseConfig } from '../src/config.js'
 
@@ -6,7 +7,8 @@ const home = '/home/me'
 
 test('a minimal configuration is a store and one system', () => {
   const config = parseConfig('store: ~/snapshots\nlinux:\n  files: [/etc/wsl.conf]\n', home)
-  assert.equal(config.store, '/home/me/snapshots')
+  // An absolute path of the platform, under the current drive on Windows.
+  assert.equal(config.store, resolve('/home/me/snapshots'))
   assert.deepEqual(config.linux, { files: ['/etc/wsl.conf'], inventories: [], repos: [] })
   assert.equal(config.windows, undefined)
 })
@@ -54,6 +56,6 @@ test('the configuration written by init reads back, with a section for each syst
 })
 
 test('CHADE_CONFIG moves the configuration file', () => {
-  assert.equal(configPath({}, home), '/home/me/.chade/config.yml')
+  assert.equal(configPath({}, home), join(home, '.chade', 'config.yml'))
   assert.equal(configPath({ CHADE_CONFIG: '/tmp/c.yml' }, home), '/tmp/c.yml')
 })

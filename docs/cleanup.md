@@ -163,6 +163,15 @@ Cache                    | Clear
 `~/.cache/ms-playwright` | `npx playwright uninstall --all`, then the browsers each project installs
 `~/.vscode-server`       | Old versions under `~/.vscode-server/bin`, unused extensions from VS Code
 
+On Windows, the same tools keep their caches under the profile, `%LOCALAPPDATA%` being `~/AppData/Local`, and are cleared with the same commands.
+
+Cache                           | Clear
+--------------------------------|--------------------------------------------------------------------------
+`~/AppData/Local/npm-cache`     | `npm cache clean --force`
+`~/.nuget/packages`             | `dotnet nuget locals all --clear`
+`~/AppData/Local/pnpm/store`    | `pnpm store prune`, which keeps the packages a project still references
+`~/AppData/Local/ms-playwright` | `npx playwright uninstall --all`, then the browsers each project installs
+
 ## Agent sessions
 
 Claude Code keeps the transcript of each session in `~/.claude/projects`, for 30 days by default.

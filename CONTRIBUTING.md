@@ -106,15 +106,28 @@ The second snapshot of an unchanged system reports no change, and any difference
 
 ### Manual test on Windows
 
-The Windows section also runs for real from a Command Prompt, with Node.js and git installed on Windows, once `task build` has built `packages/cli/dist`.
+The Windows section also runs for real with the Node.js and git of Windows, from WSL, without opening a Windows terminal.
+`scripts/run_on_windows.sh` copies the CLI `task build` built to `%TEMP%\chade-wintest`, and runs it there through `cmd.exe`, with its own configuration.
 
-```bat
-node packages\cli\bin\chade.js --config %TEMP%\chade\config.yml init --store %TEMP%\chade\store
-node packages\cli\bin\chade.js --config %TEMP%\chade\config.yml discover
-node packages\cli\bin\chade.js --config %TEMP%\chade\config.yml snapshot
+```bash
+task build
+scripts/run_on_windows.sh init --store '%TEMP%\chade-wintest\store'
+scripts/run_on_windows.sh discover
+scripts/run_on_windows.sh snapshot
+scripts/run_on_windows.sh report
+scripts/run_on_windows.sh clean --dry-run
+scripts/run_on_windows.sh --check
+scripts/run_on_windows.sh --remove
 ```
 
 The configuration `init` writes has a `windows` section only, and the store gets a single `windows` folder, the same one a run from WSL writes.
+The configuration is `%TEMP%\chade-wintest\cfg\config.yml`, `/mnt/c/Users/<user>/AppData/Local/Temp/chade-wintest/cfg/config.yml` from WSL, edited there to add files or `cleanup` steps.
+The report has no Linux section, and `clean --dry-run` shows the Linux steps of `cleanup` as skipped.
+`--remove` deletes the copy, its configuration and its store.
+
+`scripts/run_on_windows.sh --check` runs what the Windows job of CI runs: a copy of the working tree, `npm ci` by the npm of Windows, then typecheck, build, unit tests and smoke test.
+
+From a Command Prompt on Windows, in a clone of the repository, `node packages\cli\bin\chade.js --config %TEMP%\chade\config.yml <command>` runs the same commands.
 
 ## Pipelines
 
@@ -122,11 +135,15 @@ The configuration `init` writes has a `windows` section only, and the store gets
 
 `.github/workflows/ci.yaml` runs on every pull request and every push to `main`.
 
-Job          | Content
--------------|------------------------------------------------------------------------------------------------------------------------
-Markup       | Markdown and YAML lint
-Git          | Tells whether anything other than documentation changed
-Build & Test | Typecheck, build, unit tests with coverage, packaging smoke test and Sonar analysis, skipped for a documentation change
+Job                    | Content
+-----------------------|------------------------------------------------------------------------------------------------------------------------
+Markup                 | Markdown and YAML lint
+Git                    | Tells whether anything other than documentation changed
+Build & Test           | Typecheck, build, unit tests with coverage, packaging smoke test and Sonar analysis, skipped for a documentation change
+Build & Test (Windows) | Typecheck, build, unit tests and packaging smoke test on `windows-latest`, skipped for a documentation change
+
+The Windows job runs the npm scripts with Git Bash, and checks out without `core.autocrlf`, which the runner image sets, so the scripts keep their LF.
+The unit tests of a Linux host are skipped on Windows, and the smoke test configures a `windows` section there.
 
 ### Sonar
 
@@ -145,6 +162,7 @@ The coverage report comes from `npm run test:coverage` at the root, so its paths
 ### Local run
 
 [IstarCI](https://github.com/devpro/istarci) runs the same pipeline in Docker before a push, with the settings of `.istarci.yml`.
+It skips the Windows job, which `scripts/run_on_windows.sh --check` runs on the Windows of a WSL machine.
 `istarci add` and `istarci install-hook` set it up for this repository.
 
 ### Publication

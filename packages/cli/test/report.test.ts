@@ -11,13 +11,16 @@ import {
   parseIni,
   parseLxss,
   parseMeminfo,
+  parsePs,
   parseSize,
+  parseTasklist,
   renderReport,
   report,
   scheduledTimers,
   topProcesses,
 } from '../src/report.js'
 import type { Host } from '../src/system.js'
+import { Windows } from '../src/windows.js'
 
 test('sizes read in the units of Docker and of journalctl', () => {
   assert.equal(parseSize('22.24GB'), 22_240_000_000)
@@ -76,7 +79,7 @@ test('a timer is scheduled when it has a next run', () => {
 })
 
 test('processes of the same name add up', () => {
-  assert.deepEqual(topProcesses(' 1000 java\n 500 java\n 800 claude\n 10 bash\n', 2), [
+  assert.deepEqual(topProcesses(parsePs(' 1000 java\n 500 java\n 800 claude\n 10 bash\n'), 2), [
     { label: 'java', bytes: 1500 * 1024 },
     { label: 'claude', bytes: 800 * 1024 },
   ])
@@ -95,7 +98,10 @@ test('a disabled snap revision is the name and the revision', () => {
   ])
 })
 
-test('a report of a Linux machine measures every source, and hints where it is worth it', async () => {
+// A Linux host reads the files and runs the tools of Linux, which Windows does not have.
+const linuxOnly = process.platform === 'win32' && 'a Linux host on Windows'
+
+test('a report of a Linux machine measures every source, and hints where it is worth it', { skip: linuxOnly }, async () => {
   const home = await mkdtemp(join(tmpdir(), 'chade-report-'))
   await mkdir(join(home, '.npm'), { recursive: true })
   await writeFile(join(home, '.npm', 'blob'), 'x'.repeat(1000))
@@ -118,4 +124,37 @@ test('a report of a Linux machine measures every source, and hints where it is w
   assert.match(text, /docs\/cleanup\.md#journal/)
   // A cache under the threshold is measured, and gets no hint.
   assert.doesNotMatch(text, /npm cache clean/)
+})
+
+test('tasklist gives the memory of each process in kB, whatever the digit grouping of the locale', () => {
+  const output = ['"System Idle Process","0","Services","0","8 K"', '"Code.exe","4120","Console","1","1 234 567 Ko"', '"Code.exe","4200","Console","1","1.000 K"', '"svchost.exe","900","Services","0","N/A"'].join('\r\n')
+  assert.deepEqual(parseTasklist(output), [
+    { name: 'System Idle Process', bytes: 8 * 1024 },
+    { name: 'Code.exe', bytes: 1_234_567 * 1024 },
+    { name: 'Code.exe', bytes: 1000 * 1024 },
+  ])
+})
+
+test('a report from Windows measures with Windows tools, and leaves the Linux sections out', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'chade-report-'))
+  await mkdir(join(home, 'AppData', 'Local', 'npm-cache', 'index'), { recursive: true })
+  await writeFile(join(home, 'AppData', 'Local', 'npm-cache', 'index', 'blob'), 'x'.repeat(2000))
+  const fakeRun: Run = async (command) => {
+    if (command === 'tasklist') return { code: 0, stdout: '"Code.exe","4120","Console","1","2 000 K"\r\n', stderr: '' }
+    if (command === 'cmd.exe' || command === 'docker') return { code: NOT_FOUND, stdout: '', stderr: '' }
+    throw new Error(`${command} is not a Windows tool`)
+  }
+  const host: Host = { machine: 'TEST-PC', home, run: fakeRun, windows: new Windows(fakeRun, true), systems: [{ kind: 'windows', id: 'windows' }] }
+  const result = await report(undefined, host)
+  // A C: drive exists when the test itself runs on Windows.
+  assert.deepEqual(
+    result.sections.map((section) => section.title).filter((title) => title !== 'Windows disk'),
+    ['Memory', 'Caches'],
+  )
+  // No distribution in the registry, so no settings of WSL to suggest.
+  assert.ok(!result.sections.some((section) => section.title === 'WSL settings'))
+  const text = renderReport(result)
+  assert.match(text, /RAM\s+.+ used of /)
+  assert.match(text, /process Code\.exe\s+2\.0 MB/)
+  assert.match(text, /~\/AppData\/Local\/npm-cache\s+2\.0 kB/)
 })

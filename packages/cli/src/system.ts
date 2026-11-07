@@ -19,6 +19,11 @@ export interface Host {
   windows?: Windows
 }
 
+// A run from Windows itself, where the Linux tools are missing and commands go through cmd.exe.
+export function isNativeWindows(host: Host): boolean {
+  return !host.systems.some((system) => system.kind === 'linux')
+}
+
 export function isWsl(env: NodeJS.ProcessEnv): boolean {
   if (env.WSL_DISTRO_NAME) return true
   try {

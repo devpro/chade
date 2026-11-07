@@ -49,3 +49,23 @@ jobs:
       workflow-parts-version: 5379b9d0052e3b233ec2e56ba8678e827361b89e
     secrets:
       sonar-token: ${{ secrets.SONAR_TOKEN }}
+
+  # chade also runs on Windows itself, where the tests of a Linux host are skipped and the smoke test runs with a windows section.
+  build-test-windows:
+    name: Build & Test (Windows)
+    needs: git-check
+    if: needs.git-check.outputs.changed == 'true'
+    uses: devpro/github-workflow-parts/.github/workflows/reusable-node-quality.yml@5379b9d0052e3b233ec2e56ba8678e827361b89e
+    with:
+      custom-tests: npm run test:pkg
+      # npm runs the scripts with cmd.exe on Windows, and they are bash scripts.
+      # The runner image sets core.autocrlf, which would check out the scripts with CRLF, and the git environment overrides it before the checkout.
+      extra-vars: |
+        npm_config_script_shell=C:\Program Files\Git\bin\bash.exe
+        GIT_CONFIG_COUNT=1
+        GIT_CONFIG_KEY_0=core.autocrlf
+        GIT_CONFIG_VALUE_0=false
+      job-name: Build & Test (Windows)
+      operating-system: windows-latest
+      test-script: test:unit
+      workflow-parts-version: 5379b9d0052e3b233ec2e56ba8678e827361b89e

@@ -176,9 +176,11 @@ chade report
 
 The report measures, and changes nothing:
 
-- on WSL, the free space of C:, the size of each disk image against what Linux uses in it, and the memory settings of `.wslconfig`
-- the memory, swap and largest processes
-- the timers that trim the disk, Docker data and what of it is unused, the systemd journal, snap revisions kept for a rollback
+- on WSL and Windows, the free space of C:, the size of each WSL disk image, and the memory settings of `.wslconfig` once a distribution is installed
+- on WSL, the size of the disk image of the distribution against what Linux uses in it
+- the memory and the largest processes
+- Docker data and what of it is unused
+- on Linux and WSL, the swap, the timers that trim the disk, the systemd journal, snap revisions kept for a rollback
 - the caches of the tools, the Claude Code sessions, and the size of the repositories under `repos`
 
 Each finding comes with the command or setting that fixes it, and a link to [docs/cleanup.md](docs/cleanup.md), which explains each step.
@@ -205,12 +207,10 @@ Step                 | Command
 
 The steps run in this order, the custom ones before `fstrim`, so the trim covers the space the others free.
 A step whose tool is not installed is skipped, a failed step is reported and the next ones still run.
+On Windows, `journal`, `snap-revisions` and `fstrim` are skipped, and the other steps and the custom ones run through `cmd.exe /c`, where Linux runs a custom one with `sh -c`.
 `--dry-run` shows the steps without running them, and `--yes` runs them without asking, for a timer or a script.
 
 The compaction of the WSL disk image runs on Windows with WSL shut down, so it stays a manual step of [docs/cleanup.md](docs/cleanup.md#disk-image-compaction).
-
-The report and the clean-up are made for Linux and WSL.
-On Windows, the report measures the WSL disk images and `.wslconfig`, but not the memory, and the clean-up finds none of its tools.
 
 ## Commands
 
@@ -229,7 +229,6 @@ Command                     | Effect
 
 - Web viewer of the store: machines, snapshots, files and differences
 - Restore scripts generated from a snapshot, `winget import` and `code --install-extension` for instance
-- `chade report` and `chade clean` on Windows
 
 ## Contributing
 
