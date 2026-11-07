@@ -104,6 +104,18 @@ task run -- --config /tmp/chade/config.yml snapshot
 
 The second snapshot of an unchanged system reports no change, and any difference it commits is a value that changes on every run, to normalize.
 
+### Manual test on Windows
+
+The Windows section also runs for real from a Command Prompt, with Node.js and git installed on Windows, once `task build` has built `packages/cli/dist`.
+
+```bat
+node packages\cli\bin\chade.js --config %TEMP%\chade\config.yml init --store %TEMP%\chade\store
+node packages\cli\bin\chade.js --config %TEMP%\chade\config.yml discover
+node packages\cli\bin\chade.js --config %TEMP%\chade\config.yml snapshot
+```
+
+The configuration `init` writes has a `windows` section only, and the store gets a single `windows` folder, the same one a run from WSL writes.
+
 ## Pipelines
 
 ### CI

@@ -14,7 +14,7 @@ import { expandHome } from './paths.js'
 import { formatBytes, renderReport, report } from './report.js'
 import { snapshot, type Logger } from './snapshot.js'
 import { git, repositoryRoot } from './store.js'
-import { detectHost, isWsl } from './system.js'
+import { detectHost, systemKinds } from './system.js'
 
 const { version } = createRequire(import.meta.url)('../package.json') as { version: string }
 
@@ -66,7 +66,7 @@ program
       log.info(`Created the store ${store}, a new git repository`)
     }
     await mkdir(dirname(file), { recursive: true })
-    await writeFile(file, initialConfig(store, isWsl(process.env)))
+    await writeFile(file, initialConfig(store, systemKinds()))
     log.info(`Wrote ${file}`)
     log.info('chade discover suggests files for it, and the store keeps system details: its remote, if any, stays private.')
   })

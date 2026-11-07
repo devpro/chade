@@ -109,21 +109,15 @@ function parseSystem(raw: unknown, kind: Kind): SystemConfig | undefined {
   return { files, inventories, repos: stringList(raw.repos, `${kind}.repos`) }
 }
 
-export function initialConfig(store: string, wsl: boolean): string {
-  const lines = [
-    '# chade configuration, documented at https://github.com/devpro/chade#configuration',
-    `store: ${store}`,
-    'linux:',
-    '  # chade discover suggests the files changed on this system',
-    '  files: []',
-    `  inventories: [${INVENTORIES.linux.map((inventory) => inventory.name).join(', ')}]`,
-    '  repos: []',
-  ]
-  if (wsl) {
+// A section for each system the run captures, in the order of the systems.
+export function initialConfig(store: string, kinds: Kind[]): string {
+  const lines = ['# chade configuration, documented at https://github.com/devpro/chade#configuration', `store: ${store}`]
+  for (const kind of (['linux', 'windows'] as const).filter((known) => kinds.includes(known))) {
     lines.push(
-      'windows:',
+      `${kind}:`,
+      '  # chade discover suggests the files present on this system',
       '  files: []',
-      `  inventories: [${INVENTORIES.windows.map((inventory) => inventory.name).join(', ')}]`,
+      `  inventories: [${INVENTORIES[kind].map((inventory) => inventory.name).join(', ')}]`,
       '  repos: []',
     )
   }

@@ -41,12 +41,16 @@ test('a Windows file is a drive path or starts with a variable', () => {
   assert.deepEqual(config.windows?.files, ['%USERPROFILE%\\.wslconfig', 'C:\\tools\\a.json'])
 })
 
-test('the configuration written by init reads back', () => {
-  const config = parseConfig(initialConfig('/home/me/snapshots', true), home)
-  assert.ok(config.linux?.inventories.includes('apt-manual'))
-  assert.ok(config.windows?.inventories.includes('winget'))
-  assert.equal(parseConfig(initialConfig('/s', false), home).windows, undefined)
-  assert.deepEqual(parseConfig(initialConfig('/s', false), home).cleanup, [])
+test('the configuration written by init reads back, with a section for each system of the run', () => {
+  const wsl = parseConfig(initialConfig('/home/me/snapshots', ['windows', 'linux']), home)
+  assert.ok(wsl.linux?.inventories.includes('apt-manual'))
+  assert.ok(wsl.windows?.inventories.includes('winget'))
+  const linux = parseConfig(initialConfig('/s', ['linux']), home)
+  assert.equal(linux.windows, undefined)
+  assert.deepEqual(linux.cleanup, [])
+  const windows = parseConfig(initialConfig('/s', ['windows']), home)
+  assert.equal(windows.linux, undefined)
+  assert.ok(windows.windows?.inventories.includes('scheduled-tasks'))
 })
 
 test('CHADE_CONFIG moves the configuration file', () => {

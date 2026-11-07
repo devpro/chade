@@ -32,12 +32,31 @@ function slug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9.-]+/g, '-')
 }
 
-export async function detectHost(options: { machine?: string; run?: Run; env?: NodeJS.ProcessEnv } = {}): Promise<Host> {
-  if (process.platform !== 'linux') throw new Error('chade runs on Linux, and on WSL for the Windows host')
+export interface DetectOptions {
+  machine?: string
+  run?: Run
+  env?: NodeJS.ProcessEnv
+  platform?: NodeJS.Platform
+}
+
+// The systems one run captures: Windows alone on Windows, the distribution and its Windows host on WSL, Linux alone otherwise.
+export function systemKinds(platform: NodeJS.Platform = process.platform, env: NodeJS.ProcessEnv = process.env): Kind[] {
+  if (platform === 'win32') return ['windows']
+  if (platform !== 'linux') throw new Error('chade runs on Linux, on WSL and on Windows')
+  return isWsl(env) ? ['windows', 'linux'] : ['linux']
+}
+
+export async function detectHost(options: DetectOptions = {}): Promise<Host> {
   const run = options.run ?? defaultRun
   const env = options.env ?? process.env
   const home = env.HOME ?? homedir()
-  if (!isWsl(env)) {
+  const kinds = systemKinds(options.platform, env)
+  if (!kinds.includes('linux')) {
+    // The computer name is the one WSL gives the same machine, so a run from Windows and a run from WSL share its folder.
+    const machine = options.machine ?? env.COMPUTERNAME ?? hostname()
+    return { machine: machineName(machine), home, run, windows: new Windows(run, true), systems: [{ kind: 'windows', id: 'windows' }] }
+  }
+  if (!kinds.includes('windows')) {
     return { machine: machineName(options.machine ?? hostname()), home, run, systems: [{ kind: 'linux', id: 'linux' }] }
   }
   const windows = new Windows(run)

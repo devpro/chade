@@ -7,14 +7,17 @@ const WINDOWS_CWD = '/mnt/c'
 // cmd.exe reports a command it cannot find with 9009, where a Linux shell says 127.
 const CMD_NOT_FOUND = 9009
 
-// Reaches the Windows host from WSL, through the interop that runs .exe files from Linux.
+// Reaches Windows through cmd.exe, from WSL through the interop that runs .exe files from Linux, or directly when chade runs on Windows.
 export class Windows {
   private readonly variables = new Map<string, string | undefined>()
 
-  constructor(private readonly run: Run) {}
+  constructor(
+    private readonly run: Run,
+    private readonly native = false,
+  ) {}
 
   cwd(): string | undefined {
-    return existsSync(WINDOWS_CWD) ? WINDOWS_CWD : undefined
+    return !this.native && existsSync(WINDOWS_CWD) ? WINDOWS_CWD : undefined
   }
 
   async exec(args: string[], options: RunOptions = {}): Promise<Result> {
@@ -42,7 +45,9 @@ export class Windows {
     return expanded
   }
 
+  // The path the files are read through, the Windows path itself when chade runs on Windows.
   async linuxPath(windowsPath: string): Promise<string> {
+    if (this.native) return windowsPath
     const result = await this.run('wslpath', ['-u', windowsPath])
     if (result.code !== 0) throw new Error(`wslpath cannot translate ${windowsPath}: ${result.stderr.trim()}`)
     return result.stdout.trim()

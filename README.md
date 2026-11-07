@@ -18,7 +18,10 @@ The store is a dedicated repository, or a subfolder of a repository that holds o
 
 ## Requirements
 
-- Linux, or WSL on Windows, where one run captures the Windows host and the distribution
+- One of these systems, where a run captures:
+  - on Linux, the Linux system
+  - on WSL, in the distribution, the distribution and its Windows host
+  - on Windows 11, in a Command Prompt or PowerShell terminal, the Windows system
 - Node.js 24 or later
 - git
 - [gitleaks](https://github.com/gitleaks/gitleaks), recommended, for the secret scan before each commit
@@ -67,11 +70,11 @@ npm install --global chade
 
 ```txt
 <store>/
-└── DESKTOP-9AMBHO5/                  machine, the Windows computer name on WSL, the hostname on Linux
-    ├── windows/                      Windows host, on WSL only
+└── DESKTOP-9AMBHO5/                  machine, the Windows computer name on WSL and Windows, the hostname on Linux
+    ├── windows/                      Windows host, on WSL and Windows
     │   ├── files/C/Users/bthom/.wslconfig
     │   └── inventories/winget.json
-    └── wsl-ubuntu/                   distribution, linux outside of WSL
+    └── wsl-ubuntu/                   distribution on WSL, linux on Linux
         ├── files/etc/wsl.conf
         ├── files/home/bertrand/.istarci/config.yml
         └── inventories/apt-manual.txt
@@ -206,6 +209,9 @@ A step whose tool is not installed is skipped, a failed step is reported and the
 
 The compaction of the WSL disk image runs on Windows with WSL shut down, so it stays a manual step of [docs/cleanup.md](docs/cleanup.md#disk-image-compaction).
 
+The report and the clean-up are made for Linux and WSL.
+On Windows, the report measures the WSL disk images and `.wslconfig`, but not the memory, and the clean-up finds none of its tools.
+
 ## Commands
 
 Command                     | Effect
@@ -223,7 +229,7 @@ Command                     | Effect
 
 - Web viewer of the store: machines, snapshots, files and differences
 - Restore scripts generated from a snapshot, `winget import` and `code --install-extension` for instance
-- Native Windows, without WSL
+- `chade report` and `chade clean` on Windows
 
 ## Contributing
 
