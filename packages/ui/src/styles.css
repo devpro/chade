@@ -58,6 +58,11 @@ h1 {
   letter-spacing: 0.2px;
 }
 
+h1 a {
+  color: inherit;
+  text-decoration: none;
+}
+
 #machine {
   padding: 2px 10px;
   border-radius: 999px;
@@ -69,10 +74,23 @@ h1 {
   display: none;
 }
 
-#version {
+#scanned {
   margin-left: auto;
+}
+
+#version {
   color: var(--muted);
   font-size: 12.5px;
+}
+
+#message {
+  margin: 0;
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--bad);
+  text-align: center;
 }
 
 main {
@@ -145,6 +163,10 @@ main {
 
 #summary {
   margin-left: auto;
+}
+
+#refresh {
+  margin-left: 0;
 }
 
 #filter {
@@ -336,6 +358,541 @@ p.error {
 
 p.error {
   color: var(--bad);
+}
+
+/* One repository: its branches, its history and the changes of a commit, side by side, each scrolling on its own. */
+body.wide main {
+  max-width: none;
+}
+
+#back {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+#back:hover,
+a.name:hover {
+  text-decoration: underline;
+}
+
+a.name {
+  color: inherit;
+  text-decoration: none;
+}
+
+#repository h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+#repository-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#repository-state .badge {
+  margin-right: 0;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 190px minmax(240px, var(--history-width, 2fr)) 8px minmax(320px, 1fr);
+  gap: 2px;
+  height: calc(100vh - 166px);
+  min-height: 420px;
+}
+
+.workspace > * {
+  min-width: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+/* The history and the changes of a file take the same place, one at a time. */
+#branches,
+#history,
+#diff,
+#resize,
+#detail {
+  grid-row: 1;
+}
+
+#history,
+#diff {
+  grid-column: 2;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.diff-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--background);
+  font: 12.5px var(--mono);
+}
+
+.close {
+  margin-left: 12px;
+  padding: 3px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: 13px system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.close:hover {
+  border-color: var(--accent);
+}
+
+.diff-head .file-path {
+  margin-right: auto;
+  font-weight: 600;
+}
+
+.diff-head .additions,
+.diff-head .deletions {
+  margin-left: 0;
+}
+
+.file-link.selected {
+  background: var(--accent-soft);
+}
+
+#branches {
+  margin-right: 10px;
+  padding: 4px 6px 10px;
+}
+
+.workspace > #resize {
+  overflow: visible;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+#resize::before {
+  content: '';
+  display: block;
+  width: 2px;
+  height: 100%;
+  margin: 0 auto;
+  border-radius: 2px;
+  background: transparent;
+}
+
+#resize:hover::before,
+#resize.dragging::before,
+#resize:focus-visible::before {
+  background: var(--accent);
+}
+
+tbody tr {
+  cursor: pointer;
+}
+
+.file-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.file-link:hover {
+  background: var(--background);
+}
+
+.files.index li {
+  padding: 0;
+}
+
+.files.index {
+  margin-bottom: 12px;
+}
+
+.file {
+  scroll-margin-top: 8px;
+}
+
+h3 {
+  margin: 14px 8px 6px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.branch-item,
+.commit-row,
+.more {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.branch-item {
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font: 12.5px var(--mono);
+}
+
+.branch-item:hover,
+.commit-row:hover {
+  background: var(--background);
+}
+
+.branch-item.head {
+  font-weight: 700;
+}
+
+.branch-item.head::before {
+  content: '●';
+  color: var(--accent);
+  font-size: 9px;
+}
+
+.branch-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track {
+  margin-left: auto;
+  font: 600 11.5px system-ui, sans-serif;
+}
+
+.track + .track {
+  margin-left: 0;
+}
+
+.track.info {
+  color: var(--accent);
+}
+
+.track.warn {
+  color: var(--warn);
+}
+
+.commit-row {
+  gap: 10px;
+  height: 28px;
+  padding: 0 12px 0 4px;
+  white-space: nowrap;
+}
+
+.commit-row.selected {
+  background: var(--accent-soft);
+}
+
+.commit-row.working-tree {
+  height: 34px;
+  padding-left: 14px;
+  border-bottom: 1px dashed var(--border);
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.commit-row .subject {
+  flex: 1;
+  min-width: 0;
+}
+
+.commit-row .author {
+  flex: 0 0 96px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+}
+
+.commit-row .age {
+  flex: 0 0 84px;
+  text-align: right;
+}
+
+.graph {
+  flex: none;
+}
+
+.lane {
+  fill: none;
+  stroke-width: 2;
+}
+
+.dot {
+  stroke: var(--surface);
+  stroke-width: 1.5;
+}
+
+.dot.merge {
+  fill: var(--surface);
+  stroke-width: 2;
+}
+
+.lane-0 { stroke: #3b76e0; }
+.lane-1 { stroke: #d97a1c; }
+.lane-2 { stroke: #2f9e63; }
+.lane-3 { stroke: #b455c9; }
+.lane-4 { stroke: #d1495b; }
+.lane-5 { stroke: #1f9fb0; }
+.lane-6 { stroke: #a08a1f; }
+.lane-7 { stroke: #7d6ee0; }
+.dot.lane-0 { fill: #3b76e0; }
+.dot.lane-1 { fill: #d97a1c; }
+.dot.lane-2 { fill: #2f9e63; }
+.dot.lane-3 { fill: #b455c9; }
+.dot.lane-4 { fill: #d1495b; }
+.dot.lane-5 { fill: #1f9fb0; }
+.dot.lane-6 { fill: #a08a1f; }
+.dot.lane-7 { fill: #7d6ee0; }
+.dot.merge.lane-0, .dot.merge.lane-1, .dot.merge.lane-2, .dot.merge.lane-3, .dot.merge.lane-4, .dot.merge.lane-5, .dot.merge.lane-6, .dot.merge.lane-7 { fill: var(--surface); }
+.dot:not(.merge) { stroke: var(--surface); }
+
+.ref {
+  margin-right: 6px;
+  padding: 1px 7px;
+  border-radius: 5px;
+  font: 600 11.5px var(--mono);
+}
+
+.ref.head {
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.ref.local {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.ref.remote {
+  background: var(--quiet-soft);
+  color: var(--muted);
+}
+
+.ref.tag {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.more {
+  justify-content: center;
+  padding: 10px;
+  color: var(--accent);
+}
+
+#detail {
+  padding: 4px 14px 16px;
+}
+
+#detail h2 {
+  margin: 12px 0 6px;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+#detail h3 {
+  margin: 16px 0 8px;
+}
+
+.body {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font: 13px/1.5 system-ui, sans-serif;
+  white-space: pre-wrap;
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.facts code {
+  font-family: var(--mono);
+}
+
+.file {
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.file summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--background);
+  cursor: pointer;
+  font: 12.5px var(--mono);
+}
+
+.file-path {
+  overflow-wrap: anywhere;
+}
+
+.status {
+  flex: none;
+  width: 18px;
+  border-radius: 4px;
+  background: var(--quiet-soft);
+  color: var(--muted);
+  font: 700 11.5px/18px var(--mono);
+  text-align: center;
+}
+
+.status.added,
+.additions {
+  color: #2f9e63;
+}
+
+.status.deleted,
+.deletions {
+  color: var(--bad);
+}
+
+.status.renamed {
+  color: var(--accent);
+}
+
+.additions {
+  margin-left: auto;
+}
+
+.additions + .deletions {
+  margin-left: 0;
+}
+
+.deletions:not(.additions + .deletions) {
+  margin-left: auto;
+}
+
+.lines {
+  overflow-x: auto;
+  font: 12px/1.5 var(--mono);
+}
+
+.line {
+  display: flex;
+  width: max-content;
+  min-width: 100%;
+}
+
+.number {
+  flex: none;
+  width: 42px;
+  padding-right: 8px;
+  color: var(--muted);
+  text-align: right;
+  user-select: none;
+}
+
+.line .text {
+  padding-left: 8px;
+  white-space: pre;
+}
+
+.line.add {
+  background: color-mix(in srgb, #2f9e63 16%, transparent);
+}
+
+.line.del {
+  background: color-mix(in srgb, #d1495b 16%, transparent);
+}
+
+.line.hunk {
+  background: var(--accent-soft);
+  color: var(--muted);
+}
+
+.line.note {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.files {
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.files li {
+  display: flex;
+  gap: 8px;
+  padding: 3px 0;
+  font: 12.5px var(--mono);
+}
+
+#detail .empty,
+#history .empty {
+  padding: 20px;
+}
+
+@media (max-width: 1100px) {
+  .workspace {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .workspace > * {
+    max-height: 70vh;
+  }
+
+  .workspace > #resize {
+    display: none;
+  }
+
+  #branches,
+  #history,
+  #diff,
+  #detail {
+    grid-row: auto;
+    grid-column: 1;
+  }
+
+  #branches {
+    margin-right: 0;
+  }
+
+  .workspace {
+    gap: 12px;
+  }
 }
 
 /* A narrow window has no room for columns, so a repository becomes a block: its name, then what there is to do, then its last commit. */

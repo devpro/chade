@@ -9,7 +9,7 @@ export interface ServerOptions {
   // Folder of the built web interface, served as it is.
   uiDir: string
   // The routes of the API, each one answering a GET with what it returns, as JSON.
-  api: Record<string, () => Promise<unknown>>
+  api: Record<string, (query: URLSearchParams) => Promise<unknown>>
 }
 
 export interface Server {
@@ -19,6 +19,16 @@ export interface Server {
   url: string
   token: string
   close: () => Promise<void>
+}
+
+// A request the server cannot answer as asked, with the status that says why.
+export class RequestError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message)
+  }
 }
 
 // Other machines have no business with this server, so it listens on the loopback address only.
@@ -72,14 +82,15 @@ export async function startServer(options: ServerOptions): Promise<Server> {
     const origin = request.headers.origin
     if (origin !== undefined && !hosts.has(origin.replace(/^http:\/\//, ''))) return refuse(response, 403, 'this request comes from another site')
     if (request.method !== 'GET' && request.method !== 'HEAD') return refuse(response, 405, 'only GET is served')
-    const path = new URL(request.url ?? '/', `http://${HOST}`).pathname
+    const url = new URL(request.url ?? '/', `http://${HOST}`)
+    const path = url.pathname
     const head = request.method === 'HEAD'
     if (path.startsWith('/api/')) {
       const given = /^Bearer (.+)$/.exec(request.headers.authorization ?? '')?.[1]
       if (given === undefined || !sameToken(given, token)) return refuse(response, 401, 'chade ui gives the address that signs in')
       const route = options.api[path.slice('/api/'.length)]
       if (!route) return refuse(response, 404, 'no such route')
-      return send(response, 200, 'application/json; charset=utf-8', JSON.stringify(await route()), head)
+      return send(response, 200, 'application/json; charset=utf-8', JSON.stringify(await route(url.searchParams)), head)
     }
     const name = path === '/' ? '/index.html' : path
     const file = files.get(name)
@@ -90,7 +101,7 @@ export async function startServer(options: ServerOptions): Promise<Server> {
   const server = createServer((request, response) => {
     handle(request, response).catch((error: unknown) => {
       if (response.headersSent) return response.destroy()
-      refuse(response, 500, error instanceof Error ? error.message : String(error))
+      refuse(response, error instanceof RequestError ? error.status : 500, error instanceof Error ? error.message : String(error))
     })
   })
   await new Promise<void>((resolve, reject) => {

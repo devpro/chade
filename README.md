@@ -249,10 +249,33 @@ Last commit  | Subject and age
 Fetched      | Age of the last fetch or pull, which the ahead and behind counts are as old as
 
 The mark at the start of a row is blue with commits to push, amber with something to commit or pull, and red with a conflict or a repository git cannot read.
+The name of a repository opens its page.
 The filter keeps the repositories whose name, path or branch holds every word typed.
 The checkbox keeps those with something to commit, push, pull or fix.
 The page reads the repositories again every 30 seconds while it is looked at, when its tab comes back to the front, and on Refresh.
 The interface reads the repositories and changes nothing, and it fetches nothing either, so a count behind is the one of the last fetch.
+
+### A repository
+
+A row of the list opens the page of its repository, which goes from a branch to a commit, to its files, to the changes of one file.
+
+Part     | Content
+---------|-------------------------------------------------------------------------------------------------------------------
+Branches | Local and remote branches, the one checked out marked, each with what it is ahead and behind its upstream by
+History  | Commits of every branch and tag from the newest, drawn as a graph, each with the branches and tags pointing at it
+Changes  | Message, author and date of the commit chosen, and the list of the files it changed
+
+A branch chooses the commit it points at.
+A file of the list opens its changes in place of the history, line by line, and another file of the list takes its place.
+Close, the Escape key, or another commit, brings the history back.
+A merge shows what it brought to its first parent, the branch it was merged into.
+When the working tree has changes, a first line of the history, Uncommitted changes, lists what is staged, what is changed and not staged, and the files not tracked, whose content shows as lines added.
+The history lists 300 commits, and a button at its end shows 300 older ones.
+
+The bar between the history and the changes is dragged to give one the room of the other, and the browser keeps the width.
+A double click on it brings the width back.
+The address names the repository, the commit and the file, so the back button of the browser returns to the one before.
+The changes of a file stop after 10,000 lines, and a patch of more than 2 MB is cut.
 
 ### Access
 
@@ -281,7 +304,7 @@ Command                     | Effect
 
 ## Roadmap
 
-- Web interface, repositories: branches and their history, differences, then fetch, pull, checkout, branch creation, commit and push
+- Web interface, repositories: fetch, pull, checkout, branch creation, commit and push
 - Web interface, store: machines, snapshots, files and differences, and the report
 - Web interface, links: run status of [IstarCI](https://github.com/devpro/istarci), then build status and repositories of GitHub and GitLab
 - Restore scripts generated from a snapshot, `winget import` and `code --install-extension` for instance

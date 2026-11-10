@@ -35,6 +35,7 @@ export class RepositoriesPage {
   readonly summary: Locator
   readonly warnings: Locator
   readonly message: Locator
+  readonly empty: Locator
   readonly names: Locator
   readonly tabs: Locator
   readonly age: Locator
@@ -43,7 +44,8 @@ export class RepositoriesPage {
     this.machine = page.locator('#machine')
     this.summary = page.locator('#summary')
     this.warnings = page.locator('#warnings li')
-    this.message = page.locator('#content p')
+    this.message = page.locator('#message')
+    this.empty = page.locator('#content p')
     this.names = page.locator('tbody .name')
     this.tabs = page.getByRole('tab')
     this.age = page.locator('#scanned')
@@ -68,6 +70,16 @@ export class RepositoriesPage {
     await expect(this.tab(system)).toHaveAttribute('aria-selected', 'true')
   }
 
+  // Opens the page of a repository, through the link of its name.
+  async openRepository(name: string): Promise<void> {
+    await this.page.getByRole('link', { name, exact: true }).click()
+  }
+
+  // Opens the page of a repository by a click anywhere else on its row.
+  async openRow(name: string): Promise<void> {
+    await this.repository(name).lastCommit.click()
+  }
+
   repository(name: string): RepositoryRow {
     return new RepositoryRow(this.page.locator('tbody tr').filter({ has: this.page.locator('.name', { hasText: new RegExp(`^${name}$`) }) }))
   }
@@ -82,7 +94,7 @@ export class RepositoriesPage {
 
   // Reads the repositories again, and waits for the answer.
   async refresh(): Promise<void> {
-    const answer = this.page.waitForResponse((response) => response.url().endsWith('/api/state'))
+    const answer = this.page.waitForResponse((response) => new URL(response.url()).pathname === '/api/state')
     await this.page.getByRole('button', { name: 'Refresh' }).click()
     await answer
     await expect(this.page.getByRole('button', { name: 'Refresh' })).toBeEnabled()

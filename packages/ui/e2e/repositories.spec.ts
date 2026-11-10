@@ -5,7 +5,7 @@ import { shot } from './shot.js'
 
 test('each system is a tab, with its repositories and how many have something to do @layout', async ({ page, repositories }, testInfo) => {
   await expect(repositories.machine).toHaveText('E2E-PC')
-  await expect(repositories.tabs).toHaveText(['windows21', 'wsl-ubuntu86'])
+  await expect(repositories.tabs).toHaveText(['windows21', 'wsl-ubuntu97'])
   // The first system is shown until another is chosen.
   await expect(repositories.tab('windows')).toHaveAttribute('aria-selected', 'true')
   await expect(repositories.names).toHaveText(['local-only', 'portal'])
@@ -16,8 +16,8 @@ test('each system is a tab, with its repositories and how many have something to
 
 test('a repository shows its branch, what there is to push and pull, and the state of its working tree @layout', async ({ page, repositories }, testInfo) => {
   await repositories.showSystem('wsl-ubuntu')
-  await expect(repositories.names).toHaveText(['ahead', 'behind', 'clean', 'conflict', 'detached', 'dirty', 'group/feature', 'interrupted'])
-  await expect(repositories.summary).toHaveText('8 repositories, 2 with changes, 2 ahead, 1 behind, 1 without upstream, 1 unreadable')
+  await expect(repositories.names).toHaveText(['ahead', 'behind', 'clean', 'conflict', 'detached', 'dirty', 'group/feature', 'history', 'interrupted'])
+  await expect(repositories.summary).toHaveText('9 repositories, 3 with changes, 3 ahead, 1 behind, 1 without upstream, 1 unreadable')
 
   const clean = repositories.repository('clean')
   await expect(clean.branch).toHaveText('main')
@@ -49,13 +49,13 @@ test('the system chosen stays chosen when the page is loaded again', async ({ pa
   await repositories.showSystem('wsl-ubuntu')
   await page.reload()
   await expect(repositories.tab('wsl-ubuntu')).toHaveAttribute('aria-selected', 'true')
-  await expect(repositories.names).toHaveCount(8)
+  await expect(repositories.names).toHaveCount(9)
 })
 
 test('the filter keeps the repositories holding every word, and the checkbox those with something to do @layout', async ({ page, repositories }, testInfo) => {
   await repositories.showSystem('wsl-ubuntu')
   await repositories.onlyThoseWithSomethingToDo()
-  await expect(repositories.names).toHaveText(['ahead', 'behind', 'conflict', 'dirty', 'group/feature', 'interrupted'])
+  await expect(repositories.names).toHaveText(['ahead', 'behind', 'conflict', 'dirty', 'group/feature', 'history', 'interrupted'])
   await shot(page, testInfo, 'something-to-do')
   await repositories.onlyThoseWithSomethingToDo(false)
 
@@ -63,9 +63,9 @@ test('the filter keeps the repositories holding every word, and the checkbox tho
   await expect(repositories.names).toHaveText(['group/feature'])
   await repositories.filter('nothing like this')
   await expect(repositories.names).toHaveCount(0)
-  await expect(repositories.message).toHaveText('No repository matches.')
+  await expect(repositories.empty).toHaveText('No repository matches.')
   // The filter narrows the list, and the summary stays the one of the system.
-  await expect(repositories.summary).toContainText('8 repositories')
+  await expect(repositories.summary).toContainText('9 repositories')
 })
 
 test('a change made in a repository shows at the next read', async ({ repositories, server }) => {
@@ -76,7 +76,7 @@ test('a change made in a repository shows at the next read', async ({ repositori
   try {
     await repositories.refresh()
     await expect(repositories.repository('clean').workingTree).toHaveText('1 untracked')
-    await expect(repositories.tab('wsl-ubuntu')).toHaveText('wsl-ubuntu87')
+    await expect(repositories.tab('wsl-ubuntu')).toHaveText('wsl-ubuntu98')
     await expect(repositories.age).toHaveText('Read just now')
   } finally {
     rmSync(file)

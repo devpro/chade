@@ -9,23 +9,41 @@
   </head>
   <body>
     <header>
-      <h1>chade</h1>
+      <h1><a href="#">chade</a></h1>
       <span id="machine"></span>
+      <span id="scanned"></span>
+      <button id="refresh" type="button">Refresh</button>
       <span id="version"></span>
     </header>
     <main>
-      <div class="bar">
-        <nav id="tabs" role="tablist" aria-label="Systems of the machine"></nav>
-        <span id="scanned"></span>
-        <button id="refresh" type="button">Refresh</button>
-      </div>
-      <div class="bar">
-        <input id="filter" type="search" placeholder="Filter by name, path or branch" aria-label="Filter the repositories" />
-        <label><input id="attention" type="checkbox" /> Only those with something to do</label>
-        <span id="summary"></span>
-      </div>
-      <ul id="warnings"></ul>
-      <div id="content"></div>
+      <p id="message" hidden></p>
+      <section id="list" hidden>
+        <div class="bar">
+          <nav id="tabs" role="tablist" aria-label="Systems of the machine"></nav>
+        </div>
+        <div class="bar">
+          <input id="filter" type="search" placeholder="Filter by name, path or branch" aria-label="Filter the repositories" />
+          <label><input id="attention" type="checkbox" /> Only those with something to do</label>
+          <span id="summary"></span>
+        </div>
+        <ul id="warnings"></ul>
+        <div id="content"></div>
+      </section>
+      <section id="repository" hidden>
+        <div class="bar">
+          <a id="back" href="#">← Repositories</a>
+          <h2 id="repository-name"></h2>
+          <span id="repository-path" class="path"></span>
+          <span id="repository-state"></span>
+        </div>
+        <div class="workspace">
+          <nav id="branches" aria-label="Branches"></nav>
+          <div id="history" aria-label="History"></div>
+          <div id="diff" aria-label="Changes of a file" hidden></div>
+          <div id="resize" role="separator" aria-orientation="vertical" aria-label="Width of the history" tabindex="0" title="Drag to resize, double click to reset"></div>
+          <div id="detail" aria-label="Changes"></div>
+        </div>
+      </section>
     </main>
     <script type="module" src="app.js"></script>
   </body>

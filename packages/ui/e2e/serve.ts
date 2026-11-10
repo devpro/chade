@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { listRepositories, startServer, type Root, type Run } from '@chade/daemon'
+import { createApi, startServer, type Root, type Run } from '@chade/daemon'
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 const stateFile = process.env.E2E_STATE
@@ -91,6 +91,23 @@ try {
   // The merge stops on the conflict, which is the state wanted.
 }
 
+// A history with a branch merged, a tag, a rename, and a working tree with a staged file, a changed one and an untracked one.
+const history = repository('wsl-ubuntu', 'history')
+commit(history, 'guide.md', 'Install\nConfigure\nRun\n', 'Add the guide')
+git(history, 'switch', '--quiet', '--create', 'feature/graph')
+commit(history, 'graph.txt', 'lanes\n', 'Draw the graph')
+git(history, 'switch', '--quiet', 'main')
+commit(history, 'guide.md', 'Install\nSet up\nRun\nStop\n', 'Change the guide\n\nThe second step has a shorter name, and the last one was missing.')
+git(history, 'merge', '--quiet', '--no-ff', '--message', 'Merge feature/graph', 'feature/graph')
+git(history, 'tag', 'v1.0')
+git(history, 'push', '--quiet')
+git(history, 'mv', 'guide.md', 'manual.md')
+git(history, 'commit', '--quiet', '--message', 'Rename the guide')
+writeFileSync(join(history, 'staged.txt'), 'ready\n')
+git(history, 'add', 'staged.txt')
+writeFileSync(join(history, 'README.md'), '# history\n\nEdited, not staged.\n')
+writeFileSync(join(history, 'notes.txt'), 'not tracked\n')
+
 // A .git that is no repository, as an interrupted clone leaves.
 mkdirSync(join(root, 'wsl-ubuntu', 'interrupted', '.git'), { recursive: true })
 
@@ -117,10 +134,7 @@ const run: Run = async (command, args, options = {}) => {
 const server = await startServer({
   port: Number(process.env.E2E_PORT ?? 7899),
   uiDir: join(here, '..', 'dist'),
-  api: {
-    ping: async () => ({ version: '0.0.0' }),
-    state: async () => ({ version: '0.0.0', machine: 'E2E-PC', scannedAt: new Date().toISOString(), ...(await listRepositories(roots, run)) }),
-  },
+  api: createApi({ version: '0.0.0', machine: 'E2E-PC', roots: async () => roots, run }),
 })
 writeFileSync(stateFile, JSON.stringify({ url: server.url, root }))
 console.log(`chade e2e server on ${server.address}, repositories in ${root}`)

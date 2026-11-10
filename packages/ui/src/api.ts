@@ -1,0 +1,54 @@
+const TOKEN_KEY = 'chade-token'
+
+// Why a read gave nothing: no token, a token the server no longer knows, an answer that is an error, or no answer.
+export class ApiError extends Error {
+  constructor(
+    readonly kind: 'signed-out' | 'ended' | 'refused' | 'offline',
+    message: string,
+  ) {
+    super(message)
+  }
+}
+
+// What the address names after the #: the repository shown and the commit chosen, and the token when chade ui opened the page.
+export function route(): URLSearchParams {
+  return new URLSearchParams(location.hash.slice(1))
+}
+
+export function address(values: Record<string, string | undefined>): string {
+  const params = new URLSearchParams()
+  for (const [name, value] of Object.entries(values)) if (value !== undefined) params.set(name, value)
+  return `#${params}`
+}
+
+// The token arrives in the fragment of the address chade ui opens, and leaves the address bar and the history at once.
+function takeToken(): string | null {
+  const params = route()
+  const given = params.get('token')
+  if (given) {
+    sessionStorage.setItem(TOKEN_KEY, given)
+    params.delete('token')
+    history.replaceState(null, '', location.pathname + (params.size > 0 ? `#${params}` : ''))
+  }
+  return sessionStorage.getItem(TOKEN_KEY)
+}
+
+export async function get<T>(name: string, query: Record<string, string> = {}): Promise<T> {
+  const token = takeToken()
+  if (!token) throw new ApiError('signed-out', 'Not signed in. The chade ui command opens this page with the address that signs in.')
+  let response: Response
+  try {
+    const search = new URLSearchParams(query)
+    response = await fetch(`api/${name}${search.size > 0 ? `?${search}` : ''}`, { headers: { Authorization: `Bearer ${token}` } })
+  } catch {
+    throw new ApiError('offline', 'The server does not answer. The chade ui command starts it.')
+  }
+  if (response.status === 401) {
+    // The token of a server that was stopped since: the next chade ui gives a new one.
+    sessionStorage.removeItem(TOKEN_KEY)
+    throw new ApiError('ended', 'The session ended with the server it came from. The chade ui command opens a new one.')
+  }
+  const body = (await response.json().catch(() => ({}))) as T & { error?: string }
+  if (!response.ok) throw new ApiError('refused', body.error ?? `The server answered ${response.status}.`)
+  return body
+}

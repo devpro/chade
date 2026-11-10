@@ -57,7 +57,7 @@ const SKIPPED_FOLDERS = new Set(['node_modules', 'bin', 'obj', 'dist'])
 const REPOSITORY_DEPTH = 3
 // A git of Windows started from WSL takes a tenth of a second, so the repositories are read side by side.
 const CONCURRENCY = 8
-const GIT_TIMEOUT_MS = 30_000
+export const GIT_TIMEOUT_MS = 30_000
 
 export async function findRepositories(folder: string, relative: string[] = [], depth = REPOSITORY_DEPTH): Promise<string[][]> {
   const entries = await readdir(join(folder, ...relative), { withFileTypes: true }).catch(() => [])
@@ -96,8 +96,24 @@ export function parseStatus(text: string): Status {
   return status
 }
 
-async function readRepository(root: Root, relative: string[], run: Run): Promise<Repository> {
-  const path = [root.path.replace(/[\\/]+$/, ''), ...relative].join(root.separator)
+// The path the system knows a repository of a root by.
+export function repositoryPath(root: Root, relative: string[]): string {
+  return [root.path.replace(/[\\/]+$/, ''), ...relative].join(root.separator)
+}
+
+// A repository named by a request, found only among those the roots hold, so a request reaches no other folder of the machine.
+export async function findRepository(roots: Root[], system: string, path: string): Promise<{ root: Root; relative: string[] } | undefined> {
+  for (const root of roots) {
+    if (root.system !== system || !existsSync(root.folder)) continue
+    for (const relative of await findRepositories(root.folder)) {
+      if (repositoryPath(root, relative) === path) return { root, relative }
+    }
+  }
+  return undefined
+}
+
+export async function readRepository(root: Root, relative: string[], run: Run): Promise<Repository> {
+  const path = repositoryPath(root, relative)
   const folder = join(root.folder, ...relative)
   const identity = { system: root.system, name: relative.length > 0 ? relative.join('/') : basename(folder), path }
   const git = (args: string[]) => run(root.git, ['-C', path, ...args], { cwd: root.cwd, timeoutMs: GIT_TIMEOUT_MS })

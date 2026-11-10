@@ -5,7 +5,7 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 import { fileURLToPath } from 'node:url'
-import { listRepositories, startServer } from '@chade/daemon'
+import { createApi, startServer } from '@chade/daemon'
 import { Command } from 'commander'
 import { planCleanup, renderPlan, runCleanup } from './clean.js'
 import { DEFAULT_PORT, removeState, runningDaemon, signInUrl, startDaemon, stopDaemon, writeState, type DaemonState } from './daemon.js'
@@ -242,14 +242,8 @@ daemon
     const server = await startServer({
       port: portOf(options.port),
       uiDir,
-      api: {
-        ping: async () => ({ version }),
-        // The configuration is read at each call, so a folder added to repos shows without a restart.
-        state: async () => {
-          const roots = await repositoryRoots(await loadConfig(), host)
-          return { version, machine: host.machine, scannedAt: new Date().toISOString(), ...(await listRepositories(roots, run)) }
-        },
-      },
+      // The configuration is read at each call, so a folder added to repos shows without a restart.
+      api: createApi({ version, machine: host.machine, roots: async () => repositoryRoots(await loadConfig(), host), run }),
     })
     await writeState(file, { pid: process.pid, address: server.address, token: server.token, version, startedAt: new Date().toISOString() })
     const stop = () => {
