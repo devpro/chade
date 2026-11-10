@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
-import { readdir, readFile, rm } from 'node:fs/promises'
+import { readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
+import { findRepositories } from '@chade/daemon'
 import { NOT_FOUND, type Result, type Run } from './exec.js'
 import { expandHome } from './paths.js'
 import { redactUrl } from './redact.js'
@@ -203,9 +204,6 @@ async function winget(context: Context): Promise<string> {
   }
 }
 
-const SKIPPED_FOLDERS = new Set(['node_modules', 'bin', 'obj', 'dist'])
-const REPOSITORY_DEPTH = 3
-
 async function gitRepos(context: Context, kind: Kind): Promise<string> {
   const lines: string[] = []
   for (const root of context.repos) {
@@ -215,7 +213,7 @@ async function gitRepos(context: Context, kind: Kind): Promise<string> {
       continue
     }
     const separator = kind === 'linux' ? '/' : '\\'
-    for (const relative of await findRepositories(folder, [], REPOSITORY_DEPTH)) {
+    for (const relative of await findRepositories(folder)) {
       const display = [root.replace(/[\\/]+$/, ''), ...relative].join(separator)
       const remotes = await context.run('git', ['-C', join(folder, ...relative), 'remote', '-v'])
       const fetches = remotes.stdout
@@ -227,16 +225,4 @@ async function gitRepos(context: Context, kind: Kind): Promise<string> {
     }
   }
   return lines.join('\n')
-}
-
-export async function findRepositories(folder: string, relative: string[], depth: number): Promise<string[][]> {
-  const entries = await readdir(join(folder, ...relative), { withFileTypes: true }).catch(() => [])
-  if (entries.some((entry) => entry.name === '.git')) return [relative]
-  if (depth === 0) return []
-  const found: string[][] = []
-  const children = entries.filter((entry) => entry.isDirectory() && !entry.name.startsWith('.') && !SKIPPED_FOLDERS.has(entry.name))
-  for (const child of children.sort((a, b) => a.name.localeCompare(b.name))) {
-    found.push(...(await findRepositories(folder, [...relative, child.name], depth - 1)))
-  }
-  return found
 }

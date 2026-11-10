@@ -1,7 +1,8 @@
 // Key names whose value is a secret in the files chade usually meets: YAML, JSON, INI, .npmrc, docker config.json, kubeconfig.
 export const DEFAULT_KEYS = ['token', 'password', 'passwd', 'secret', 'api[_-]?key', 'credential', 'private[_-]?key', '^auth$', 'key-data']
 
-export const MASK = '***'
+// Letters, as asterisks are an alias in YAML and emphasis in Markdown, which a linter of the repository holding the store would refuse.
+export const MASK = 'xxx'
 
 const KEY = /([\w.-]+)(["']?\s*[:=]\s*)/g
 const URL_CREDENTIALS = /([a-z][\w+.-]*:\/\/)([^\s/@:]+):([^\s/@]+)@/gi

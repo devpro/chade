@@ -1,5 +1,8 @@
 node_modules/
 dist/
 coverage/
+report/
+packages/ui/e2e/test-results/
+packages/ui/e2e/screenshots/
 *.tgz
 .env

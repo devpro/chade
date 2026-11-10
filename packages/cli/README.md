@@ -18,6 +18,7 @@ npm install --global chade
 chade init --store ~/system-snapshots   # configuration in ~/.chade/config.yml, store created when missing
 chade discover                          # configuration files present and not configured yet
 chade snapshot                          # collect, redact secrets, commit
+chade ui                                # web interface listing the git repositories and their state
 chade diff                              # what changed since the previous snapshot
 chade report                            # disk and memory taken, and how to get them back
 chade clean                             # run the clean-up steps of the configuration, after a confirmation

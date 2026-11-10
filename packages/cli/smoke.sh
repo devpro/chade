@@ -8,7 +8,9 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
 tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
+ui=
+# A server left running by a failed check would outlive the test, and keep its folder open on Windows.
+trap '[ -z "$ui" ] || "$chade" daemon stop >/dev/null 2>&1; rm -rf "$tmp"' EXIT
 
 tarball=$(cd "$here" && npm pack --pack-destination "$tmp" --silent)
 cd "$tmp"
@@ -54,12 +56,14 @@ printf 'secret: hunter2\n' > "$HOME/.app.conf"
 if $windows; then
   section="windows:
   files: ['%USERPROFILE%\\.app.conf']
-  inventories: [{ name: kernel, command: ver }]"
+  inventories: [{ name: kernel, command: ver }]
+  repos: ['$(native "$tmp")']"
   kernel='Microsoft Windows'
 else
   section="linux:
   files: [~/.app.conf]
-  inventories: [{ name: kernel, command: uname -s }]"
+  inventories: [{ name: kernel, command: uname -s }]
+  repos: [$tmp]"
   kernel='Linux'
 fi
 cat > "$CHADE_CONFIG" <<CONFIG
@@ -76,7 +80,7 @@ CONFIG
 system=$(ls "$tmp/store/smoke")
 if $windows; then path=$(cygpath -m "$HOME/.app.conf"); path=/${path/:/}; else path="$HOME/.app.conf"; fi
 stored="$tmp/store/smoke/$system/files$path"
-[ "$(cat "$stored")" = 'secret: ***' ] || fail "the snapshot of .app.conf is not redacted: $(cat "$stored")"
+[ "$(cat "$stored")" = 'secret: xxx' ] || fail "the snapshot of .app.conf is not redacted: $(cat "$stored")"
 grep -q "$kernel" "$tmp/store/smoke/$system/inventories/kernel.txt" || fail 'the custom inventory was not written'
 [ "$(git -C "$tmp/store" rev-list --count HEAD)" = 1 ] || fail 'the snapshot was not committed'
 
@@ -91,4 +95,24 @@ grep -q "$kernel" "$tmp/store/smoke/$system/inventories/kernel.txt" || fail 'the
 "$chade" report --json | node -e 'const r = JSON.parse(require("fs").readFileSync(0, "utf8")); if (!r.sections.some((s) => s.title === "Memory")) process.exit(1)' \
   || fail 'chade report --json does not give a report with a Memory section'
 
-echo "smoke: $tarball installs, links chade, initializes a store, snapshots, redacts, diffs, cleans and reports (v$version)"
+# The interface is served from the files of the package, which one left out of the tarball would break.
+# Port 0 takes any free one, and the store is the one repository under the repos folder.
+ui=started
+url=$("$chade" ui --no-open --port 0 | sed -n 's/^Address that signs in: //p' | tr -d '\r')
+[ -n "$url" ] || fail "chade ui did not start the server: $(cat "$HOME/.chade/daemon.log" 2>/dev/null)"
+"$chade" daemon status >/dev/null || fail 'chade daemon status does not see the server chade ui started'
+node -e '
+const [address, token] = process.argv[1].split("/#token=")
+const check = (ok, message) => { if (!ok) { console.error(message); process.exit(1) } }
+const page = await fetch(address)
+check(page.ok && (await page.text()).includes("app.js"), "the page is not served")
+check((await fetch(`${address}/app.js`)).ok && (await fetch(`${address}/app.css`)).ok, "the script or the style sheet is not served")
+check((await fetch(`${address}/api/state`)).status === 401, "the API answers without the token")
+const state = await (await fetch(`${address}/api/state`, { headers: { Authorization: `Bearer ${token}` } })).json()
+check(state.repositories?.some((repository) => repository.name === "store" && repository.branch === "main"), `the store is not listed: ${JSON.stringify(state)}`)
+' "$url" || fail 'chade ui does not serve the interface and the repositories'
+"$chade" daemon stop | grep -q '^Stopped the server' || fail 'chade daemon stop did not stop the server'
+ui=
+if "$chade" daemon status >/dev/null; then fail 'the server still answers after chade daemon stop'; fi
+
+echo "smoke: $tarball installs, links chade, initializes a store, snapshots, redacts, diffs, cleans, reports and serves the interface (v$version)"

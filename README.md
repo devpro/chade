@@ -12,6 +12,7 @@ A snapshot holds configuration files (`/etc/wsl.conf`, `C:\Users\<user>\.wslconf
 and inventories: installed applications, VS Code extensions, services, scheduled tasks and git repositories.
 
 chade only reads the system, it never changes it.
+`chade ui` opens a web interface served on the machine, which lists every git repository of the machine with what is left to commit, push or pull.
 `chade report` measures what takes disk and memory, the space WSL takes on C: above all, and gives the command that gets each one back.
 It is the tool, the snapshots live in the store, a folder of a git repository chosen at `chade init`.
 The store is a dedicated repository, or a subfolder of a repository that holds other things, such as personal notes.
@@ -81,6 +82,7 @@ npm install --global chade
 ```
 
 A file keeps its absolute path under `files/`.
+A snapshot is one commit, named after the machine, its systems and the local date and time: `DESKTOP-9AMBHO5: snapshot of windows, wsl-ubuntu, 2026-11-10 17:45`.
 Each snapshot rewrites the folder of the system, so a file removed from the configuration, or from the system, disappears from the next commit.
 Only the folder of the current machine is committed, so several machines share one store, and anything else of the repository, staged or not, stays out of the commit.
 
@@ -128,7 +130,7 @@ Key                | Content
 `linux`, `windows` | One section per system, a system without its section is not captured
 `files`            | Absolute paths of files, a folder stands for every file under it
 `inventories`      | Built-in inventory names, or a custom one with a `name` and a `command`
-`repos`            | Folders scanned for git repositories, three levels deep, into the `git-repos` inventory
+`repos`            | Folders scanned for git repositories, three levels deep, into the `git-repos` inventory and the web interface
 `redact`           | Regular expressions of key names whose values are masked, on top of the defaults
 `cleanup`          | Steps `chade clean` runs, built-in names or a custom one with a `name` and a `command`
 
@@ -163,8 +165,8 @@ An inventory whose tool is not installed is skipped, and the run says so.
 
 A snapshot is meant for a git repository, so chade masks secrets before writing them.
 
-- Values of keys named like a secret are replaced by `***`: `token`, `password`, `passwd`, `secret`, `apikey`, `api_key`, `credential`, `private_key`, `auth`, `*-key-data`, and the `redact` entries.
-- Credentials in URLs keep the user and lose the password: `https://user:***@host`.
+- Values of keys named like a secret are replaced by `xxx`: `token`, `password`, `passwd`, `secret`, `apikey`, `api_key`, `credential`, `private_key`, `auth`, `*-key-data`, and the `redact` entries.
+- Credentials in URLs keep the user and lose the password: `https://user:xxx@host`.
 - gitleaks scans the staged snapshot before the commit, and a finding stops it, with nothing committed.
 - `--no-secret-scan` commits without the scan, and a missing gitleaks gives a warning.
 
@@ -212,6 +214,56 @@ On Windows, `journal`, `snap-revisions` and `fstrim` are skipped, and the other 
 
 The compaction of the WSL disk image runs on Windows with WSL shut down, so it stays a manual step of [docs/cleanup.md](docs/cleanup.md#disk-image-compaction).
 
+## Web interface
+
+```bash
+chade ui
+```
+
+The interface opens in the browser, the one of Windows on WSL, and the command returns.
+Its server runs in the background, on `http://127.0.0.1:7843`: the first `chade ui` starts it, and the next ones find it running.
+`--no-open` prints the address without opening it, and `--port <number>` starts the server on another port.
+
+Command               | Effect
+----------------------|-------------------------------------------------------------------------------
+`chade daemon start`  | Starts the server when it is not running, `--port <number>` chooses the port
+`chade daemon stop`   | Stops the server
+`chade daemon status` | Tells whether the server runs, on what address and since when
+`chade daemon run`    | Runs the server in the terminal until Ctrl+C, which is what `start` runs in the background
+
+The server stops with the session of the user or the machine, and the next `chade ui` starts it again.
+A `chade ui` of another version of chade replaces the server an earlier version started.
+The folder of the configuration holds its state, `daemon.json`, and its output, `daemon.log`.
+The configuration is read at each read of the repositories, so a folder added to `repos` shows without a restart.
+
+Each system of the machine is a tab, with the number of its repositories and of those with something to do.
+A tab lists the git repositories found under `repos`, a Windows repository being read by the git of Windows, on WSL as well.
+
+Column       | Content
+-------------|-------------------------------------------------------------------------------------------------
+Repository   | Name and path
+Branch       | Checked out branch, or the commit of a detached HEAD
+Upstream     | Commits ahead (↑) and behind (↓) the upstream branch, `no upstream`, or `upstream gone`
+Working tree | Files changed, untracked and in conflict
+Last commit  | Subject and age
+Fetched      | Age of the last fetch or pull, which the ahead and behind counts are as old as
+
+The mark at the start of a row is blue with commits to push, amber with something to commit or pull, and red with a conflict or a repository git cannot read.
+The filter keeps the repositories whose name, path or branch holds every word typed.
+The checkbox keeps those with something to commit, push, pull or fix.
+The page reads the repositories again every 30 seconds while it is looked at, when its tab comes back to the front, and on Refresh.
+The interface reads the repositories and changes nothing, and it fetches nothing either, so a count behind is the one of the last fetch.
+
+### Access
+
+- The server listens on `127.0.0.1` only, so no other machine reaches it.
+- Every start of the server makes a new token, and the data is served to that token alone.
+- The token is kept in `daemon.json`, a file of the user alone, for the next `chade ui` to sign in.
+- `chade ui` prints the address that signs in, with the token after the `#`, a part a browser sends to no server.
+  The page keeps the token for the tab, and takes it out of the address bar and of the history.
+- A request named after another host, or sent by another site, is refused, so a web page open in the same browser cannot read the interface.
+- A page opened without the token, or after a restart of the server, says so, and the next `chade ui` signs in again.
+
 ## Commands
 
 Command                     | Effect
@@ -221,13 +273,17 @@ Command                     | Effect
 `chade snapshot`            | Collects, redacts, writes and commits, `--dry-run` lists only, `--push` pushes the repository of the store after the commit, `--no-secret-scan` skips gitleaks
 `chade clean`               | Runs the `cleanup` steps of the configuration after a confirmation, `--dry-run` shows them only, `--yes` skips the confirmation
 `chade report`              | Measures disk and memory and suggests what to clean, without changing anything, `--json` prints JSON
+`chade ui`                  | Opens the web interface, starting its server in the background when it is not running, `--no-open` only prints the address, `--port <number>` chooses the port of a server it starts
+`chade daemon <action>`     | `start`, `stop`, `status` or `run` the server of the web interface
 `chade diff [rev]`          | Compares the last snapshot with the previous one, or with `rev`, `--since <date>` with the last one before that date, `--stat` lists the files, `--machine <name>` reads another machine folder
 
 `--config <path>` applies to every command.
 
 ## Roadmap
 
-- Web viewer of the store: machines, snapshots, files and differences
+- Web interface, repositories: branches and their history, differences, then fetch, pull, checkout, branch creation, commit and push
+- Web interface, store: machines, snapshots, files and differences, and the report
+- Web interface, links: run status of [IstarCI](https://github.com/devpro/istarci), then build status and repositories of GitHub and GitLab
 - Restore scripts generated from a snapshot, `winget import` and `code --install-extension` for instance
 
 ## Contributing

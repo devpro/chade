@@ -60,7 +60,7 @@ export async function snapshot(config: Config, host: Host, log: Logger, options:
   const staged = await host.run('git', ['-C', config.store, 'diff', '--cached', '--quiet', '--', host.machine])
   if (staged.code === 0) return { entries }
   if (options.secretScan !== false) await scanSecrets(repository, config, host, log)
-  const message = `${host.machine}: snapshot of ${systems.map((system) => system.id).join(', ')}`
+  const message = `${host.machine}: snapshot of ${systems.map((system) => system.id).join(', ')}, ${timestamp(new Date())}`
   await git(host.run, config.store, ['commit', '--quiet', '--message', message, '--', host.machine])
   const commit = (await git(host.run, config.store, ['rev-parse', '--short', 'HEAD'])).trim()
   if (options.push) await git(host.run, config.store, ['push', '--quiet'])
@@ -166,4 +166,10 @@ async function readText(path: string): Promise<string | undefined> {
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+// The local date and minute of a snapshot, which tell the commits of one machine apart in a log of subjects.
+export function timestamp(date: Date): string {
+  const two = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())} ${two(date.getHours())}:${two(date.getMinutes())}`
 }

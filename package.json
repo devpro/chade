@@ -3,13 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "workspaces": [
-    "packages/cli"
+    "packages/cli",
+    "packages/daemon",
+    "packages/ui"
   ],
   "scripts": {
     "build": "npm run build --workspace=packages/cli",
-    "typecheck": "npm run typecheck --workspace=packages/cli",
-    "test:unit": "npm run test --workspace=packages/cli",
-    "test:coverage": "mkdir -p packages/cli/coverage && scripts/with_test_tmpdir.sh node --import tsx --experimental-test-coverage --test-coverage-include=\"packages/cli/src/**\" --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=packages/cli/coverage/lcov.info --test packages/cli/test/*.test.ts",
+    "typecheck": "npm run typecheck --workspaces",
+    "test:unit": "npm run test --workspaces",
+    "test:coverage": "mkdir -p packages/cli/coverage && scripts/with_test_tmpdir.sh node --import tsx --experimental-test-coverage --test-coverage-include=\"packages/*/src/**\" --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=packages/cli/coverage/lcov.info --test packages/*/test/*.test.ts",
+    "test:e2e": "npm run test:e2e --workspace=packages/ui",
+    "ui:screenshots": "npm run screenshots --workspace=packages/ui",
     "test:pkg": "npm run smoke --workspace=packages/cli"
   },
   "allowScripts": {

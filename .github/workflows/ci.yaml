@@ -37,7 +37,8 @@ jobs:
     if: needs.git-check.outputs.changed == 'true'
     uses: devpro/github-workflow-parts/.github/workflows/reusable-node-quality.yml@5379b9d0052e3b233ec2e56ba8678e827361b89e
     with:
-      custom-tests: npm run test:pkg
+      # The end to end tests run with their screenshots, copied where the job keeps its test results.
+      custom-tests: npm run test:pkg && npm run ui:screenshots && mkdir -p report && cp -r packages/ui/e2e/screenshots report/
       job-name: Build & Test
       sonar-enabled: true
       sonar-host-url: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}

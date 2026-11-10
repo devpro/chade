@@ -19,7 +19,7 @@ tasks:
   # ── Build ───────────────────────────────────────────────────────────────────
 
   build:
-    desc: Typecheck and bundle the CLI into packages/cli/dist
+    desc: Typecheck and bundle the CLI into packages/cli/dist, and the web interface into its ui folder
     cmds:
       - npm run build
 
@@ -37,12 +37,12 @@ tasks:
   # ── Tests ───────────────────────────────────────────────────────────────────
 
   typecheck:
-    desc: Typecheck the sources and the tests, which tsx runs without checking
+    desc: Typecheck the sources and the tests of every package, which tsx runs without checking
     cmds:
       - npm run typecheck
 
   test:
-    desc: Unit tests, which need git and nothing else, and never reach Windows
+    desc: Unit tests of every package, which need git and nothing else, and never reach Windows
     aliases: [test:unit]
     cmds:
       - npm run test:unit
@@ -52,15 +52,26 @@ tasks:
     cmds:
       - npm run test:coverage
 
+  test:e2e:
+    desc: Web interface end to end tests in Chromium, against the built server and repositories made for the run
+    cmds:
+      - npm run test:e2e
+
+  ui:screenshots:
+    desc: Runs the end to end tests in the light theme, the dark theme and at phone width, and saves a screenshot of each state in packages/ui/e2e/screenshots
+    cmds:
+      - npm run ui:screenshots
+
   test:pkg:
     desc: Packaging smoke test, packs the tarball and installs it into an empty project the way a first install would
     cmds:
       - npm run test:pkg
 
   check:
-    desc: What CI runs, typecheck, build, unit tests and packaging smoke test
+    desc: What CI runs, typecheck, build, unit tests, packaging smoke test and end to end tests
     cmds:
       - task: typecheck
       - task: build
       - task: test
       - task: test:pkg
+      - task: test:e2e

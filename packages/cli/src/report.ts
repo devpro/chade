@@ -2,9 +2,9 @@ import { existsSync } from 'node:fs'
 import { lstat, readdir, readFile, stat, statfs } from 'node:fs/promises'
 import { freemem, totalmem } from 'node:os'
 import { join } from 'node:path'
+import { findRepositories } from '@chade/daemon'
 import type { Config } from './config.js'
 import { NOT_FOUND } from './exec.js'
-import { findRepositories } from './inventories.js'
 import { expandHome } from './paths.js'
 import { isNativeWindows, type Host } from './system.js'
 
@@ -449,7 +449,7 @@ async function repositories(config: Config | undefined, host: Host): Promise<Sec
   for (const root of roots) {
     const folder = expandHome(root, host.home)
     if (!existsSync(folder)) continue
-    for (const relative of await findRepositories(folder, [], 3)) {
+    for (const relative of await findRepositories(folder)) {
       const bytes = await folderSize(host, join(folder, ...relative))
       if (bytes !== undefined) sizes.push({ label: [root.replace(/\/+$/, ''), ...relative].join('/'), bytes })
     }

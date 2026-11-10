@@ -7,7 +7,7 @@ import { beforeEach, test } from 'node:test'
 import type { Config } from '../src/config.js'
 import { diffArgs } from '../src/diff.js'
 import { NOT_FOUND, run, type Run } from '../src/exec.js'
-import { snapshot, type Logger } from '../src/snapshot.js'
+import { snapshot, timestamp, type Logger } from '../src/snapshot.js'
 import type { Host } from '../src/system.js'
 import { Windows } from '../src/windows.js'
 
@@ -73,8 +73,12 @@ test('a snapshot writes the files and inventories of the machine, redacted, in o
   const config: Config = { store, linux: { files: ['~/.app/config.yml'], inventories: ['apt-manual', 'snap'], repos: [] }, redact: [], cleanup: [] }
   const result = await snapshot(config, host(), log, { secretScan: false })
   assert.ok(result.commit)
+  // The date and time tell one snapshot from the next in a log of subjects.
+  const subject = (await run('git', ['-C', store, 'log', '-1', '--format=%s'])).stdout.trim()
+  assert.match(subject, /^TEST-PC: snapshot of linux, \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)
+  assert.equal(timestamp(new Date(2026, 0, 5, 7, 9)), '2026-01-05 07:09')
   const file = join(store, 'TEST-PC', 'linux', 'files', root.slice(1), 'home', '.app', 'config.yml')
-  assert.equal(await readFile(file, 'utf8'), 'url: https://example.test\ntoken: ***\n')
+  assert.equal(await readFile(file, 'utf8'), 'url: https://example.test\ntoken: xxx\n')
   assert.equal(await readFile(join(store, 'TEST-PC', 'linux', 'inventories', 'apt-manual.txt'), 'utf8'), 'git\ncurl\n')
   // A tool that is not installed is no inventory at all, rather than an empty one that would read as "nothing installed".
   assert.ok(!existsSync(join(store, 'TEST-PC', 'linux', 'inventories', 'snap.txt')))
@@ -147,7 +151,7 @@ test('git-repos lists every repository under the folders and their remotes', asy
   const config: Config = { store, linux: { files: [], inventories: [], repos: ['~/repos', '~/missing'] }, redact: [], cleanup: [] }
   await snapshot(config, host(), log, { secretScan: false })
   const listing = await readFile(join(store, 'TEST-PC', 'linux', 'inventories', 'git-repos.txt'), 'utf8')
-  assert.equal(listing, '~/repos/group/two\t-\n~/repos/one\torigin\thttps://me:***@example.test/one.git\n')
+  assert.equal(listing, '~/repos/group/two\t-\n~/repos/one\torigin\thttps://me:xxx@example.test/one.git\n')
   assert.deepEqual(warnings, ['linux: repository folder ~/missing does not exist'])
 })
 

@@ -16,11 +16,19 @@
 ├── docs/
 │   └── cleanup.md          clean-up steps the report links to
 ├── packages/
-│   └── cli/                chade, the published package
-│       ├── bin/chade.js    entry point of the chade command
-│       ├── src/            sources, bundled into dist/bin.js
-│       ├── test/           unit tests
-│       └── smoke.sh        packaging smoke test
+│   ├── cli/                chade, the published package
+│   │   ├── bin/chade.js    entry point of the chade command
+│   │   ├── src/            sources, bundled into dist/bin.js
+│   │   ├── test/           unit tests
+│   │   └── smoke.sh        packaging smoke test
+│   ├── daemon/             HTTP server of chade ui and reading of the git repositories, bundled into dist/bin.js
+│   │   ├── src/
+│   │   └── test/
+│   └── ui/                 web interface, built into dist/ui of the published package
+│       ├── e2e/            end to end tests, their page objects and their server
+│       ├── public/         page
+│       ├── src/            script and style sheet
+│       └── test/           unit tests
 ├── scripts/                scripts shared by the packages
 ├── package.json            npm workspaces root, never published
 ├── sonar-project.properties  Sonar analysis settings
@@ -50,6 +58,10 @@
 
    `npm unlink --global chade` removes it.
 
+`chade ui` serves the interface `task build` built, from a server that keeps running in the background.
+A change to `packages/ui` or to the server shows after `task build` and `task run -- daemon stop`, as the next `task run -- ui` starts a new server.
+`task run -- daemon run` keeps the server in the terminal instead, with its output.
+
 > [!NOTE]
 > A run reads `~/.chade/config.yml` and commits to its store.
 > `--config <path>` points a run at a test configuration and its own store.
@@ -61,14 +73,16 @@
 Task                      | Effect
 --------------------------|--------------------------------------------------------------------------------------------------------
 `task install`            | Installs the npm workspaces
-`task build`              | Typechecks and bundles the CLI into `packages/cli/dist`
+`task build`              | Typechecks and bundles the CLI into `packages/cli/dist`, and the web interface into its `ui` folder
 `task run -- <arguments>` | Runs the CLI from its sources
 `task link`               | Builds and links the `chade` command globally
-`task typecheck`          | Typechecks the sources and the tests
-`task test`               | Runs the unit tests
+`task typecheck`          | Typechecks the sources and the tests of every package
+`task test`               | Runs the unit tests of every package
 `task test:coverage`      | Runs the unit tests with a coverage report, also written to `packages/cli/coverage/lcov.info` for Sonar
+`task test:e2e`           | Runs the end to end tests of the web interface in Chromium, after a build
+`task ui:screenshots`     | Runs them in the light theme, the dark theme and at phone width, and saves a screenshot of each state for review
 `task test:pkg`           | Runs the packaging smoke test
-`task check`              | Runs what CI runs: typecheck, build, unit tests, packaging smoke test
+`task check`              | Runs what CI runs: typecheck, build, unit tests, packaging smoke test, end to end tests
 
 ## Testing
 
@@ -82,15 +96,49 @@ The tests run with the Node.js test runner, through `tsx`, against real git repo
 A fake command runner stands in for the Windows tools (`cmd.exe`, `wslpath`, `winget.exe`) and for the package managers, so the tests behave the same on WSL, on Linux and in CI.
 `tsx` does not check types, so `task typecheck` goes with them.
 
+The tests of `packages/daemon` start the server on a free port and call it over HTTP, and read repositories made for the test.
+Those of `packages/ui` cover what the interface computes, and the end to end tests cover the page.
+
 ### Packaging smoke test
 
 ```bash
 task test:pkg
 ```
 
-`packages/cli/smoke.sh` packs the tarball, installs it into an empty project and runs the installed `chade` command: init, snapshot, redaction, diff, clean-up and report.
+`packages/cli/smoke.sh` packs the tarball, installs it into an empty project and runs the installed `chade` command: init, snapshot, redaction, diff, clean-up, report and web interface.
 It catches what the unit tests cannot see, such as a file missing from `files` in `package.json` or a dependency missing from the bundle.
 It uses a home folder of its own and a Linux section only, so it never reads the configuration of the machine, nor reaches Windows.
+
+### End to end tests
+
+```bash
+npx --workspace=packages/ui playwright install chromium   # once
+task build
+task test:e2e
+```
+
+The Playwright specs of `packages/ui/e2e` drive Chromium against the server of `chade ui`, started by `e2e/serve.ts` over the built interface.
+That server reads real repositories, made for the run in a temporary folder, one in each state the interface tells apart: clean, ahead, behind, changed, in conflict, never pushed, detached, unreadable.
+A spec signs in the way `chade ui` does, with the address that carries the token, and reaches the page through the page objects of `e2e/pages`, so a change of markup is a change in one place.
+
+```bash
+task ui:screenshots
+```
+
+The same run with `SCREENSHOTS=1` also saves a screenshot of each state a spec reaches, in `packages/ui/e2e/screenshots`, for a review of a change of the interface.
+The specs tagged `@layout`, those that capture a page, then run in the dark theme and at phone width as well.
+The screenshots are not compared with earlier ones, and are not committed.
+
+### Manual test of the web interface
+
+```bash
+task build
+task run -- daemon stop
+task run -- ui
+```
+
+The browser opens the list of the repositories under `repos` of `~/.chade/config.yml`.
+On WSL, the Windows section lists the repositories of Windows, and the browser is the one of Windows.
 
 ### Manual test on WSL
 
@@ -139,9 +187,10 @@ Job                    | Content
 -----------------------|------------------------------------------------------------------------------------------------------------------------
 Markup                 | Markdown and YAML lint
 Git                    | Tells whether anything other than documentation changed
-Build & Test           | Typecheck, build, unit tests with coverage, packaging smoke test and Sonar analysis, skipped for a documentation change
+Build & Test           | Typecheck, build, unit tests with coverage, packaging smoke test, end to end tests and Sonar analysis, skipped for a documentation change
 Build & Test (Windows) | Typecheck, build, unit tests and packaging smoke test on `windows-latest`, skipped for a documentation change
 
+The end to end tests run with their screenshots, which the job keeps in its `node-test-results` artifact, under `report/screenshots`.
 The Windows job runs the npm scripts with Git Bash, and checks out without `core.autocrlf`, which the runner image sets, so the scripts keep their LF.
 The unit tests of a Linux host are skipped on Windows, and the smoke test configures a `windows` section there.
 

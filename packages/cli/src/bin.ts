@@ -2,16 +2,21 @@ import { existsSync, readdirSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
-import { dirname, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline/promises'
+import { fileURLToPath } from 'node:url'
+import { listRepositories, startServer } from '@chade/daemon'
 import { Command } from 'commander'
 import { planCleanup, renderPlan, runCleanup } from './clean.js'
+import { DEFAULT_PORT, removeState, runningDaemon, signInUrl, startDaemon, stopDaemon, writeState, type DaemonState } from './daemon.js'
 import { configPath, initialConfig, parseConfig, type Config } from './config.js'
 import { diff } from './diff.js'
 import { discover } from './discover.js'
 import { run, runInherit } from './exec.js'
+import { openBrowser } from './open.js'
 import { expandHome } from './paths.js'
 import { diskUsage, formatBytes, renderReport, report } from './report.js'
+import { repositoryRoots } from './roots.js'
 import { snapshot, type Logger } from './snapshot.js'
 import { git, repositoryRoot } from './store.js'
 import { detectHost, systemKinds } from './system.js'
@@ -162,6 +167,97 @@ program
     log.info(`\n${result.ran.length} step(s) ran${result.failed.length > 0 ? `, ${result.failed.join(', ')} failed` : ''}`)
     if (before && after) log.info(`Free space on ${disk}: ${formatBytes(before.available)} before, ${formatBytes(after.available)} after`)
     if (result.failed.length > 0) process.exitCode = 1
+  })
+
+// A port the option names, or the usual one.
+function portOf(value: string | undefined): number {
+  const port = value === undefined ? DEFAULT_PORT : Number(value)
+  if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error(`--port ${value} is not a port number`)
+  return port
+}
+
+// The running server, started when there is none, and replaced when another version of chade started it.
+async function ensureDaemon(port: string | undefined): Promise<{ state: DaemonState; started: boolean }> {
+  const file = configFile()
+  await loadConfig()
+  const running = await runningDaemon(file)
+  if (running?.version === version) return { state: running, started: false }
+  if (running) await stopDaemon(file)
+  return { state: await startDaemon(file, portOf(port)), started: true }
+}
+
+program
+  .command('ui')
+  .description('Open the web interface in the browser, starting its server in the background when it is not running')
+  .option('--port <number>', `port a server started by this command listens on, ${DEFAULT_PORT} by default`)
+  .option('--no-open', 'print the address without opening the browser')
+  .action(async (options: { port?: string; open: boolean }) => {
+    const { state, started } = await ensureDaemon(options.port)
+    log.info(`${started ? 'Started the server' : 'The server is running'} on ${state.address}, chade daemon stop stops it`)
+    // The address holds the token, which the terminal of the user is the place for, and no log file.
+    log.info(`Address that signs in: ${signInUrl(state)}`)
+    if (!options.open) return
+    const host = await detectHost({ machine: (await loadConfig()).machine })
+    if (!(await openBrowser(signInUrl(state), host, run))) log.warn('no browser could be opened, the address above opens the interface')
+  })
+
+const daemon = program.command('daemon').description('The server of the web interface, a background process of this user')
+
+daemon
+  .command('start')
+  .description('Start the server in the background, when it is not running')
+  .option('--port <number>', `port to listen on, ${DEFAULT_PORT} by default`)
+  .action(async (options: { port?: string }) => {
+    const { state, started } = await ensureDaemon(options.port)
+    log.info(`${started ? 'Started the server' : 'The server is already running'} on ${state.address}, chade ui opens it`)
+  })
+
+daemon
+  .command('stop')
+  .description('Stop the server')
+  .action(async () => {
+    const state = await stopDaemon(configFile())
+    log.info(state ? `Stopped the server of ${state.address}` : 'The server is not running')
+  })
+
+daemon
+  .command('status')
+  .description('Tell whether the server is running, exit code 1 when it is not')
+  .action(async () => {
+    const state = await runningDaemon(configFile())
+    log.info(state ? `The server is running on ${state.address} since ${state.startedAt}, version ${state.version}, process ${state.pid}` : 'The server is not running')
+    if (!state) process.exitCode = 1
+  })
+
+daemon
+  .command('run')
+  .description('Run the server in this terminal, until Ctrl+C, which is what start runs in the background')
+  .option('--port <number>', `port to listen on, ${DEFAULT_PORT} by default`)
+  .action(async (options: { port?: string }) => {
+    const file = configFile()
+    const host = await detectHost({ machine: (await loadConfig()).machine })
+    // The interface is built beside the bundle, which a run from the sources reaches the same way.
+    const uiDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'ui')
+    if (!existsSync(join(uiDir, 'index.html'))) throw new Error(`the web interface is not built in ${uiDir}, npm run build builds it`)
+    const server = await startServer({
+      port: portOf(options.port),
+      uiDir,
+      api: {
+        ping: async () => ({ version }),
+        // The configuration is read at each call, so a folder added to repos shows without a restart.
+        state: async () => {
+          const roots = await repositoryRoots(await loadConfig(), host)
+          return { version, machine: host.machine, scannedAt: new Date().toISOString(), ...(await listRepositories(roots, run)) }
+        },
+      },
+    })
+    await writeState(file, { pid: process.pid, address: server.address, token: server.token, version, startedAt: new Date().toISOString() })
+    const stop = () => {
+      void removeState(file).then(() => process.exit(0))
+    }
+    process.on('SIGINT', stop)
+    process.on('SIGTERM', stop)
+    log.info(`chade serves ${host.machine} on ${server.address}`)
   })
 
 program.parseAsync().catch((error: unknown) => {
