@@ -615,12 +615,21 @@ h3 {
   background: var(--accent-soft);
 }
 
-.commit-row.working-tree {
-  height: 34px;
-  padding-left: 14px;
-  border-bottom: 1px dashed var(--border);
+.commit-row.working-tree .subject {
   color: var(--warn);
-  font-weight: 600;
+  font-style: italic;
+}
+
+.lane.pending {
+  stroke: var(--warn);
+  stroke-dasharray: 3 3;
+}
+
+/* Named with its row, to come after the color every other dot takes from its lane. */
+.working-tree .dot.pending {
+  fill: var(--surface);
+  stroke: var(--warn);
+  stroke-width: 2;
 }
 
 .commit-row .subject {

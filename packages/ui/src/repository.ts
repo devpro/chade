@@ -64,15 +64,22 @@ function renderHistory(current: Loaded): void {
   const history = element('history')
   rows.clear()
   const created: HTMLElement[] = []
+  const graph = layout(current.commits)
+  const width = Math.min(Math.max(1, ...graph.map((row) => row.width)), LANES_SHOWN) * LANE + 6
   if (current.changes.length > 0) {
+    // A line of the history like the commits, as the commit to come: a hollow dot, tied to the commit checked out when that one is the next line.
     const working = node('button', '', 'commit-row working-tree')
-    working.append(node('span', 'Uncommitted changes', 'subject'), node('span', `${current.changes.length} file${current.changes.length === 1 ? '' : 's'}`, 'age'))
+    const onHead = current.commits[0]?.refs.some((ref) => ref === 'HEAD' || ref.startsWith('HEAD -> ')) ?? false
+    const drawing = svg('svg', { width, height: ROW, class: 'graph', 'aria-hidden': 'true' })
+    const x = (onHead ? graph[0].column : 0) * LANE + LANE / 2 + 2
+    if (onHead) drawing.append(svg('path', { d: `M ${x} ${ROW / 2} V ${ROW}`, class: 'lane pending' }))
+    drawing.append(svg('circle', { cx: x, cy: ROW / 2, r: 4, class: 'dot pending' }))
+    const files = `${current.changes.length} file${current.changes.length === 1 ? '' : 's'}`
+    working.append(drawing, node('span', 'Uncommitted changes', 'subject'), node('span', '', 'author'), node('span', files, 'age'))
     working.addEventListener('click', () => choose(WORKING_TREE))
     rows.set(WORKING_TREE, working)
     created.push(working)
   }
-  const graph = layout(current.commits)
-  const width = Math.min(Math.max(1, ...graph.map((row) => row.width)), LANES_SHOWN) * LANE + 6
   const now = Date.now()
   current.commits.forEach((commit, index) => {
     const line = node('button', '', 'commit-row')

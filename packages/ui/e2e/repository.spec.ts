@@ -86,6 +86,9 @@ test('a repository shows its state, its branches, and its history from the newes
   await expect(history.refs('Draw the graph')).toHaveText(['feature/graph'])
   // Every commit has its dot, and the merge two lines leaving it.
   await expect(history.commits.locator('svg circle')).toHaveCount(6)
+  // The uncommitted changes are one more line of the graph, tied to the commit checked out.
+  await expect(history.workingTree.locator('svg circle')).toHaveCount(1)
+  await expect(history.workingTree.locator('svg path')).toHaveCount(1)
   await expect(history.commit('Merge feature/graph').locator('svg path')).toHaveCount(3)
   await expect(history.changes).toHaveText('Choose a commit to see what it changed.')
   await shot(page, testInfo, 'repository')
