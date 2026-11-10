@@ -106,10 +106,10 @@ const [address, token] = process.argv[1].split("/#token=")
 const check = (ok, message) => { if (!ok) { console.error(message); process.exit(1) } }
 const page = await fetch(address)
 check(page.ok && (await page.text()).includes("app.js"), "the page is not served")
-check((await fetch(`${address}/app.js`)).ok && (await fetch(`${address}/app.css`)).ok, "the script or the style sheet is not served")
-check((await fetch(`${address}/api/state`)).status === 401, "the API answers without the token")
-const state = await (await fetch(`${address}/api/state`, { headers: { Authorization: `Bearer ${token}` } })).json()
-check(state.repositories?.some((repository) => repository.name === "store" && repository.branch === "main"), `the store is not listed: ${JSON.stringify(state)}`)
+check((await fetch(address + "/app.js")).ok && (await fetch(address + "/app.css")).ok, "the script or the style sheet is not served")
+check((await fetch(address + "/api/state")).status === 401, "the API answers without the token")
+const state = await (await fetch(address + "/api/state", { headers: { Authorization: "Bearer " + token } })).json()
+check(state.repositories?.some((repository) => repository.name === "store" && repository.branch === "main"), "the store is not listed: " + JSON.stringify(state))
 ' "$url" || fail 'chade ui does not serve the interface and the repositories'
 "$chade" daemon stop | grep -q '^Stopped the server' || fail 'chade daemon stop did not stop the server'
 ui=
