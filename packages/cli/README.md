@@ -5,6 +5,7 @@ Command line tool that snapshots the configuration of a system into a git reposi
 A snapshot holds configuration files and inventories: installed applications, VS Code extensions, services, scheduled tasks and git repositories.
 It runs on Linux, on WSL, where one run captures the distribution and its Windows host, and on Windows.
 chade only reads the system, it never changes it.
+Its web interface also runs git in a repository when asked: fetch, pull, checkout, new branch, commit and push.
 
 ## Installation
 

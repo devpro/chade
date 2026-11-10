@@ -13,6 +13,7 @@ and inventories: installed applications, VS Code extensions, services, scheduled
 
 chade only reads the system, it never changes it.
 `chade ui` opens a web interface served on the machine, which lists every git repository of the machine with what is left to commit, push or pull.
+A git repository is the one thing chade changes, and only when asked at that interface: a fetch, a pull, a checkout, a new branch, a commit or a push.
 `chade report` measures what takes disk and memory, the space WSL takes on C: above all, and gives the command that gets each one back.
 It is the tool, the snapshots live in the store, a folder of a git repository chosen at `chade init`.
 The store is a dedicated repository, or a subfolder of a repository that holds other things, such as personal notes.
@@ -124,7 +125,7 @@ cleanup:
 ```
 
 Key                | Content
--------------------|--------------------------------------------------------------------------------------------------
+-------------------|--------------------------------------------------------------------------------------------------------------
 `store`            | Folder the snapshots are written to, the root of a git repository or a subfolder of one, required
 `machine`          | Name of the machine folder, detected when absent
 `linux`, `windows` | One section per system, a system without its section is not captured
@@ -226,7 +227,7 @@ Its server runs in the background, on `http://127.0.0.1:7843`: the first `chade 
 `--no-open` prints the address without opening it, and `--port <number>` starts the server on another port.
 
 Command               | Effect
-----------------------|-------------------------------------------------------------------------------
+----------------------|-------------------------------------------------------------------------------------------
 `chade daemon start`  | Starts the server when it is not running, `--port <number>` chooses the port
 `chade daemon stop`   | Stops the server
 `chade daemon status` | Tells whether the server runs, on what address and since when
@@ -241,7 +242,7 @@ Each system of the machine is a tab, with the number of its repositories and of 
 A tab lists the git repositories found under `repos`, a Windows repository being read by the git of Windows, on WSL as well.
 
 Column       | Content
--------------|-------------------------------------------------------------------------------------------------
+-------------|----------------------------------------------------------------------------------------
 Repository   | Name and path
 Branch       | Checked out branch, or the commit of a detached HEAD
 Upstream     | Commits ahead (↑) and behind (↓) the upstream branch, `no upstream`, or `upstream gone`
@@ -262,7 +263,7 @@ The interface reads the repositories and changes nothing, and it fetches nothing
 A row of the list opens the page of its repository, which goes from a branch to a commit, to its files, to the changes of one file.
 
 Part     | Content
----------|-------------------------------------------------------------------------------------------------------------------
+---------|------------------------------------------------------------------------------------------------------------------
 Branches | Local and remote branches, the one checked out marked, each with what it is ahead and behind its upstream by
 History  | Commits of every branch and tag from the newest, drawn as a graph, each with the branches and tags pointing at it
 Changes  | Message, author and date of the commit chosen, and the list of the files it changed
@@ -273,6 +274,39 @@ Close, the Escape key, or another commit, brings the history back.
 A merge shows what it brought to its first parent, the branch it was merged into.
 When the working tree has changes, a first line of the history, Uncommitted changes, lists what is staged, what is changed and not staged, and the files not tracked, whose content shows as lines added.
 The history lists 300 commits, and a button at its end shows 300 older ones.
+
+### Git actions
+
+The page of a repository changes it through these actions, and no other.
+
+Action       | Where                                    | What git runs
+-------------|------------------------------------------|-----------------------------------------------------------------------------------
+Fetch        | Top of the page                          | `git fetch --all --prune`
+Pull         | Top of the page                          | `git pull --ff-only`
+Push         | Top of the page                          | `git push`, or `git push --set-upstream origin <branch>` for a branch never pushed
+New branch   | Top of the page, then a name             | `git switch --create <name>`, from the commit checked out
+Check out    | Beside a branch, when it is pointed at   | `git switch <branch>`, or `git switch --track <remote>/<branch>` for a remote one
+Stage, `+`   | Beside a file of the uncommitted changes | `git add --all -- <file>`
+Unstage, `−` | Beside a staged file                     | `git reset -- <file>`
+Stage all    | Beside Not staged, or Untracked          | `git add --all -- <files>`
+Unstage all  | Beside Staged                            | `git reset`
+Commit       | Under the message, above the files       | `git commit --message <message>`, of what is staged
+
+While git works, the button that asked turns and a notice in a corner of the page says what is running.
+The notice then says what was done, or what git answered when it refused, a push the pre-push hook of IstarCI blocked for instance.
+A notice of a refusal stays until dismissed.
+One action runs at a time in a repository, and the page reads the repository again after each.
+The list of the repositories reads again when it is returned to, so it shows a repository as the action left it.
+
+What is left to the terminal, on purpose:
+
+- A pull only fast forwards, so a branch that diverged from its upstream is merged or rebased by hand.
+- Nothing is forced, discarded, deleted or rewritten: no force push, no reset of the working tree, no branch deletion, no amend.
+- A conflict is resolved in an editor.
+
+git runs as the user, with the credentials of the user: the SSH agent and the credential helper already set up.
+chade holds no credential, and a command that would ask for a password in a terminal fails instead.
+A message being written stays in its box, with its caret, while the page reads the repository again.
 
 The bar between the history and the changes is dragged to give one the room of the other, and the browser keeps the width.
 A double click on it brings the width back.
@@ -286,7 +320,9 @@ The changes of a file stop after 10,000 lines, and a patch of more than 2 MB is 
 - The token is kept in `daemon.json`, a file of the user alone, for the next `chade ui` to sign in.
 - `chade ui` prints the address that signs in, with the token after the `#`, a part a browser sends to no server.
   The page keeps the token for the tab, and takes it out of the address bar and of the history.
-- A request named after another host, or sent by another site, is refused, so a web page open in the same browser cannot read the interface.
+- A request named after another host, or sent by another site, is refused, so a web page open in the same browser can neither read the interface nor act through it.
+- An action is a JSON request with the token, which a form of another site cannot send.
+- An action names a repository among those under `repos`, a branch among those git lists, and a file among the changes git lists, so it reaches nothing else of the machine.
 - A page opened without the token, or after a restart of the server, says so, and the next `chade ui` signs in again.
 
 ## Commands
@@ -306,7 +342,6 @@ Command                     | Effect
 
 ## Roadmap
 
-- Web interface, repositories: fetch, pull, checkout, branch creation, commit and push
 - Web interface, store: machines, snapshots, files and differences, and the report
 - Web interface, links: run status of [IstarCI](https://github.com/devpro/istarci), then build status and repositories of GitHub and GitLab
 - Restore scripts generated from a snapshot, `winget import` and `code --install-extension` for instance

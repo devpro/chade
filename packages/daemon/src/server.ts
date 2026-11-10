@@ -10,6 +10,8 @@ export interface ServerOptions {
   uiDir: string
   // The routes of the API, each one answering a GET with what it returns, as JSON.
   api: Record<string, (query: URLSearchParams) => Promise<unknown>>
+  // The routes that change something, each one answering a POST of a JSON body.
+  actions?: Record<string, (body: unknown) => Promise<unknown>>
 }
 
 export interface Server {
@@ -58,6 +60,25 @@ function refuse(response: ServerResponse, status: number, error: string): void {
   send(response, status, 'application/json; charset=utf-8', JSON.stringify({ error }))
 }
 
+const MAX_BODY = 1024 * 1024
+
+async function readJson(request: IncomingMessage): Promise<unknown> {
+  // A form of another site can post text or form fields without asking, and never JSON.
+  if (!/^application\/json\b/i.test(request.headers['content-type'] ?? '')) throw new RequestError(415, 'the body of a request is JSON')
+  const chunks: Buffer[] = []
+  let size = 0
+  for await (const chunk of request) {
+    size += (chunk as Buffer).length
+    if (size > MAX_BODY) throw new RequestError(413, 'the body of the request is too large')
+    chunks.push(chunk as Buffer)
+  }
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString('utf8'))
+  } catch {
+    throw new RequestError(400, 'the body of the request is not valid JSON')
+  }
+}
+
 // Digests have one length, which timingSafeEqual needs, and comparing them tells nothing about the token.
 function sameToken(given: string, token: string): boolean {
   const digest = (value: string) => createHash('sha256').update(value).digest()
@@ -81,17 +102,24 @@ export async function startServer(options: ServerOptions): Promise<Server> {
     // The browser names the site a request comes from, and no other site has a request to send here.
     const origin = request.headers.origin
     if (origin !== undefined && !hosts.has(origin.replace(/^http:\/\//, ''))) return refuse(response, 403, 'this request comes from another site')
-    if (request.method !== 'GET' && request.method !== 'HEAD') return refuse(response, 405, 'only GET is served')
     const url = new URL(request.url ?? '/', `http://${HOST}`)
     const path = url.pathname
     const head = request.method === 'HEAD'
     if (path.startsWith('/api/')) {
       const given = /^Bearer (.+)$/.exec(request.headers.authorization ?? '')?.[1]
       if (given === undefined || !sameToken(given, token)) return refuse(response, 401, 'chade ui gives the address that signs in')
-      const route = options.api[path.slice('/api/'.length)]
-      if (!route) return refuse(response, 404, 'no such route')
+      const name = path.slice('/api/'.length)
+      const action = options.actions?.[name]
+      if (request.method === 'POST') {
+        if (!action) return refuse(response, options.api[name] ? 405 : 404, options.api[name] ? 'this route only reads' : 'no such route')
+        return send(response, 200, 'application/json; charset=utf-8', JSON.stringify(await action(await readJson(request))))
+      }
+      if (request.method !== 'GET' && request.method !== 'HEAD') return refuse(response, 405, 'a route is read with GET, or changed with POST')
+      const route = options.api[name]
+      if (!route) return refuse(response, action ? 405 : 404, action ? 'this route is called with POST' : 'no such route')
       return send(response, 200, 'application/json; charset=utf-8', JSON.stringify(await route(url.searchParams)), head)
     }
+    if (request.method !== 'GET' && request.method !== 'HEAD') return refuse(response, 405, 'a page is read with GET')
     const name = path === '/' ? '/index.html' : path
     const file = files.get(name)
     if (!file) return refuse(response, 404, 'no such page')

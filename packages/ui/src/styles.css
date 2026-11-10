@@ -904,6 +904,203 @@ h3 {
   }
 }
 
+/* What changes a repository: the buttons, the line that names a new branch, the commit box, and the notice of what git answered. */
+#actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.action,
+#branch-cancel,
+#notice-close {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: 13px system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.action:hover:not(:disabled),
+#branch-cancel:hover,
+#notice-close:hover {
+  border-color: var(--accent);
+}
+
+.action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.busy .action:disabled {
+  cursor: progress;
+}
+
+.action.small {
+  flex: none;
+  padding: 0 8px;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+#branch-name {
+  flex: 0 1 340px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: 13px var(--mono);
+}
+
+.branch-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 6px;
+}
+
+.branch-line .branch-item {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The button shows when its branch is pointed at or reached with the keyboard, so the list stays a list of names. */
+.checkout {
+  display: none;
+}
+
+.branch-line:hover .checkout,
+.branch-line:focus-within .checkout {
+  display: block;
+}
+
+.commit-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+
+#commit-message {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--text);
+  font: 13px/1.45 system-ui, sans-serif;
+  resize: vertical;
+}
+
+h3.with-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+h3.with-action .action {
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.files.index li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.files.index .file-link {
+  flex: 1;
+  min-width: 0;
+}
+
+#notice {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 16px;
+  max-width: min(640px, calc(100vw - 40px));
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-left: 4px solid #2f9e63;
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
+}
+
+#notice.failed {
+  border-left-color: var(--bad);
+}
+
+#notice.running {
+  border-left-color: var(--accent);
+}
+
+/* A turning ring, on the button that asked and in the notice, for as long as git works. */
+#notice.running #notice-title::before,
+.action.running::after {
+  content: '';
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--accent);
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -1px;
+  animation: turn 0.7s linear infinite;
+}
+
+#notice.running #notice-title::before {
+  margin-right: 8px;
+}
+
+.action.running::after {
+  margin-left: 7px;
+}
+
+.action.running:disabled {
+  opacity: 1;
+}
+
+#notice.running #notice-close {
+  display: none;
+}
+
+@keyframes turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+#notice-text {
+  grid-column: 1 / -1;
+  max-height: 40vh;
+  margin: 0;
+  overflow: auto;
+  color: var(--muted);
+  font: 12px/1.5 var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+#notice-text:empty {
+  display: none;
+}
+
+#notice-close {
+  grid-column: 2;
+  grid-row: 1;
+  padding: 1px 10px;
+  font-size: 12px;
+}
+
 /* A narrow window has no room for columns, so a repository becomes a block: its name, then what there is to do, then its last commit. */
 @media (max-width: 760px) {
   thead {

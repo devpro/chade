@@ -1,10 +1,10 @@
 import type { Branch, Commit, Detail, Diff, FileChange } from '@chade/daemon'
-import { address, get } from './api.js'
+import { address, get, post } from './api.js'
 import { parseDiff, type DiffFile } from './diff.js'
 import { element, node, svg } from './dom.js'
 import { ago, changes, sync } from './format.js'
 import { layout, type GraphRow } from './graph.js'
-import { badges } from './list.js'
+import { badges, list } from './list.js'
 
 type Loaded = Detail & { machine: string; version: string; scannedAt: string }
 
@@ -26,6 +26,110 @@ let shownFile: { path: string; from: string } | undefined
 // The patch of a commit never changes, so it is asked once.
 const patches = new Map<string, Diff>()
 const rows = new Map<string, HTMLElement>()
+// An action is running: the next one waits for its answer, as git changes one thing at a time in a repository.
+let acting = false
+
+let noticeTimer: ReturnType<typeof setTimeout> | undefined
+
+// What an action did, or why git refused it, in the words of git, in a corner of the page.
+function notify(title: string, text: string, state: 'running' | 'done' | 'failed'): void {
+  const failed = state === 'failed'
+  clearTimeout(noticeTimer)
+  const notice = element('notice')
+  notice.hidden = false
+  notice.className = state
+  element('notice-title').textContent = title
+  element('notice-text').textContent = text
+  // A success leaves by itself, and a failure stays until read.
+  if (state === 'done') noticeTimer = setTimeout(() => (notice.hidden = true), 6000)
+}
+
+element('notice-close').addEventListener('click', () => (element('notice').hidden = true))
+
+function setBusy(busy: boolean): void {
+  acting = busy
+  repository.section.classList.toggle('busy', busy)
+  for (const button of repository.section.querySelectorAll<HTMLButtonElement>('.action')) button.disabled = busy || button.dataset.off === 'true'
+}
+
+// What the notice says while git works, a push taking the seconds its remote takes.
+const RUNNING: Record<string, string> = {
+  fetch: 'Fetching…',
+  pull: 'Pulling…',
+  push: 'Pushing…',
+  checkout: 'Checking out…',
+  branch: 'Creating the branch…',
+  stage: 'Staging…',
+  unstage: 'Unstaging…',
+  commit: 'Committing…',
+}
+
+// Asks the server for one change in the repository shown, then reads the repository again.
+// The button that asked turns until the answer, and the notice says what is running, so the page never looks stopped.
+async function act(request: Record<string, unknown>, done: string, button?: HTMLElement): Promise<boolean> {
+  if (!detail || acting) return false
+  const { system, path } = detail.repository
+  const action = String(request.action)
+  setBusy(true)
+  button?.classList.add('running')
+  notify(RUNNING[action] ?? 'Working…', '', 'running')
+  let succeeded = false
+  try {
+    const { output } = await post<{ output: string }>('action', { system, path, ...request })
+    succeeded = true
+    acting = false
+    await repository.reload().catch(() => undefined)
+    notify(done, output, 'done')
+  } catch (error) {
+    acting = false
+    await repository.reload().catch(() => undefined)
+    notify(`${action[0].toUpperCase()}${action.slice(1)} did not go through`, error instanceof Error ? error.message : String(error), 'failed')
+  }
+  button?.classList.remove('running')
+  setBusy(false)
+  // The list of the repositories shows this one as it was before, until it reads again.
+  list.clear()
+  return succeeded
+}
+
+function actionButton(text: string, title: string, run: (button: HTMLButtonElement) => void, className = 'action small'): HTMLButtonElement {
+  const button = node('button', text, className) as HTMLButtonElement
+  button.type = 'button'
+  button.title = title
+  button.disabled = acting
+  button.addEventListener('click', (event) => {
+    event.stopPropagation()
+    run(button)
+  })
+  return button
+}
+
+// The message being written, kept while the page reads the repository again around it.
+const message = node('textarea') as HTMLTextAreaElement
+message.id = 'commit-message'
+message.placeholder = 'Commit message'
+message.rows = 3
+message.setAttribute('aria-label', 'Commit message')
+const commitButton = node('button', 'Commit', 'action') as HTMLButtonElement
+commitButton.type = 'button'
+const commitForm = node('div', '', 'commit-form')
+commitForm.append(message, commitButton)
+let stagedCount = 0
+
+function updateCommit(): void {
+  const off = stagedCount === 0 || message.value.trim() === ''
+  commitButton.dataset.off = String(off)
+  commitButton.disabled = off || acting
+  commitButton.title = stagedCount === 0 ? 'Stage a file to commit it' : message.value.trim() === '' ? 'Write a message to commit' : `Commit ${stagedCount} staged file${stagedCount === 1 ? '' : 's'}`
+}
+
+message.addEventListener('input', updateCommit)
+commitButton.addEventListener('click', () => {
+  void act({ action: 'commit', message: message.value }, 'Committed', commitButton).then((succeeded) => {
+    if (succeeded) message.value = ''
+    updateCommit()
+  })
+})
 
 function graphCell(row: GraphRow, width: number, merge: boolean): SVGElement {
   const x = (lane: number) => lane * LANE + LANE / 2 + 2
@@ -116,7 +220,13 @@ function renderBranches(current: Loaded): void {
       if (branch.behind) item.append(node('span', `↓${branch.behind}`, 'track warn'))
       item.title = branch.upstream ? `${branch.name}, tracking ${branch.upstream}` : branch.name
       item.addEventListener('click', () => choose(branch.commit))
-      return item
+      if (branch.head) return item
+      // The name shows the commit of the branch, and the button beside it checks the branch out.
+      const line = node('div', '', 'branch-line')
+      const checkout = actionButton('Check out', `Check out ${branch.name}`, (button) => void act({ action: 'checkout', branch: branch.name }, `Checked out ${branch.name}`, button), 'action small checkout')
+      checkout.setAttribute('aria-label', `Check out ${branch.name}`)
+      line.append(item, checkout)
+      return line
     })
     return [node('h3', title), ...items]
   }
@@ -156,8 +266,15 @@ function open(from: string, path: string | undefined): void {
   location.hash = address({ system: detail.repository.system, path: detail.repository.path, commit: group ? WORKING_TREE : from, group, file: path })
 }
 
+// What a file of the working tree can be asked: to be staged, or to leave the index.
+interface FileAction {
+  text: string
+  title: string
+  action: 'stage' | 'unstage'
+}
+
 // The files of a patch by name, each one opening its changes in place of the history.
-function fileIndex(diff: Diff, from: string): HTMLElement[] {
+function fileIndex(diff: Diff, from: string, change?: FileAction): HTMLElement[] {
   const index = node('ul', '', 'files index')
   for (const file of parseDiff(diff.patch)) {
     const entry = node('button', '', 'file-link')
@@ -166,6 +283,12 @@ function fileIndex(diff: Diff, from: string): HTMLElement[] {
     entry.addEventListener('click', () => open(from, file.path))
     const item = node('li')
     item.append(entry)
+    if (change) {
+      const done = change.action === 'stage' ? `Staged ${file.path}` : `Unstaged ${file.path}`
+      const button = actionButton(change.text, `${change.title} ${file.path}`, (pressed) => void act({ action: change.action, files: [file.path] }, done, pressed))
+      button.setAttribute('aria-label', `${change.title} ${file.path}`)
+      item.append(button)
+    }
     index.append(item)
   }
   const created = [index]
@@ -250,11 +373,32 @@ async function renderDetail(current: Loaded): Promise<void> {
       created.push(node('h2', 'Uncommitted changes'))
       if (current.changes.length === 0) created.push(node('p', 'The working tree is clean.', 'empty'))
       created.push(...fileList('In conflict', conflicts, 'U'))
-      if (staged.length > 0) created.push(node('h3', `Staged (${staged.length})`), ...fileIndex(await patch(current, 'staged'), 'staged'))
-      if (unstaged.length + conflicts.length > 0) {
-        created.push(node('h3', `Not staged (${unstaged.length + conflicts.length})`), ...fileIndex(await patch(current, 'unstaged'), 'unstaged'))
+      // A title of a part of the working tree, with the button that stages or unstages all of it.
+      const title = (text: string, button?: HTMLButtonElement): HTMLElement => {
+        const heading = node('h3', text, 'with-action')
+        if (button) heading.append(button)
+        return heading
       }
-      if (untracked.length > 0) created.push(node('h3', `Untracked (${untracked.length})`), ...fileIndex(await patch(current, 'untracked'), 'untracked'))
+      const paths = (files: FileChange[]): string[] => files.map((file) => file.path)
+      const stage: FileAction = { text: '+', title: 'Stage', action: 'stage' }
+      stagedCount = staged.length
+      updateCommit()
+      created.push(commitForm)
+      if (staged.length > 0) {
+        const all = actionButton('Unstage all', 'Take every file out of the index', (button) => void act({ action: 'unstage' }, 'Unstaged every file', button))
+        created.push(title(`Staged (${staged.length})`, all), ...fileIndex(await patch(current, 'staged'), 'staged', { text: '−', title: 'Unstage', action: 'unstage' }))
+      }
+      if (unstaged.length + conflicts.length > 0) {
+        const all = unstaged.length > 0 ? actionButton('Stage all', 'Stage every changed file', (button) => void act({ action: 'stage', files: paths(unstaged) }, 'Staged the changed files', button)) : undefined
+        // The two Stage all buttons of the panel are told apart by what they stage.
+        all?.setAttribute('aria-label', 'Stage all changed files')
+        created.push(title(`Not staged (${unstaged.length + conflicts.length})`, all), ...fileIndex(await patch(current, 'unstaged'), 'unstaged', stage))
+      }
+      if (untracked.length > 0) {
+        const all = actionButton('Stage all', 'Stage every file not tracked', (button) => void act({ action: 'stage', files: paths(untracked) }, 'Staged the new files', button))
+        all.setAttribute('aria-label', 'Stage all new files')
+        created.push(title(`Untracked (${untracked.length})`, all), ...fileIndex(await patch(current, 'untracked'), 'untracked', stage))
+      }
     } else {
       const diff = await patch(current, shown)
       const [subject, ...body] = (diff.commit?.message ?? '').split('\n')
@@ -269,7 +413,14 @@ async function renderDetail(current: Loaded): Promise<void> {
       else created.push(node('h3', 'Files'), ...fileIndex(diff, shown))
     }
     // The answer of a commit left for another one meanwhile is dropped.
-    if (shown === target) panel.replaceChildren(...created)
+    if (shown !== target) return
+    // A message being written keeps its place and its caret, which taking the box out of the page and back would lose.
+    const writing = document.activeElement === message ? [message.selectionStart, message.selectionEnd] : undefined
+    panel.replaceChildren(...created)
+    if (writing && message.isConnected) {
+      message.focus()
+      message.setSelectionRange(writing[0], writing[1])
+    }
   } catch (error) {
     if (shown === target) panel.replaceChildren(node('p', error instanceof Error ? error.message : String(error), 'error'))
   }
@@ -340,6 +491,45 @@ function resizable(): void {
 
 resizable()
 
+for (const button of actionButtons()) {
+  const action = button.dataset.action as string
+  const done: Record<string, string> = { fetch: 'Fetched', pull: 'Pulled', push: 'Pushed' }
+  button.addEventListener('click', () => void act({ action }, done[action], button))
+}
+
+function actionButtons(): HTMLButtonElement[] {
+  return [...document.querySelectorAll<HTMLButtonElement>('#actions [data-action]')]
+}
+
+// The name of a new branch is asked in a line of its own, which Create and Enter send, and Cancel and Escape close.
+{
+  const form = element<HTMLFormElement>('branch-form')
+  const name = element<HTMLInputElement>('branch-name')
+  const close = (): void => {
+    form.hidden = true
+    name.value = ''
+  }
+  element('new-branch').addEventListener('click', () => {
+    form.hidden = false
+    name.focus()
+  })
+  element('branch-cancel').addEventListener('click', close)
+  name.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      close()
+      event.stopPropagation()
+    }
+  })
+  form.addEventListener('submit', (event) => {
+    event.preventDefault()
+    const branch = name.value.trim()
+    if (branch === '') return
+    void act({ action: 'branch', branch }, `Created ${branch}`, form.querySelector<HTMLElement>('[type=submit]') ?? undefined).then((succeeded) => {
+      if (succeeded) close()
+    })
+  })
+}
+
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && shownFile && !repository.section.hidden) open(shownFile.from, undefined)
 })
@@ -363,6 +553,8 @@ export const repository = {
     limit = PAGE
     detail = undefined
     patches.clear()
+    message.value = ''
+    element('branch-form').hidden = true
     for (const id of ['branches', 'history', 'diff', 'detail', 'repository-state']) element(id).replaceChildren()
     element('repository-name').textContent = ''
     element('repository-path').textContent = params.get('path') ?? ''

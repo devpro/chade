@@ -127,7 +127,7 @@ test('a merge shows what the branch brought, and a rename the two names of the f
 test('the uncommitted changes show what is staged, what is not, and the files not tracked @layout', async ({ page, history }, testInfo) => {
   await history.workingTree.click()
   await expect(history.heading).toHaveText('Uncommitted changes')
-  await expect(history.changes.locator('h3')).toHaveText(['Staged (1)', 'Not staged (1)', 'Untracked (1)'])
+  await expect(history.changes.locator('h3')).toHaveText([/^Staged \(1\)/, /^Not staged \(1\)/, /^Untracked \(1\)/])
   await expect(history.files).toHaveText(['Astaged.txt+1', 'MREADME.md+2', 'Anotes.txt+1'])
   // A file not tracked yet shows its content, as lines added.
   await history.openFile('notes.txt')

@@ -36,7 +36,18 @@
           <h2 id="repository-name"></h2>
           <span id="repository-path" class="path"></span>
           <span id="repository-state"></span>
+          <span id="actions">
+            <button class="action" type="button" data-action="fetch" title="Bring what the remotes have, without changing any branch">Fetch</button>
+            <button class="action" type="button" data-action="pull" title="Move the branch to its upstream, when that is a fast forward">Pull</button>
+            <button class="action" type="button" data-action="push" title="Send the branch to its upstream, or to origin when it was never pushed">Push</button>
+            <button class="action" type="button" id="new-branch" title="Create a branch from the commit checked out, and check it out">New branch</button>
+          </span>
         </div>
+        <form id="branch-form" class="bar" hidden>
+          <input id="branch-name" type="text" placeholder="Name of the new branch" aria-label="Name of the new branch" autocomplete="off" spellcheck="false" />
+          <button class="action" type="submit">Create branch</button>
+          <button type="button" id="branch-cancel">Cancel</button>
+        </form>
         <div class="workspace">
           <nav id="branches" aria-label="Branches"></nav>
           <div id="history" aria-label="History"></div>
@@ -46,6 +57,11 @@
         </div>
       </section>
     </main>
+    <div id="notice" role="status" hidden>
+      <strong id="notice-title"></strong>
+      <pre id="notice-text"></pre>
+      <button id="notice-close" type="button">Dismiss</button>
+    </div>
     <script type="module" src="app.js"></script>
   </body>
 </html>

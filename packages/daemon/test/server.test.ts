@@ -23,13 +23,19 @@ before(async () => {
         throw new Error('git is missing')
       },
     },
+    actions: { action: async (body) => ({ received: body }) },
   })
 })
 
 after(() => server.close())
 
 // fetch refuses to set the Host header, which is what the server checks.
-function get(path: string, headers: Record<string, string> = {}, method = 'GET'): Promise<{ status: number; body: string; headers: Record<string, unknown> }> {
+function get(
+  path: string,
+  headers: Record<string, string> = {},
+  method = 'GET',
+  body?: string,
+): Promise<{ status: number; body: string; headers: Record<string, unknown> }> {
   return new Promise((resolve, reject) => {
     const url = new URL(path, server.address)
     const call = request({ host: url.hostname, port: url.port, path, method, headers }, (response) => {
@@ -38,7 +44,7 @@ function get(path: string, headers: Record<string, string> = {}, method = 'GET')
       response.on('end', () => resolve({ status: response.statusCode ?? 0, body, headers: response.headers }))
     })
     call.on('error', reject)
-    call.end()
+    call.end(body)
   })
 }
 
@@ -89,8 +95,30 @@ test('a request named after another host, or sent by another site, is refused ev
   assert.equal((await get('/api/repositories', { ...signedIn(), host: `localhost:${port}` })).status, 200)
 })
 
-test('nothing is changed through the server', async () => {
-  assert.equal((await get('/api/repositories', signedIn(), 'POST')).status, 405)
+const json = (): Record<string, string> => ({ ...signedIn(), 'content-type': 'application/json' })
+
+test('a route that changes something answers a POST of JSON, with the token', async () => {
+  const answer = await get('/api/action', json(), 'POST', JSON.stringify({ action: 'fetch' }))
+  assert.equal(answer.status, 200)
+  assert.deepEqual(JSON.parse(answer.body), { received: { action: 'fetch' } })
+  assert.equal((await get('/api/action', { 'content-type': 'application/json' }, 'POST', '{}')).status, 401)
+  assert.equal((await get('/api/action', { ...json(), origin: 'https://evil.example.test' }, 'POST', '{}')).status, 403)
+})
+
+test('a body that is not JSON is refused, as a form of another site would send it, and so is one too large', async () => {
+  assert.equal((await get('/api/action', { ...signedIn(), 'content-type': 'text/plain' }, 'POST', '{}')).status, 415)
+  assert.equal((await get('/api/action', { ...signedIn(), 'content-type': 'application/x-www-form-urlencoded' }, 'POST', 'action=fetch')).status, 415)
+  assert.equal((await get('/api/action', signedIn(), 'POST', '{}')).status, 415)
+  assert.equal((await get('/api/action', json(), 'POST', '{not json')).status, 400)
+  assert.equal((await get('/api/action', json(), 'POST', JSON.stringify({ message: 'x'.repeat(1024 * 1024) }))).status, 413)
+})
+
+test('a route answers its own method only, and a page is only read', async () => {
+  assert.equal((await get('/api/repositories', json(), 'POST', '{}')).status, 405)
+  assert.equal((await get('/api/action', signedIn())).status, 405)
+  assert.equal((await get('/api/unknown', json(), 'POST', '{}')).status, 404)
+  assert.equal((await get('/api/repositories', signedIn(), 'DELETE')).status, 405)
+  assert.equal((await get('/', {}, 'POST', '')).status, 405)
 })
 
 test('a port already taken says so', async () => {

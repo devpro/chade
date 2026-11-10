@@ -5,7 +5,7 @@ import { shot } from './shot.js'
 
 test('each system is a tab, with its repositories and how many have something to do @layout', async ({ page, repositories }, testInfo) => {
   await expect(repositories.machine).toHaveText('E2E-PC')
-  await expect(repositories.tabs).toHaveText(['windows21', 'wsl-ubuntu97'])
+  await expect(repositories.tabs).toHaveText(['windows21', 'wsl-ubuntu97', /^sandbox1/])
   // The first system is shown until another is chosen.
   await expect(repositories.tab('windows')).toHaveAttribute('aria-selected', 'true')
   await expect(repositories.names).toHaveText(['local-only', 'portal'])

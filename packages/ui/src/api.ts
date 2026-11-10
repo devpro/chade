@@ -33,13 +33,22 @@ function takeToken(): string | null {
   return sessionStorage.getItem(TOKEN_KEY)
 }
 
-export async function get<T>(name: string, query: Record<string, string> = {}): Promise<T> {
+export function get<T>(name: string, query: Record<string, string> = {}): Promise<T> {
+  const search = new URLSearchParams(query)
+  return call<T>(`api/${name}${search.size > 0 ? `?${search}` : ''}`, {})
+}
+
+// Asks the server to change something, where get only reads.
+export function post<T>(name: string, body: unknown): Promise<T> {
+  return call<T>(`api/${name}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+}
+
+async function call<T>(url: string, init: RequestInit): Promise<T> {
   const token = takeToken()
   if (!token) throw new ApiError('signed-out', 'Not signed in. The chade ui command opens this page with the address that signs in.')
   let response: Response
   try {
-    const search = new URLSearchParams(query)
-    response = await fetch(`api/${name}${search.size > 0 ? `?${search}` : ''}`, { headers: { Authorization: `Bearer ${token}` } })
+    response = await fetch(url, { ...init, headers: { ...init.headers, Authorization: `Bearer ${token}` } })
   } catch {
     throw new ApiError('offline', 'The server does not answer. The chade ui command starts it.')
   }

@@ -125,6 +125,7 @@ export const list = {
   clear: (): void => {
     state = undefined
   },
+  // What was read before shows at once, and the page then reads again, as a repository left a moment ago may have changed.
   async show(): Promise<{ machine: string; version: string; scannedAt: string } | void> {
     if (!state) return this.reload()
     render()

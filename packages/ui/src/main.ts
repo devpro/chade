@@ -56,23 +56,27 @@ function fail(error: unknown): void {
   message(error.message)
 }
 
-async function run(action: () => Promise<{ machine: string; version: string; scannedAt: string } | void>): Promise<void> {
+async function run(action: () => Promise<{ machine: string; version: string; scannedAt: string } | void>): Promise<boolean> {
   if (loading) {
-    queued = () => run(action)
-    return
+    queued = async () => void (await run(action))
+    return true
   }
+  let read = false
   loading = true
   const button = element<HTMLButtonElement>('refresh')
   button.disabled = true
   try {
     const view = current()
     const result = await action()
+    read = result !== undefined
     element('message').hidden = true
     list.section.hidden = view !== list
     repository.section.hidden = view !== repository
     document.body.classList.toggle('wide', view === repository)
     loaded(result)
   } catch (error) {
+    // A read that failed has said why, and is not tried again behind the message.
+    read = true
     fail(error)
   } finally {
     loading = false
@@ -81,10 +85,15 @@ async function run(action: () => Promise<{ machine: string; version: string; sca
     queued = undefined
     if (next) await next()
   }
+  return read
 }
 
-const show = (): Promise<void> => run(() => current().show(route()))
-const reload = (): Promise<void> => run(() => current().reload())
+const reload = async (): Promise<void> => void (await run(() => current().reload()))
+// A list shown from what was read before is read again behind it, so a repository just left shows as it is now.
+const show = async (): Promise<void> => {
+  const read = await run(() => current().show(route()))
+  if (!read && current() === list) await reload()
+}
 
 element('refresh').addEventListener('click', () => void reload())
 window.addEventListener('hashchange', () => void show())

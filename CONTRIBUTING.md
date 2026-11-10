@@ -71,7 +71,7 @@ A change to `packages/ui` or to the server shows after `task build` and `task ru
 `task` alone lists every task.
 
 Task                      | Effect
---------------------------|--------------------------------------------------------------------------------------------------------
+--------------------------|-----------------------------------------------------------------------------------------------------------
 `task install`            | Installs the npm workspaces
 `task build`              | Typechecks and bundles the CLI into `packages/cli/dist`, and the web interface into its `ui` folder
 `task run -- <arguments>` | Runs the CLI from its sources
@@ -120,6 +120,7 @@ task test:e2e
 The Playwright specs of `packages/ui/e2e` drive Chromium against the server of `chade ui`, started by `e2e/serve.ts` over the built interface.
 That server reads real repositories, made for the run in a temporary folder, one in each state the interface tells apart: clean, ahead, behind, changed, in conflict, never pushed, detached, unreadable.
 One more, `history`, has a merged branch, a tag, a renamed file and uncommitted changes, for the page of a repository.
+The last one, `work`, sits under a system of its own, `sandbox`, with a remote that is one commit ahead: `e2e/actions.spec.ts` fetches, pulls, commits, pushes and branches in it, each test from the state the one before left.
 A spec signs in the way `chade ui` does, with the address that carries the token, and reaches the page through the page objects of `e2e/pages`, so a change of markup is a change in one place.
 
 ```bash
@@ -187,7 +188,7 @@ From a Command Prompt on Windows, in a clone of the repository, `node packages\c
 `.github/workflows/ci.yaml` runs on every pull request and every push to `main`.
 
 Job                    | Content
------------------------|------------------------------------------------------------------------------------------------------------------------
+-----------------------|------------------------------------------------------------------------------------------------------------------------------------------
 Markup                 | Markdown and YAML lint
 Git                    | Tells whether anything other than documentation changed
 Build & Test           | Typecheck, build, unit tests with coverage, packaging smoke test, end to end tests and Sonar analysis, skipped for a documentation change

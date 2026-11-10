@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createApi, startServer, type Root, type Run } from '@chade/daemon'
+import { createActions, createApi, startServer, type Root, type Run } from '@chade/daemon'
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 const stateFile = process.env.E2E_STATE
@@ -111,10 +111,23 @@ writeFileSync(join(history, 'notes.txt'), 'not tracked\n')
 // A .git that is no repository, as an interrupted clone leaves.
 mkdirSync(join(root, 'wsl-ubuntu', 'interrupted', '.git'), { recursive: true })
 
+// The repositories the tests change, under a system of their own, so the lists the other tests count stay as they are.
+// The remote of work has one commit more, which a fetch brings, and a branch work never fetched.
+const work = repository('sandbox', 'work')
+const elsewhere = join(root, 'elsewhere')
+git(root, 'clone', '--quiet', join(root, 'remotes', 'sandbox-work.git'), elsewhere)
+commit(elsewhere, 'remote.txt', 'pushed from elsewhere\n', 'Add a file from another machine')
+git(elsewhere, 'push', '--quiet')
+git(elsewhere, 'switch', '--quiet', '--create', 'review')
+commit(elsewhere, 'review.txt', 'to review\n', 'Start the review')
+git(elsewhere, 'push', '--quiet', '--set-upstream', 'origin', 'review')
+writeFileSync(join(work, 'README.md'), '# work\n\nEdited.\n')
+writeFileSync(join(work, 'draft.txt'), 'a new file\n')
+
 repository('windows', 'portal')
 repository('windows', 'local-only', { push: false })
 
-const roots: Root[] = ['windows', 'wsl-ubuntu', 'missing'].map((system) => ({
+const roots: Root[] = ['windows', 'wsl-ubuntu', 'sandbox', 'missing'].map((system) => ({
   system: system === 'missing' ? 'wsl-ubuntu' : system,
   folder: join(root, system),
   path: join(root, system),
@@ -131,10 +144,12 @@ const run: Run = async (command, args, options = {}) => {
   }
 }
 
+const options = { version: '0.0.0', machine: 'E2E-PC', roots: async () => roots, run }
 const server = await startServer({
   port: Number(process.env.E2E_PORT ?? 7899),
   uiDir: join(here, '..', 'dist'),
-  api: createApi({ version: '0.0.0', machine: 'E2E-PC', roots: async () => roots, run }),
+  api: createApi(options),
+  actions: createActions(options),
 })
 writeFileSync(stateFile, JSON.stringify({ url: server.url, root }))
 console.log(`chade e2e server on ${server.address}, repositories in ${root}`)

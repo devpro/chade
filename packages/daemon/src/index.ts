@@ -1,4 +1,5 @@
-export { createApi, type ApiOptions } from './api.js'
+export { ACTIONS, runAction, type ActionRequest } from './actions.js'
+export { createActions, createApi, type ApiOptions } from './api.js'
 export {
   parseBranches,
   parseChanges,

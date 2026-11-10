@@ -37,6 +37,10 @@ export class RepositoryPage {
   readonly comparison: FileComparison
   readonly history: Locator
   readonly resizer: Locator
+  readonly notice: Locator
+  readonly noticeText: Locator
+  readonly commitMessage: Locator
+  readonly commitButton: Locator
   readonly message: Locator
 
   constructor(readonly page: Page) {
@@ -54,6 +58,10 @@ export class RepositoryPage {
     this.comparison = new FileComparison(page.locator('#diff'))
     this.history = page.locator('#history')
     this.resizer = page.getByRole('separator', { name: 'Width of the history' })
+    this.notice = page.locator('#notice-title')
+    this.noticeText = page.locator('#notice-text')
+    this.commitMessage = page.getByRole('textbox', { name: 'Commit message' })
+    this.commitButton = page.getByRole('button', { name: 'Commit', exact: true })
     this.message = page.locator('#message')
   }
 
@@ -90,6 +98,46 @@ export class RepositoryPage {
   async openFile(path: string): Promise<void> {
     await this.files.filter({ hasText: path }).click()
     await expect(this.comparison.path).toContainText(path)
+  }
+
+  // Fetch, Pull or Push, and the notice that it is done.
+  async run(action: 'Fetch' | 'Pull' | 'Push', done: string): Promise<void> {
+    await this.page.getByRole('button', { name: action, exact: true }).click()
+    await expect(this.notice).toHaveText(done)
+  }
+
+  async checkOut(branch: string): Promise<void> {
+    await this.branch(branch).hover()
+    await this.page.getByRole('button', { name: `Check out ${branch}`, exact: true }).click()
+    await expect(this.notice).toHaveText(`Checked out ${branch}`)
+  }
+
+  async createBranch(name: string): Promise<void> {
+    await this.page.getByRole('button', { name: 'New branch' }).click()
+    await this.page.getByRole('textbox', { name: 'Name of the new branch' }).fill(name)
+    await this.page.getByRole('button', { name: 'Create branch' }).click()
+  }
+
+  // The files under a title of the uncommitted changes: Staged, Not staged or Untracked.
+  part(title: string): Locator {
+    // From its first letter, as Staged is also the end of Not staged.
+    return this.changes.locator('h3', { hasText: new RegExp(`^${title}`) }).locator('+ ul .file-path')
+  }
+
+  async stage(path: string): Promise<void> {
+    await this.page.getByRole('button', { name: `Stage ${path}`, exact: true }).click()
+    await expect(this.notice).toHaveText(`Staged ${path}`)
+  }
+
+  async unstage(path: string): Promise<void> {
+    await this.page.getByRole('button', { name: `Unstage ${path}`, exact: true }).click()
+    await expect(this.notice).toHaveText(`Unstaged ${path}`)
+  }
+
+  async commitWith(message: string): Promise<void> {
+    await this.commitMessage.fill(message)
+    await this.commitButton.click()
+    await expect(this.notice).toHaveText('Committed')
   }
 
   // Drags the bar between the history and the changes, to the right by the pixels given, or to the left when negative.

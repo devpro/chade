@@ -5,7 +5,7 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 import { fileURLToPath } from 'node:url'
-import { createApi, startServer } from '@chade/daemon'
+import { createActions, createApi, startServer } from '@chade/daemon'
 import { Command } from 'commander'
 import { planCleanup, renderPlan, runCleanup } from './clean.js'
 import { DEFAULT_PORT, removeState, runningDaemon, signInUrl, startDaemon, stopDaemon, writeState, type DaemonState } from './daemon.js'
@@ -19,7 +19,7 @@ import { diskUsage, formatBytes, renderReport, report } from './report.js'
 import { repositoryRoots } from './roots.js'
 import { snapshot, type Logger } from './snapshot.js'
 import { git, repositoryRoot } from './store.js'
-import { detectHost, systemKinds } from './system.js'
+import { detectHost, systemKinds, type Host } from './system.js'
 
 const { version } = createRequire(import.meta.url)('../package.json') as { version: string }
 
@@ -169,6 +169,12 @@ program
     if (result.failed.length > 0) process.exitCode = 1
   })
 
+// The routes of the server over the repositories of the configuration.
+function routes(host: Host): { api: ReturnType<typeof createApi>; actions: ReturnType<typeof createActions> } {
+  const options = { version, machine: host.machine, roots: async () => repositoryRoots(await loadConfig(), host), run }
+  return { api: createApi(options), actions: createActions(options) }
+}
+
 // A port the option names, or the usual one.
 function portOf(value: string | undefined): number {
   const port = value === undefined ? DEFAULT_PORT : Number(value)
@@ -236,6 +242,8 @@ daemon
   .action(async (options: { port?: string }) => {
     const file = configFile()
     const host = await detectHost({ machine: (await loadConfig()).machine })
+    // A git command that would ask for a password in a terminal fails instead, as the server has none to ask in.
+    process.env.GIT_TERMINAL_PROMPT = '0'
     // The interface is built beside the bundle, which a run from the sources reaches the same way.
     const uiDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'ui')
     if (!existsSync(join(uiDir, 'index.html'))) throw new Error(`the web interface is not built in ${uiDir}, npm run build builds it`)
@@ -243,7 +251,7 @@ daemon
       port: portOf(options.port),
       uiDir,
       // The configuration is read at each call, so a folder added to repos shows without a restart.
-      api: createApi({ version, machine: host.machine, roots: async () => repositoryRoots(await loadConfig(), host), run }),
+      ...routes(host),
     })
     await writeState(file, { pid: process.pid, address: server.address, token: server.token, version, startedAt: new Date().toISOString() })
     const stop = () => {
