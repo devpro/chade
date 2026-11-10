@@ -58,7 +58,7 @@ tasks:
       - npm run test:e2e
 
   ui:screenshots:
-    desc: Runs the end to end tests in the light theme, the dark theme and at phone width, and saves a screenshot of each state in packages/ui/e2e/screenshots
+    desc: Runs the end to end tests on the two target screens and in the dark theme, and saves a screenshot of each state in packages/ui/e2e/screenshots
     cmds:
       - npm run ui:screenshots
 

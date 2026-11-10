@@ -221,6 +221,7 @@ chade ui
 ```
 
 The interface opens in the browser, the one of Windows on WSL, and the command returns.
+The tab of the browser shows the icon of chade, a C drawn as a line of history between two commits.
 Its server runs in the background, on `http://127.0.0.1:7843`: the first `chade ui` starts it, and the next ones find it running.
 `--no-open` prints the address without opening it, and `--port <number>` starts the server on another port.
 
@@ -252,7 +253,8 @@ The mark at the start of a row is blue with commits to push, amber with somethin
 The name of a repository opens its page.
 The filter keeps the repositories whose name, path or branch holds every word typed.
 The checkbox keeps those with something to commit, push, pull or fix.
-The page reads the repositories again every 30 seconds while it is looked at, when its tab comes back to the front, and on Refresh.
+The page reads again by itself every 30 seconds while it is looked at, and when its tab comes back to the front, the list as well as the page of a repository.
+Refresh reads at once, without waiting for the next time.
 The interface reads the repositories and changes nothing, and it fetches nothing either, so a count behind is the one of the last fetch.
 
 ### A repository

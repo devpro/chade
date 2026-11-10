@@ -26,7 +26,7 @@
 │   │   └── test/
 │   └── ui/                 web interface, built into dist/ui of the published package
 │       ├── e2e/            end to end tests, their page objects and their server
-│       ├── public/         page
+│       ├── public/         page and its icon
 │       ├── src/            script and style sheet
 │       └── test/           unit tests
 ├── scripts/                scripts shared by the packages
@@ -80,7 +80,7 @@ Task                      | Effect
 `task test`               | Runs the unit tests of every package
 `task test:coverage`      | Runs the unit tests with a coverage report, also written to `packages/cli/coverage/lcov.info` for Sonar
 `task test:e2e`           | Runs the end to end tests of the web interface in Chromium, after a build
-`task ui:screenshots`     | Runs them in the light theme, the dark theme and at phone width, and saves a screenshot of each state for review
+`task ui:screenshots`     | Runs them on the two target screens and in the dark theme, and saves a screenshot of each state for review
 `task test:pkg`           | Runs the packaging smoke test
 `task check`              | Runs what CI runs: typecheck, build, unit tests, packaging smoke test, end to end tests
 
@@ -127,7 +127,9 @@ task ui:screenshots
 ```
 
 The same run with `SCREENSHOTS=1` also saves a screenshot of each state a spec reaches, in `packages/ui/e2e/screenshots`, for a review of a change of the interface.
-The specs tagged `@layout`, those that capture a page, then run in the dark theme and at phone width as well.
+The interface is designed for two screens, 1920x1200 and 2560x1440, both scaled at 125%, which a browser sees as 1536x960 and 2048x1152.
+The specs run on the first one, and those tagged `@layout`, which capture a page, then run on the second one and in the dark theme as well.
+A screenshot has the pixels of the screen, 1920 or 2560 wide.
 The screenshots are not compared with earlier ones, and are not committed.
 
 ### Manual test of the web interface

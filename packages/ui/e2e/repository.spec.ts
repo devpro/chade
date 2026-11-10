@@ -55,7 +55,6 @@ test('the Escape key and another commit both leave the changes of a file for the
 })
 
 test('the bar between the history and the changes resizes them, and the width is kept @layout', async ({ page, history }, testInfo) => {
-  test.skip((page.viewportSize()?.width ?? 0) < 1100, 'a narrow window stacks the parts, with nothing to resize')
   await history.choose('Change the guide')
   const before = await history.historyWidth()
   await history.resizeHistory(-260)

@@ -28,6 +28,15 @@ test('the token of a server that is gone ends the session, and says how to open 
   await expect(repositories.message).toContainText('Not signed in.')
 })
 
+test('the page has its icon, served with it', async ({ page }) => {
+  await page.goto('/')
+  const icon = page.locator('link[rel="icon"]')
+  await expect(icon).toHaveAttribute('href', 'icon.svg')
+  const response = await page.request.get('/icon.svg')
+  expect(response.status()).toBe(200)
+  expect(response.headers()['content-type']).toBe('image/svg+xml')
+})
+
 test('the API answers the token and not a page that has none', async ({ page, server }) => {
   await page.goto('/')
   const status = (token?: string) =>

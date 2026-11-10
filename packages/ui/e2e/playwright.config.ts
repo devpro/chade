@@ -15,8 +15,13 @@ const baseURL = `http://127.0.0.1:${port}`
 // The server writes there the address that signs in and the folder of its repositories, which the tests read.
 process.env.E2E_STATE ??= join(tmpdir(), `chade-e2e-${port}.json`)
 
-// Screenshots are taken for review only when asked, and then in the dark theme and at phone width as well.
-// The theme and the width change the styles alone, so there only the tests tagged @layout run, those that capture a page.
+// The two screens the interface is designed for: 1920x1200 and 2560x1440, both scaled at 125% by Windows.
+// A browser sees them in CSS pixels, 1536x960 and 2048x1152, and draws 1.25 pixel of the screen for each.
+const screen1536 = { ...devices['Desktop Chrome'], viewport: { width: 1536, height: 960 }, deviceScaleFactor: 1.25 }
+const screen2048 = { ...devices['Desktop Chrome'], viewport: { width: 2048, height: 1152 }, deviceScaleFactor: 1.25 }
+
+// Screenshots are taken for review only when asked, and then on the larger screen and in the dark theme as well.
+// The width and the theme change the styles alone, so there only the tests tagged @layout run, those that capture a page.
 const screenshots = process.env.SCREENSHOTS === '1'
 
 export default defineConfig({
@@ -43,11 +48,11 @@ export default defineConfig({
     gracefulShutdown: { signal: 'SIGTERM', timeout: 5000 },
   },
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
+    { name: 'screen-1536', use: screen1536 },
     ...(screenshots
       ? [
-          { name: 'desktop-dark', grep: /@layout/, use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 }, colorScheme: 'dark' as const } },
-          { name: 'mobile', grep: /@layout/, use: { ...devices['Pixel 7'] } },
+          { name: 'screen-2048', grep: /@layout/, use: screen2048 },
+          { name: 'screen-1536-dark', grep: /@layout/, use: { ...screen1536, colorScheme: 'dark' as const } },
         ]
       : []),
   ],
