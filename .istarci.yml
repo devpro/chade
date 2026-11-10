@@ -3,7 +3,8 @@ runner:
   images:
     "markup-lint*": ghcr.io/devpro/debian-node:latest
     # The end to end tests drive Chromium, whose system libraries the job cannot install as an ordinary user.
-    "build-test*": ghcr.io/devpro/debian-node-playwright:latest
+    # The pattern stops at the job of Linux, as the Windows one has no image and is skipped.
+    "build-test__*": ghcr.io/devpro/debian-node-playwright:latest
   docker: ["image-scan*"]
   # The analysis runs against the SonarQube IstarCI starts on this machine, with a token made there.
   sonarqube: true
