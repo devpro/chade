@@ -1,7 +1,7 @@
-import type { Repository } from '@chade/daemon'
+import type { Repository, RepositoryCheck } from '@chade/daemon'
 import { address, get } from './api.js'
 import { element, node } from './dom.js'
-import { ago, changes, matches, needsAttention, summary, sync, tone, type Badge } from './format.js'
+import { ago, changes, checkOf, matches, needsAttention, summary, sync, tone, type Badge } from './format.js'
 
 interface State {
   version: string
@@ -14,6 +14,27 @@ interface State {
 const TAB_KEY = 'chade-system'
 
 let state: State | undefined
+// The latest check of IstarCI on each repository, by its system and its path, read after the list.
+let latest = new Map<string, RepositoryCheck>()
+const keyOf = (system: string, path: string): string => `${system}\n${path}`
+
+// What IstarCI said last about the repository, grey when it is about another commit than the one checked out.
+function checkCell(repository: Repository): HTMLElement {
+  const cell = node('td', '', 'ci')
+  const check = latest.get(keyOf(repository.system, repository.path))
+  if (!check) return cell
+  const { mark, tone, text } = checkOf(check)
+  const current = repository.head !== undefined && check.sha.startsWith(repository.head)
+  const link = node('a', '', `check-link ${current ? tone : 'quiet'}`) as HTMLAnchorElement
+  link.href = check.url
+  link.target = '_blank'
+  link.rel = 'noopener'
+  link.title = `${text}, for ${check.sha.slice(0, 7)}${check.branch ? ` on ${check.branch}` : ''}${current ? '' : ', not the commit checked out'}`
+  link.setAttribute('aria-label', link.title)
+  link.append(node('span', mark, 'check'))
+  cell.append(link)
+  return cell
+}
 
 export function badges(list: Badge[], tag = 'td'): HTMLElement {
   const cell = node(tag)
@@ -25,7 +46,7 @@ export function badges(list: Badge[], tag = 'td'): HTMLElement {
   return cell
 }
 
-function row(repository: Repository, now: number): HTMLElement {
+function row(repository: Repository, now: number, withChecks: boolean): HTMLElement {
   const line = node('tr', '', tone(repository))
   const name = node('td', '', 'repository')
   const link = node('a', repository.name, 'name') as HTMLAnchorElement
@@ -34,11 +55,11 @@ function row(repository: Repository, now: number): HTMLElement {
   line.append(name)
   // The whole row opens the repository, and the link stays for the keyboard and for opening in another tab.
   line.addEventListener('click', (event) => {
-    if (event.target !== link && !getSelection()?.toString()) location.hash = link.hash
+    if (event.target !== link && !(event.target as HTMLElement).closest('.ci') && !getSelection()?.toString()) location.hash = link.hash
   })
   if (repository.error !== undefined) {
     const error = node('td', repository.error, 'error')
-    error.setAttribute('colspan', '5')
+    error.setAttribute('colspan', String(columns(withChecks).length - 1))
     line.append(error)
     return line
   }
@@ -48,9 +69,18 @@ function row(repository: Repository, now: number): HTMLElement {
   const commit = node('td', '', 'commit')
   if (repository.commit) commit.append(node('div', repository.commit.subject, 'subject'), node('div', ago(repository.commit.date, now), 'age'))
   else commit.append(node('span', 'no commit yet', 'age'))
-  line.append(branch, badges(sync(repository)), badges(changes(repository)), commit, node('td', repository.fetchedAt ? ago(repository.fetchedAt, now) : 'never', 'age'))
+  line.append(branch, badges(sync(repository)), badges(changes(repository)), commit)
+  if (withChecks) line.append(checkCell(repository))
+  line.append(node('td', repository.fetchedAt ? ago(repository.fetchedAt, now) : 'never', 'age'))
   return line
 }
+
+// The column of IstarCI shows when it has a word on one of the repositories listed, so a list IstarCI says nothing of is as it is without it.
+function columns(withChecks: boolean): string[] {
+  return ['Repository', 'Branch', 'Upstream', 'Working tree', 'Last commit', ...(withChecks ? ['IstarCI'] : []), 'Fetched']
+}
+
+const hasCheck = (repository: Repository): boolean => latest.has(keyOf(repository.system, repository.path))
 
 function systems(current: State): string[] {
   return [...new Set(current.repositories.map((repository) => repository.system))]
@@ -108,10 +138,11 @@ function render(): void {
   const table = node('table')
   const header = node('thead')
   const head = node('tr')
-  for (const title of ['Repository', 'Branch', 'Upstream', 'Working tree', 'Last commit', 'Fetched']) head.append(node('th', title))
+  const withChecks = listed.some(hasCheck)
+  for (const title of columns(withChecks)) head.append(node('th', title))
   header.append(head)
   const body = node('tbody')
-  for (const repository of listed) body.append(row(repository, now))
+  for (const repository of listed) body.append(row(repository, now, withChecks))
   table.append(header, body)
   content.replaceChildren(table)
 }
@@ -133,6 +164,13 @@ export const list = {
   async reload(): Promise<{ machine: string; version: string; scannedAt: string }> {
     state = await get<State>('state')
     render()
+    void get<{ checks: { system: string; path: string; check: RepositoryCheck }[] }>('latest-checks')
+      .then(({ checks }) => {
+        latest = new Map(checks.map(({ system, path, check }) => [keyOf(system, path), check]))
+        render()
+      })
+      // IstarCI is no part of the list, which a read of it that fails leaves as it was.
+      .catch(() => undefined)
     return state
   },
 }

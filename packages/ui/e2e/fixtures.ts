@@ -14,6 +14,8 @@ export interface Server {
   root: string
   // Folder of the store the server reads.
   store: string
+  // Address of the IstarCI the server reads the runs from.
+  istarci: string
 }
 
 export const test = base.extend<{ server: Server; repositories: RepositoriesPage; history: RepositoryPage; store: StorePage; report: ReportPage; docs: DocsPage }>({

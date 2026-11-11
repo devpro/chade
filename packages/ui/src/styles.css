@@ -12,6 +12,7 @@
   --bad: #b3261e;
   --bad-soft: #fde7e5;
   --quiet-soft: #eef0f3;
+  --good: #1a7f37;
   --mono: ui-monospace, 'Cascadia Code', 'SF Mono', Consolas, monospace;
 }
 
@@ -29,6 +30,7 @@
     --bad: #f49088;
     --bad-soft: #472320;
     --quiet-soft: #262a32;
+    --good: #6fcf8a;
   }
 }
 
@@ -637,6 +639,57 @@ h3 {
   min-width: 0;
 }
 
+.commit-row .check {
+  flex: 0 0 14px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.check.good,
+.check-link.good .check {
+  color: var(--good);
+}
+
+.check.bad,
+.check-link.bad .check {
+  color: var(--bad);
+}
+
+.check.info,
+.check-link.info .check {
+  color: var(--accent);
+}
+
+.check.quiet,
+.check-link.quiet .check {
+  color: var(--muted);
+}
+
+.check-fact {
+  margin: -6px 0 12px;
+  font-size: 12.5px;
+}
+
+.check-link {
+  display: inline-flex;
+  gap: 6px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.check-link.quiet {
+  color: var(--muted);
+}
+
+td.ci {
+  white-space: nowrap;
+  font-size: 16px;
+}
+
+.check-link:hover span:last-child {
+  text-decoration: underline;
+}
+
 .commit-row .author {
   flex: 0 0 96px;
   overflow: hidden;
@@ -646,7 +699,7 @@ h3 {
 }
 
 .commit-row .age {
-  flex: 0 0 84px;
+  flex: 0 0 104px;
   text-align: right;
 }
 

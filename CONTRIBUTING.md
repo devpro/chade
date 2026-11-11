@@ -14,6 +14,7 @@
 │   ├── ci.yaml             markup lint, build and tests
 │   └── pkg.yaml            publication of chade to npmjs.org
 ├── docs/
+│   ├── backlog.md          what is left to do
 │   └── cleanup.md          clean-up steps the report links to
 ├── packages/
 │   ├── cli/                chade, the published package

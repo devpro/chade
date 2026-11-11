@@ -12,6 +12,7 @@ export {
   type Diff,
   type FileChange,
 } from './history.js'
+export { pathKey, readChecks, readRepositories, type Check, type CheckStatus, type IstarciServer, type RepositoryCheck } from './istarci.js'
 export type { Measure, Report, Section } from './report.js'
 export { findRepositories, findRepository, listRepositories, parseStatus, type Listing, type Repository, type Root, type Run, type Status } from './repositories.js'
 export { RequestError, startServer, type Server, type ServerOptions } from './server.js'

@@ -2,6 +2,8 @@
 // The repositories are real ones, read by git, each in one of the states the interface tells apart.
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -124,7 +126,7 @@ git(elsewhere, 'push', '--quiet', '--set-upstream', 'origin', 'review')
 writeFileSync(join(work, 'README.md'), '# work\n\nEdited.\n')
 writeFileSync(join(work, 'draft.txt'), 'a new file\n')
 
-repository('windows', 'portal')
+const portal = repository('windows', 'portal')
 repository('windows', 'local-only', { push: false })
 
 // The store, a subfolder of a repository of its own, with two machines: the one of the run, with three snapshots, and another one.
@@ -230,12 +232,54 @@ const report = async (): Promise<Report> => {
   }
 }
 
-const options = { version: '0.0.0', machine: 'E2E-PC', roots: async () => roots, store: async () => store, report, run }
+// An IstarCI that watches the repository named history, with a commit of each kind it tells apart, and nothing of the other repositories.
+const hashOf = (subject: string): string => git(history, 'log', '--all', '--format=%H', '--fixed-strings', `--grep=${subject}`).trim().split('\n')[0]
+const istarciRuns = [
+  { id: 'run-rename', commitSha: hashOf('Rename the guide'), status: 'running', workflow: null },
+  { id: 'run-merge', commitSha: hashOf('Merge feature/graph'), status: 'success', durationMs: 112_000, workflow: null },
+  { id: 'run-change', commitSha: hashOf('Change the guide'), status: 'failure', durationMs: 5_000, workflow: null },
+  { id: 'run-draw-by-hand', commitSha: hashOf('Draw the graph'), status: 'failure', workflow: 'release.yml' },
+  { id: 'run-start', commitSha: hashOf('Start history'), status: 'cancelled', workflow: null },
+]
+// A repository of Windows, which IstarCI knows by the path chade reads it through.
+const portalRuns = [{ id: 'run-portal', commitSha: git(portal, 'rev-parse', 'HEAD').trim(), status: 'success', durationMs: 40_000, workflow: null }]
+const istarciEvents = [{ id: 1, commitSha: hashOf('Draw the graph'), reason: 'A newer commit replaced it in the queue' }]
+// IstarCI knows each repository by its folder, and gives the latest word on it: of the commit checked out, or of an older one for ahead.
+const istarciRepos = [
+  { path: history, latestRun: istarciRuns[0], latestEvent: null },
+  { path: portal, latestRun: portalRuns[0], latestEvent: null },
+  { path: detached, latestRun: null, latestEvent: null },
+  { path: ahead, latestRun: { id: 'run-ahead', commitSha: git(ahead, 'rev-parse', 'HEAD~2').trim(), status: 'failure', branch: 'main', workflow: null }, latestEvent: null },
+]
+const istarci = createServer((request, response) => {
+  const url = new URL(request.url ?? '', 'http://localhost')
+  if (request.headers.authorization !== 'Bearer e2e-istarci') return response.writeHead(401).end('{}')
+  // An IstarCI that never answers about detached, which the page gives up on without a word.
+  if (url.searchParams.get('repoPath') === detached) return
+  const watched = url.searchParams.get('repoPath') === history
+  if (url.pathname === '/api/v1/repos') return response.end(JSON.stringify(istarciRepos))
+  if (url.pathname === '/api/v1/runs' && url.searchParams.get('repoPath') === portal) return response.end(JSON.stringify(portalRuns))
+  if (url.pathname === '/api/v1/runs') return response.end(JSON.stringify(watched ? istarciRuns : []))
+  if (url.pathname === '/api/v1/events') return response.end(JSON.stringify(watched ? istarciEvents : []))
+  response.writeHead(404).end('{}')
+})
+await new Promise<void>((resolve) => istarci.listen(0, '127.0.0.1', resolve))
+const istarciUrl = `http://127.0.0.1:${(istarci.address() as AddressInfo).port}`
+
+const options = {
+  version: '0.0.0',
+  machine: 'E2E-PC',
+  roots: async () => roots,
+  store: async () => store,
+  report,
+  istarci: async () => ({ url: istarciUrl, token: 'e2e-istarci' }),
+  run,
+}
 const server = await startServer({
   port: Number(process.env.E2E_PORT ?? 7899),
   uiDir: join(here, '..', 'dist'),
   api: createApi(options),
   actions: createActions(options),
 })
-writeFileSync(stateFile, JSON.stringify({ url: server.url, root, store }))
+writeFileSync(stateFile, JSON.stringify({ url: server.url, root, store, istarci: istarciUrl }))
 console.log(`chade e2e server on ${server.address}, repositories in ${root}`)

@@ -1,9 +1,9 @@
-import type { Branch, Commit, Detail, Diff, FileChange } from '@chade/daemon'
+import type { Branch, Check, Commit, Detail, Diff, FileChange } from '@chade/daemon'
 import { address, get, post } from './api.js'
 import { parseDiff } from './diff.js'
 import { element, node, svg } from './dom.js'
 import { counts, diffLines, fileHead, fileOf, label, resizable, statusOf } from './files.js'
-import { ago, changes, sync } from './format.js'
+import { ago, changes, checkOf, sync } from './format.js'
 import { layout, type GraphRow } from './graph.js'
 import { badges, list } from './list.js'
 
@@ -24,6 +24,8 @@ let shownFile: { path: string; from: string } | undefined
 // The patch of a commit never changes, so it is asked once.
 const patches = new Map<string, Diff>()
 const rows = new Map<string, HTMLElement>()
+// What IstarCI did with each commit, read after the history so the history never waits for it.
+let checks: Record<string, Check> = {}
 // An action is running: the next one waits for its answer, as git changes one thing at a time in a repository.
 let acting = false
 
@@ -157,6 +159,53 @@ function refBadges(commit: Commit, branches: Branch[]): HTMLElement[] {
     })
 }
 
+// The mark of a line of the history, empty for a commit IstarCI has no word on.
+function paintMark(mark: HTMLElement, hash: string): void {
+  const check = checks[hash]
+  if (!check) {
+    mark.textContent = ''
+    mark.className = 'check'
+    mark.removeAttribute('title')
+    return
+  }
+  const { mark: symbol, tone, text } = checkOf(check)
+  mark.textContent = symbol
+  mark.className = `check ${tone}`
+  mark.title = text
+}
+
+// The line of the changes of a commit that links to what IstarCI did with it, on the page of IstarCI.
+function paintFact(fact: HTMLElement, hash: string): void {
+  const check = checks[hash]
+  fact.replaceChildren()
+  fact.hidden = !check
+  if (!check) return
+  const { mark, tone, text } = checkOf(check)
+  const link = node('a', '', `check-link ${tone}`) as HTMLAnchorElement
+  link.href = check.url
+  link.target = '_blank'
+  link.rel = 'noopener'
+  link.append(node('span', mark, 'check'), node('span', text))
+  fact.append(link)
+}
+
+function paintChecks(): void {
+  for (const [hash, line] of rows) {
+    const mark = line.querySelector<HTMLElement>('.check')
+    if (mark) paintMark(mark, hash)
+  }
+  const fact = element('detail').querySelector<HTMLElement>('.check-fact')
+  if (fact?.dataset.hash) paintFact(fact, fact.dataset.hash)
+}
+
+async function loadChecks(system: string, path: string): Promise<void> {
+  const answer = await get<{ checks: Record<string, Check> }>('checks', { system, path }).catch(() => undefined)
+  // The answer for a repository left meanwhile is dropped, and a failed read keeps the marks of the one before.
+  if (!answer || `${system}\n${path}` !== key) return
+  checks = answer.checks
+  paintChecks()
+}
+
 function choose(chosen: string): void {
   if (!detail) return
   location.hash = address({ system: detail.repository.system, path: detail.repository.path, commit: chosen })
@@ -187,7 +236,9 @@ function renderHistory(current: Loaded): void {
     const line = node('button', '', 'commit-row')
     const text = node('span', '', 'subject')
     text.append(...refBadges(commit, current.branches), commit.subject)
-    line.append(graphCell(graph[index], width, commit.parents.length > 1), text, node('span', commit.author, 'author'), node('span', ago(commit.date, now), 'age'))
+    const mark = node('span', '', 'check')
+    paintMark(mark, commit.hash)
+    line.append(graphCell(graph[index], width, commit.parents.length > 1), text, mark, node('span', commit.author, 'author'), node('span', ago(commit.date, now), 'age'))
     line.title = commit.subject
     line.addEventListener('click', () => choose(commit.hash))
     rows.set(commit.hash, line)
@@ -372,6 +423,10 @@ async function renderDetail(current: Loaded): Promise<void> {
       hash.title = shown
       facts.append(hash, node('span', diff.commit?.author ?? ''), node('span', diff.commit ? new Date(diff.commit.date).toLocaleString() : ''))
       created.push(facts)
+      const fact = node('p', '', 'check-fact')
+      fact.dataset.hash = shown
+      paintFact(fact, shown)
+      created.push(fact)
       if (diff.patch === '') created.push(node('p', 'This commit changes no file.', 'empty'))
       else created.push(node('h3', 'Files'), ...fileIndex(diff, shown))
     }
@@ -466,6 +521,7 @@ export const repository = {
     limit = PAGE
     detail = undefined
     patches.clear()
+    checks = {}
     message.value = ''
     element('branch-form').hidden = true
     for (const id of ['branches', 'history', 'diff', 'detail', 'repository-state']) element(id).replaceChildren()
@@ -480,6 +536,7 @@ export const repository = {
     if (`${system}\n${path}` !== key) return loaded
     detail = loaded
     render(detail)
+    void loadChecks(system, path)
     return detail
   },
 }

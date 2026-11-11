@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { Repository } from '@chade/daemon'
-import { ago, bytes, changes, matches, needsAttention, summary, sync, tone } from '../src/format.js'
+import { ago, bytes, changes, checkOf, duration, matches, needsAttention, summary, sync, tone } from '../src/format.js'
 
 const clean: Repository = {
   system: 'linux',
@@ -77,4 +77,18 @@ test('a size reads in the unit that keeps it short, in powers of 1000', () => {
   assert.equal(bytes(1000), '1.0 kB')
   assert.equal(bytes(352523911168), '352.5 GB')
   assert.equal(bytes(2.5e15), '2500.0 TB')
+})
+
+test('a duration reads in seconds, then minutes, then hours', () => {
+  assert.equal(duration(4_600), '5 s')
+  assert.equal(duration(112_000), '1 min 52 s')
+  assert.equal(duration(120_000), '2 min')
+  assert.equal(duration(3_900_000), '1 h 5 min')
+})
+
+test('a check of IstarCI reads as a mark and a sentence', () => {
+  assert.deepEqual(checkOf({ status: 'success', durationMs: 112_000, url: '' }), { mark: '✓', tone: 'good', text: 'Passed on IstarCI in 1 min 52 s' })
+  assert.equal(checkOf({ status: 'failure', durationMs: 5_000, url: '' }).text, 'Failed on IstarCI after 5 s')
+  assert.equal(checkOf({ status: 'running', url: '' }).tone, 'info')
+  assert.equal(checkOf({ status: 'not-run', reason: 'A newer commit replaced it in the queue', url: '' }).text, 'Not run by IstarCI: A newer commit replaced it in the queue')
 })

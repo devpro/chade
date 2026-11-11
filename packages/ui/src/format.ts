@@ -1,4 +1,4 @@
-import type { Repository } from '@chade/daemon'
+import type { Check, Repository } from '@chade/daemon'
 
 const UNITS: [number, string][] = [
   [60, 'second'],
@@ -89,4 +89,34 @@ export function bytes(value: number): string {
     unit++
   }
   return `${unit === 0 ? size : size.toFixed(1)} ${units[unit]}`
+}
+
+// A duration as a run is read: in seconds under a minute, in minutes and seconds under an hour.
+export function duration(ms: number): string {
+  const seconds = Math.round(ms / 1000)
+  if (seconds < 60) return `${seconds} s`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return seconds % 60 === 0 ? `${minutes} min` : `${minutes} min ${seconds % 60} s`
+  return `${Math.floor(minutes / 60)} h ${minutes % 60} min`
+}
+
+// What IstarCI did with a commit: the mark of its line in the history, and the sentence that tells it.
+export function checkOf(check: Check): { mark: string; tone: 'good' | 'bad' | 'info' | 'quiet'; text: string } {
+  const took = check.durationMs === undefined ? '' : ` in ${duration(check.durationMs)}`
+  switch (check.status) {
+    case 'success':
+      return { mark: '✓', tone: 'good', text: `Passed on IstarCI${took}` }
+    case 'failure':
+      return { mark: '✕', tone: 'bad', text: `Failed on IstarCI${check.durationMs === undefined ? '' : ` after ${duration(check.durationMs)}`}` }
+    case 'running':
+      return { mark: '●', tone: 'info', text: 'Running on IstarCI' }
+    case 'queued':
+      return { mark: '○', tone: 'info', text: 'Waiting to run on IstarCI' }
+    case 'cancelled':
+      return { mark: '⊘', tone: 'quiet', text: 'Stopped on IstarCI' }
+    case 'skipped':
+      return { mark: '◌', tone: 'quiet', text: 'Skipped by IstarCI' }
+    case 'not-run':
+      return { mark: '◌', tone: 'quiet', text: `Not run by IstarCI${check.reason ? `: ${check.reason}` : ''}` }
+  }
 }

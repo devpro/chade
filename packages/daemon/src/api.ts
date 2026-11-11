@@ -1,6 +1,9 @@
+import { join } from 'node:path'
 import { runAction, type ActionRequest } from './actions.js'
 import { repositoryDetail, repositoryDiff } from './history.js'
-import { findRepository, listRepositories, type Root, type Run } from './repositories.js'
+import { existsSync } from 'node:fs'
+import { pathKey, readChecks, readRepositories, type IstarciServer, type RepositoryCheck } from './istarci.js'
+import { findRepositories, findRepository, listRepositories, repositoryPath, type Root, type Run } from './repositories.js'
 import type { Report } from './report.js'
 import { RequestError, type ServerOptions } from './server.js'
 import { readSnapshot, readSnapshotFile, readSnapshotFiles, readStore, storeRepository } from './store.js'
@@ -14,6 +17,8 @@ export interface ApiOptions {
   store: () => Promise<string>
   // What chade report measures, which takes the seconds its commands take.
   report: () => Promise<Report>
+  // Where IstarCI answers on this machine, asked at each call, and absent when it is not set up.
+  istarci?: () => Promise<IstarciServer | undefined>
   run: Run
 }
 
@@ -62,6 +67,8 @@ export function createApi(options: ApiOptions): ServerOptions['api'] {
     if (!machine || !commit) throw new RequestError(400, 'a snapshot is named by its machine and its commit')
     return { machine, commit }
   }
+  // IstarCI, when it is set up, whose configuration a mistake in leaves the interface as it is without it.
+  const istarci = async (): Promise<IstarciServer | undefined> => options.istarci?.().catch(() => undefined)
   // A report asked while one is measured is that one, as two would measure the same machine twice at once.
   let measuring: Promise<Report> | undefined
   return {
@@ -75,6 +82,27 @@ export function createApi(options: ApiOptions): ServerOptions['api'] {
     repository: async (query) => {
       const { root, relative } = await repository(query)
       return { version: options.version, machine: options.machine, scannedAt: new Date().toISOString(), ...(await repositoryDetail(root, relative, options.run, limitOf(query))) }
+    },
+    // Apart from the repository, so the history shows without waiting for IstarCI.
+    checks: async (query) => {
+      const { root, relative } = await repository(query)
+      const server = await istarci()
+      const watched = (await readRepositories(server)).get(pathKey(join(root.folder, ...relative)))
+      return { checks: watched ? await readChecks(server, watched.path) : {} }
+    },
+    // The latest check of each repository of the list, read after the list so that it never waits for IstarCI.
+    'latest-checks': async () => {
+      const watched = await readRepositories(await istarci())
+      const checks: { system: string; path: string; check: RepositoryCheck }[] = []
+      if (watched.size === 0) return { checks }
+      for (const root of await options.roots()) {
+        if (!existsSync(root.folder)) continue
+        for (const relative of await findRepositories(root.folder)) {
+          const latest = watched.get(pathKey(join(root.folder, ...relative)))?.latest
+          if (latest) checks.push({ system: root.system, path: repositoryPath(root, relative), check: latest })
+        }
+      }
+      return { checks }
     },
     diff: async (query) => {
       const { root, relative } = await repository(query)

@@ -13,6 +13,7 @@ import { configPath, initialConfig, parseConfig, type Config } from './config.js
 import { diff } from './diff.js'
 import { discover } from './discover.js'
 import { run, runInherit } from './exec.js'
+import { istarciServer } from './istarci.js'
 import { openBrowser } from './open.js'
 import { expandHome } from './paths.js'
 import { diskUsage, formatBytes, renderReport, report } from './report.js'
@@ -177,6 +178,7 @@ function routes(host: Host): { api: ReturnType<typeof createApi>; actions: Retur
     roots: async () => repositoryRoots(await loadConfig(), host),
     store: async () => (await loadConfig()).store,
     report: async () => report(await loadConfig(), host),
+    istarci: async () => istarciServer(homedir()),
     run,
   }
   return { api: createApi(options), actions: createActions(options) }

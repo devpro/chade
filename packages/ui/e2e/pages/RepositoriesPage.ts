@@ -24,6 +24,11 @@ export class RepositoryRow {
     return this.row.locator('.subject')
   }
 
+  // What IstarCI said last about the repository, a link to it.
+  get check(): Locator {
+    return this.row.locator('td.ci a')
+  }
+
   get error(): Locator {
     return this.row.locator('td.error')
   }

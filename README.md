@@ -280,6 +280,37 @@ A merge shows what it brought to its first parent, the branch it was merged into
 When the working tree has changes, a first line of the history, Uncommitted changes, lists what is staged, what is changed and not staged, and the files not tracked, whose content shows as lines added.
 The history lists 300 commits, and a button at its end shows 300 older ones.
 
+### IstarCI
+
+When IstarCI runs on the machine, the list and the page of a repository show what it said of the repositories it watches.
+
+The list has a column IstarCI, with the mark of what it said last of each repository, a link to that run, when it watches one of the repositories listed.
+A cell is grey when its run is of another commit than the one checked out, and its title names that commit and its branch.
+The history of a repository marks each commit IstarCI ran with what came of it.
+
+Mark | Meaning
+-----|-------------------------------------
+✓    | Passed
+✕    | Failed
+●    | Running
+○    | Waiting to run
+⊘    | Stopped
+◌    | Skipped, or not run, with the reason
+
+The mark tells the same in words when pointed at, and the changes of the commit chosen link to its run in IstarCI, or to the page of the repository for a commit not run.
+A browser never signed in to IstarCI asks for its token there, which this command gives:
+
+```bash
+istarci ui
+```
+
+chade reads the port and the token of IstarCI from `~/.istarci/config.yml` at each read, and keeps neither.
+The marks are read after the list and the history, so neither waits for them, and again at each read of the page.
+A run of a workflow started by hand is not the run of its commit, and shows no mark.
+When IstarCI does not run, does not answer within a second, or does not watch the repository, the list has no IstarCI column or an empty cell, the history shows no mark, and nothing else changes.
+A repository is the same for both whether named from WSL or from Windows, `/mnt/c/Users/<user>/projects/<name>` being `C:\Users\<user>\projects\<name>`.
+IstarCI runs on Linux and WSL alone, so chade on Windows without WSL shows none of it.
+
 ### Git actions
 
 The page of a repository changes it through these actions, and no other.
@@ -366,6 +397,7 @@ An image is not shown, as the interface loads nothing from another site.
 - An action is a JSON request with the token, which a form of another site cannot send.
 - An action names a repository among those under `repos`, a branch among those git lists, and a file among the changes git lists, so it reaches nothing else of the machine.
 - A read of the store names a machine among its folders, a snapshot among the commits of that machine, and a file among those of that snapshot, so it reaches nothing else of the repository holding the store.
+- IstarCI is asked on `127.0.0.1` alone, whatever address it listens on, and its token stays in the server of chade, never sent to the page.
 - A page opened without the token, or after a restart of the server, says so, and the next `chade ui` signs in again.
 
 ## Commands

@@ -85,6 +85,16 @@ export class RepositoryPage {
     return this.commit(subject).locator('.ref')
   }
 
+  // The mark IstarCI gives the commit in the history.
+  check(subject: string): Locator {
+    return this.commit(subject).locator('.check')
+  }
+
+  // The link of the commit chosen to its page in IstarCI.
+  get checkLink(): Locator {
+    return this.changes.locator('.check-link')
+  }
+
   async choose(subject: string): Promise<void> {
     await this.commit(subject).click()
     await expect(this.commit(subject)).toHaveClass(/selected/)
