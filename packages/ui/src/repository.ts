@@ -1,7 +1,8 @@
 import type { Branch, Commit, Detail, Diff, FileChange } from '@chade/daemon'
 import { address, get, post } from './api.js'
-import { parseDiff, type DiffFile } from './diff.js'
+import { parseDiff } from './diff.js'
 import { element, node, svg } from './dom.js'
+import { counts, diffLines, fileHead, fileOf, label, resizable, statusOf } from './files.js'
 import { ago, changes, sync } from './format.js'
 import { layout, type GraphRow } from './graph.js'
 import { badges, list } from './list.js'
@@ -14,9 +15,6 @@ const PAGE = 300
 const LANE = 14
 const ROW = 28
 const LANES_SHOWN = 12
-// A file of more lines than this is cut, as a page of that length no longer scrolls.
-const MAX_LINES = 10_000
-
 let detail: Loaded | undefined
 let key = ''
 let limit = PAGE
@@ -242,23 +240,6 @@ function renderBranches(current: Loaded): void {
   )
 }
 
-const STATUS: Record<string, string> = { added: 'A', deleted: 'D', renamed: 'R', modified: 'M' }
-
-const label = (file: { path: string; from?: string }): string => (file.from ? `${file.from} → ${file.path}` : file.path)
-
-function statusOf(file: DiffFile): HTMLElement {
-  const status = node('span', STATUS[file.status], `status ${file.status}`)
-  status.title = file.status
-  return status
-}
-
-function counts(file: DiffFile): HTMLElement[] {
-  const created: HTMLElement[] = []
-  if (file.additions > 0) created.push(node('span', `+${file.additions}`, 'additions'))
-  if (file.deletions > 0) created.push(node('span', `−${file.deletions}`, 'deletions'))
-  return created
-}
-
 // Where the changes of one file are asked from: a commit, or what is staged or not in the working tree.
 function open(from: string, path: string | undefined): void {
   if (!detail) return
@@ -278,7 +259,7 @@ function fileIndex(diff: Diff, from: string, change?: FileAction): HTMLElement[]
   const index = node('ul', '', 'files index')
   for (const file of parseDiff(diff.patch)) {
     const entry = node('button', '', 'file-link')
-    entry.append(statusOf(file), node('span', label(file), 'file-path'), ...counts(file))
+    entry.append(statusOf(file.status), node('span', label(file), 'file-path'), ...counts(file))
     entry.classList.toggle('selected', shownFile?.path === file.path && shownFile.from === from)
     entry.addEventListener('click', () => open(from, file.path))
     const item = node('li')
@@ -323,34 +304,16 @@ async function renderFile(current: Loaded): Promise<void> {
   element('history').hidden = shown !== undefined
   view.hidden = shown === undefined
   if (!shown) return view.replaceChildren()
-  const close = node('button', 'Close', 'close')
-  close.title = 'Back to the history (Escape)'
-  close.addEventListener('click', () => open(shown.from, undefined))
-  const head = node('div', '', 'diff-head')
+  const close = (): void => open(shown.from, undefined)
   try {
-    const file = parseDiff((await patch(current, shown.from)).patch).find((candidate) => candidate.path === shown.path)
+    const file = fileOf((await patch(current, shown.from)).patch, shown.path)
     if (shown !== shownFile) return
-    if (!file) {
-      head.append(node('span', shown.path, 'file-path'), close)
-      return view.replaceChildren(head, node('p', 'This file is no longer among the changes.', 'empty'))
-    }
-    head.append(statusOf(file), node('span', label(file), 'file-path'), ...counts(file), close)
-    if (file.binary) return view.replaceChildren(head, node('p', 'Binary file, not shown.', 'empty'))
-    if (file.lines.length === 0) return view.replaceChildren(head, node('p', file.status === 'renamed' ? 'Renamed, with no change of content.' : 'No change of content.', 'empty'))
-    const lines = node('div', '', 'lines')
-    for (const line of file.lines.slice(0, MAX_LINES)) {
-      const created = node('div', '', `line ${line.kind}`)
-      created.append(node('span', line.before === undefined ? '' : String(line.before), 'number'), node('span', line.after === undefined ? '' : String(line.after), 'number'))
-      created.append(node('span', line.kind === 'note' ? `\\ ${line.text}` : line.text, 'text'))
-      lines.append(created)
-    }
-    view.replaceChildren(head, lines)
-    if (file.lines.length > MAX_LINES) view.append(node('p', `The first ${MAX_LINES} lines of the changes are shown.`, 'empty'))
+    if (!file) return view.replaceChildren(fileHead(close, node('span', shown.path, 'file-path')), node('p', 'This file is no longer among the changes.', 'empty'))
+    view.replaceChildren(fileHead(close, statusOf(file.status), node('span', label(file), 'file-path'), ...counts(file)), ...diffLines(file))
     view.scrollTop = 0
   } catch (error) {
     if (shown !== shownFile) return
-    head.append(node('span', shown.path, 'file-path'), close)
-    view.replaceChildren(head, node('p', error instanceof Error ? error.message : String(error), 'error'))
+    view.replaceChildren(fileHead(close, node('span', shown.path, 'file-path')), node('p', error instanceof Error ? error.message : String(error), 'error'))
   }
 }
 
@@ -439,57 +402,7 @@ function render(current: Loaded): void {
   void renderDetail(current)
 }
 
-const WIDTH_KEY = 'chade-history-width'
-const MIN_HISTORY = 240
-const MIN_CHANGES = 320
-
-// The bar between the history and the changes is dragged to give one the room of the other, and the width is kept for the next visit.
-function resizable(): void {
-  const bar = element('resize')
-  const workspace = bar.parentElement as HTMLElement
-  const history = element('history')
-  const apply = (width: number | undefined, keep = true): void => {
-    if (width === undefined) {
-      workspace.style.removeProperty('--history-width')
-      if (keep) localStorage.removeItem(WIDTH_KEY)
-      return
-    }
-    // Both sides keep a width they can be read at.
-    const most = workspace.clientWidth - history.offsetLeft - bar.offsetWidth - MIN_CHANGES
-    const clamped = Math.round(Math.max(MIN_HISTORY, Math.min(width, most)))
-    workspace.style.setProperty('--history-width', `${clamped}px`)
-    if (keep) localStorage.setItem(WIDTH_KEY, String(clamped))
-  }
-  const kept = Number(localStorage.getItem(WIDTH_KEY))
-  if (kept > 0) workspace.style.setProperty('--history-width', `${kept}px`)
-  bar.addEventListener('pointerdown', (event) => {
-    const start = event.clientX
-    const width = history.offsetWidth
-    bar.setPointerCapture(event.pointerId)
-    bar.classList.add('dragging')
-    const move = (moved: PointerEvent): void => apply(width + moved.clientX - start)
-    const stop = (): void => {
-      bar.classList.remove('dragging')
-      bar.removeEventListener('pointermove', move)
-      bar.removeEventListener('pointerup', stop)
-      bar.removeEventListener('pointercancel', stop)
-    }
-    bar.addEventListener('pointermove', move)
-    bar.addEventListener('pointerup', stop)
-    bar.addEventListener('pointercancel', stop)
-    event.preventDefault()
-  })
-  bar.addEventListener('keydown', (event) => {
-    if (event.key === 'ArrowLeft') apply(history.offsetWidth - 40)
-    else if (event.key === 'ArrowRight') apply(history.offsetWidth + 40)
-    else if (event.key === 'Home') apply(undefined)
-    else return
-    event.preventDefault()
-  })
-  bar.addEventListener('dblclick', () => apply(undefined))
-}
-
-resizable()
+resizable('resize', 'history', 'diff')
 
 for (const button of actionButtons()) {
   const action = button.dataset.action as string

@@ -169,9 +169,16 @@ program
     if (result.failed.length > 0) process.exitCode = 1
   })
 
-// The routes of the server over the repositories of the configuration.
+// The routes of the server over the repositories and the store of the configuration.
 function routes(host: Host): { api: ReturnType<typeof createApi>; actions: ReturnType<typeof createActions> } {
-  const options = { version, machine: host.machine, roots: async () => repositoryRoots(await loadConfig(), host), run }
+  const options = {
+    version,
+    machine: host.machine,
+    roots: async () => repositoryRoots(await loadConfig(), host),
+    store: async () => (await loadConfig()).store,
+    report: async () => report(await loadConfig(), host),
+    run,
+  }
   return { api: createApi(options), actions: createActions(options) }
 }
 

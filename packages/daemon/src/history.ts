@@ -50,11 +50,11 @@ export interface Diff {
 
 export const DEFAULT_COMMITS = 300
 export const MAX_COMMITS = 5000
-const MAX_PATCH = 2 * 1024 * 1024
+export const MAX_PATCH = 2 * 1024 * 1024
 // Untracked files are read one git command each, so a folder of generated files is not read whole.
 const MAX_UNTRACKED = 200
 
-type Git = (args: string[]) => Promise<{ code: number; stdout: string; stderr: string }>
+export type Git = (args: string[]) => Promise<{ code: number; stdout: string; stderr: string }>
 
 function gitOf(root: Root, relative: string[], run: Run): Git {
   // Reading never waits for a lock, and file names come as they are rather than escaped.
@@ -137,7 +137,7 @@ export async function repositoryDetail(root: Root, relative: string[], run: Run,
   return { repository, branches: parseBranches(refs.stdout), commits: commits.slice(0, count), more: commits.length > count, changes: parseChanges(status.stdout) }
 }
 
-const DIFF_OPTIONS = ['--patch', '--no-color', '--no-ext-diff', '--no-textconv', '--find-renames']
+export const DIFF_OPTIONS = ['--patch', '--no-color', '--no-ext-diff', '--no-textconv', '--find-renames']
 
 // The files git does not track yet, each as a patch that adds its every line.
 async function untrackedPatch(git: Git): Promise<Diff> {
@@ -161,6 +161,20 @@ async function untrackedPatch(git: Git): Promise<Diff> {
   return diff
 }
 
+// Who made a commit, when, and its whole message.
+export async function readCommit(git: Git, hash: string): Promise<NonNullable<Diff['commit']>> {
+  const show = await git(['show', '--no-patch', '--format=%H%x00%an%x00%ae%x00%aI%x00%B', hash])
+  if (show.code !== 0) throw new Error((show.stderr || show.stdout).trim().split('\n')[0])
+  const [full, author, email, date, ...message] = show.stdout.split('\0')
+  return { hash: full, author, email, date, message: message.join('\0').trim() }
+}
+
+// A patch no larger than a page can show, cut at the end of a line, so the last one shown is whole.
+export function cutPatch(patch: string): { patch: string; truncated: boolean } {
+  if (patch.length <= MAX_PATCH) return { patch, truncated: false }
+  return { patch: patch.slice(0, patch.lastIndexOf('\n', MAX_PATCH) + 1), truncated: true }
+}
+
 // The patch of a commit against its first parent, or of what is staged, of what is changed and not staged, or of the files not tracked.
 export async function repositoryDiff(root: Root, relative: string[], run: Run, target: string): Promise<Diff> {
   const git = gitOf(root, relative, run)
@@ -172,15 +186,9 @@ export async function repositoryDiff(root: Root, relative: string[], run: Run, t
   else {
     // A full hash and nothing else, so the value never reads as an option or a path.
     if (!/^[0-9a-f]{40}$/.test(target)) throw new Error('the target of a diff is staged, unstaged, untracked or the full hash of a commit')
-    const show = await git(['show', '--no-patch', '--format=%H%x00%an%x00%ae%x00%aI%x00%B', target])
-    if (show.code !== 0) throw new Error((show.stderr || show.stdout).trim().split('\n')[0])
-    const [hash, author, email, date, ...message] = show.stdout.split('\0')
-    diff.commit = { hash, author, email, date, message: message.join('\0').trim() }
+    diff.commit = await readCommit(git, target)
     result = await git(['show', '--format=', '--diff-merges=first-parent', ...DIFF_OPTIONS, target])
   }
   if (result.code !== 0) throw new Error((result.stderr || result.stdout).trim().split('\n')[0])
-  diff.truncated = result.stdout.length > MAX_PATCH
-  // Cut at the end of a line, so the last one shown is whole.
-  diff.patch = diff.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n', MAX_PATCH) + 1) : result.stdout
-  return diff
+  return { ...diff, ...cutPatch(result.stdout) }
 }

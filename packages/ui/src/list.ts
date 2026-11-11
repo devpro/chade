@@ -1,4 +1,4 @@
-import type { Repository } from '@chade/daemon'
+import type { Repository, Store } from '@chade/daemon'
 import { address, get } from './api.js'
 import { element, node } from './dom.js'
 import { ago, changes, matches, needsAttention, summary, sync, tone, type Badge } from './format.js'
@@ -14,6 +14,8 @@ interface State {
 const TAB_KEY = 'chade-system'
 
 let state: State | undefined
+// The store is read with the list, for the tab that opens it, and the list shows without it when it cannot be read.
+let stored: Store | undefined
 
 export function badges(list: Badge[], tag = 'td'): HTMLElement {
   const cell = node(tag)
@@ -82,7 +84,32 @@ function renderTabs(current: State, shown: string | undefined): void {
     })
     return tab
   })
-  element('tabs').replaceChildren(...tabs)
+  element('tabs').replaceChildren(...tabs, ...storeTab(), reportTab())
+}
+
+// The tab of the store is a link, as it opens another page where the others change what this one lists.
+function storeTab(): HTMLElement[] {
+  if (!stored) return []
+  const tab = node('a', '', 'tab store-tab') as HTMLAnchorElement
+  tab.href = address({ page: 'store' })
+  const last = stored.machines.flatMap((machine) => machine.snapshots.slice(0, 1).map((snapshot) => snapshot.date)).sort().at(-1)
+  tab.append(node('span', 'Store'))
+  if (stored.error !== undefined) {
+    tab.append(node('span', '!', 'count todo'))
+    tab.title = stored.error
+  } else {
+    tab.append(node('span', String(stored.machines.length), 'count'))
+    const machines = `${stored.machines.length} machine${stored.machines.length === 1 ? '' : 's'}`
+    tab.title = last ? `${machines}, last snapshot ${ago(last, Date.now())}` : `${machines}, no snapshot yet`
+  }
+  return [tab]
+}
+
+function reportTab(): HTMLElement {
+  const tab = node('a', 'Report', 'tab') as HTMLAnchorElement
+  tab.href = address({ page: 'report' })
+  tab.title = 'What takes disk and memory on this machine, and what to clean'
+  return tab
 }
 
 function render(): void {
@@ -131,7 +158,9 @@ export const list = {
     render()
   },
   async reload(): Promise<{ machine: string; version: string; scannedAt: string }> {
-    state = await get<State>('state')
+    const [read, readStore] = await Promise.all([get<State>('state'), get<Store>('store', { limit: '1' }).catch(() => undefined)])
+    state = read
+    stored = readStore
     render()
     return state
   },

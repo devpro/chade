@@ -2,32 +2,13 @@ import { existsSync } from 'node:fs'
 import { lstat, readdir, readFile, stat, statfs } from 'node:fs/promises'
 import { freemem, totalmem } from 'node:os'
 import { join } from 'node:path'
-import { findRepositories } from '@chade/daemon'
+import { findRepositories, type Measure, type Report, type Section } from '@chade/daemon'
 import type { Config } from './config.js'
 import { NOT_FOUND } from './exec.js'
 import { expandHome } from './paths.js'
 import { isNativeWindows, type Host } from './system.js'
 
-export interface Measure {
-  label: string
-  bytes?: number
-  detail?: string
-}
-
-export interface Section {
-  title: string
-  measures: Measure[]
-  // What to do about a measure, each the command or setting the machine documentation gives.
-  hints: string[]
-  // Section of docs/cleanup.md that explains the hints.
-  guide?: string
-}
-
-export interface Report {
-  machine: string
-  date: string
-  sections: Section[]
-}
+export type { Measure, Report, Section }
 
 export const GUIDE = 'https://github.com/devpro/chade/blob/main/docs/cleanup.md'
 
@@ -236,8 +217,14 @@ async function windowsDisk(host: Host, linuxRoot: Usage | undefined, native: boo
       section.hints.push(
         `${distribution.name} uses ${formatBytes(linuxRoot.used)} of an image of ${formatBytes(info.size)} on C:, so ${formatBytes(info.size - linuxRoot.used)} come back once trimmed and compacted:`,
         '  sudo fstrim -av',
-        '  then from an administrator prompt on Windows: wsl --shutdown, diskpart,',
-        `  select vdisk file="${image}", attach vdisk readonly, compact vdisk, detach vdisk, exit`,
+        'Then, from an administrator prompt on Windows:',
+        '  wsl --shutdown',
+        '  diskpart',
+        `  select vdisk file="${image}"`,
+        '  attach vdisk readonly',
+        '  compact vdisk',
+        '  detach vdisk',
+        '  exit',
       )
     }
   }
@@ -260,7 +247,7 @@ async function wslConfig(host: Host): Promise<Section> {
 }
 
 // Services that hold memory as long as they run, and that a development machine starts for a while and forgets.
-const SERVICES = [{ process: 'kubelite', hint: 'MicroK8s is running, sudo microk8s stop frees its memory until the next sudo microk8s start.' }]
+const SERVICES = [{ process: 'kubelite', hint: 'MicroK8s is running, and stopping it frees its memory until it is started again:', command: 'sudo microk8s stop' }]
 
 async function memory(host: Host, native: boolean): Promise<Section> {
   const section: Section = { title: 'Memory', measures: [], hints: [], guide: 'running-services' }
@@ -283,7 +270,7 @@ async function memory(host: Host, native: boolean): Promise<Section> {
   const processes = parsePs((await host.run('ps', ['-eo', 'rss=,comm='])).stdout)
   for (const process of topProcesses(processes, 8)) section.measures.push({ ...process, label: `process ${process.label}` })
   for (const service of SERVICES) {
-    if (processes.some((process) => process.name === service.process)) section.hints.push(service.hint)
+    if (processes.some((process) => process.name === service.process)) section.hints.push(service.hint, `  ${service.command}`)
   }
   return section
 }
@@ -315,7 +302,7 @@ async function docker(host: Host, native: boolean): Promise<Section | undefined>
   const section: Section = { title: 'Docker', measures: [], hints: [], guide: 'weekly-prune-and-trim' }
   for (const usage of parseDockerDf(result.stdout)) {
     section.measures.push({ label: usage.type, bytes: usage.size, detail: `${formatBytes(usage.reclaimable)} reclaimable, ${usage.active} of ${usage.total} in use` })
-    if (usage.reclaimable > WORTH && PRUNES[usage.type]) section.hints.push(`${formatBytes(usage.reclaimable)} of ${usage.type.toLowerCase()} unused: ${PRUNES[usage.type]}`)
+    if (usage.reclaimable > WORTH && PRUNES[usage.type]) section.hints.push(`${formatBytes(usage.reclaimable)} of ${usage.type.toLowerCase()} are unused, and removed with:`, `  ${PRUNES[usage.type]}`)
   }
   // Docker Desktop keeps the settings of its engine in the profile of the user.
   const daemonFile = native ? join(host.home, '.docker', 'daemon.json') : '/etc/docker/daemon.json'
@@ -327,7 +314,7 @@ async function docker(host: Host, native: boolean): Promise<Section | undefined>
     cap = undefined
   }
   section.measures.push({ label: 'build cache cap', detail: cap ?? 'none' })
-  if (!cap) section.hints.push(`Docker collects no build cache below 750 GiB, {"builder": {"gc": {"enabled": true, "defaultMaxUsedSpace": "30GB"}}} in ${daemonFile} caps it.`)
+  if (!cap) section.hints.push(`Docker collects no build cache below 750 GiB, and this setting in ${daemonFile} caps it:`, '  {"builder": {"gc": {"enabled": true, "defaultMaxUsedSpace": "30GB"}}}')
   return section
 }
 
@@ -361,31 +348,37 @@ async function snaps(host: Host): Promise<Section | undefined> {
     title: 'Snap',
     guide: 'snap-revisions',
     measures: [{ label: 'disabled revisions', detail: disabled.length > 0 ? disabled.map((snap) => `${snap.name} ${snap.revision}`).join(', ') : 'none' }],
-    hints: disabled.map((snap) => `sudo snap remove ${snap.name} --revision=${snap.revision}`),
+    hints:
+      disabled.length > 0
+        ? ['Disabled revisions are kept for a rollback, and removed one by one:', ...disabled.map((snap) => `  sudo snap remove ${snap.name} --revision=${snap.revision}`)]
+        : [],
   }
 }
 
 interface Cache {
   path: string
-  clear: string
+  // The command that clears the cache, when one command does.
+  command?: string
+  // What clearing it costs, or what to clear when no command does.
+  note?: string
 }
 
 const CACHES: Cache[] = [
-  { path: '~/.npm', clear: 'npm cache clean --force' },
-  { path: '~/.nuget/packages', clear: 'dotnet nuget locals all --clear' },
-  { path: '~/.local/share/pnpm/store', clear: 'pnpm store prune' },
-  { path: '~/.cache/JetBrains', clear: 'rm -rf ~/.cache/JetBrains, IDE backends and indexes rebuilt on demand' },
-  { path: '~/.cache/ms-playwright', clear: 'npx playwright uninstall --all, then an install of the browsers the projects use' },
-  { path: '~/.vscode-server', clear: 'old versions under ~/.vscode-server/bin and extensions removed from VS Code' },
-  { path: '~/.cache', clear: 'the largest folders of ~/.cache, each rebuilt by its tool' },
+  { path: '~/.npm', command: 'npm cache clean --force' },
+  { path: '~/.nuget/packages', command: 'dotnet nuget locals all --clear' },
+  { path: '~/.local/share/pnpm/store', command: 'pnpm store prune' },
+  { path: '~/.cache/JetBrains', command: 'rm -rf ~/.cache/JetBrains', note: 'the IDE backends and indexes are rebuilt on demand' },
+  { path: '~/.cache/ms-playwright', command: 'npx playwright uninstall --all', note: 'the browsers the projects use are installed again after it' },
+  { path: '~/.vscode-server', note: 'the old versions under ~/.vscode-server/bin and the extensions removed from VS Code can go' },
+  { path: '~/.cache', note: 'its largest folders are each rebuilt by their tool' },
 ]
 
 // The same tools on Windows, which keep most of their caches under %LOCALAPPDATA%.
 const WINDOWS_CACHES: Cache[] = [
-  { path: '~/AppData/Local/npm-cache', clear: 'npm cache clean --force' },
-  { path: '~/.nuget/packages', clear: 'dotnet nuget locals all --clear' },
-  { path: '~/AppData/Local/pnpm/store', clear: 'pnpm store prune' },
-  { path: '~/AppData/Local/ms-playwright', clear: 'npx playwright uninstall --all, then an install of the browsers the projects use' },
+  { path: '~/AppData/Local/npm-cache', command: 'npm cache clean --force' },
+  { path: '~/.nuget/packages', command: 'dotnet nuget locals all --clear' },
+  { path: '~/AppData/Local/pnpm/store', command: 'pnpm store prune' },
+  { path: '~/AppData/Local/ms-playwright', command: 'npx playwright uninstall --all', note: 'the browsers the projects use are installed again after it' },
 ]
 
 async function caches(host: Host, native: boolean): Promise<Section> {
@@ -394,7 +387,10 @@ async function caches(host: Host, native: boolean): Promise<Section> {
     const bytes = await folderSize(host, expandHome(cache.path, host.home))
     if (bytes === undefined) continue
     section.measures.push({ label: cache.path, bytes })
-    if (bytes > WORTH) section.hints.push(`${cache.path} holds ${formatBytes(bytes)}: ${cache.clear}`)
+    if (bytes > WORTH) {
+      section.hints.push(`${cache.path} holds ${formatBytes(bytes)}${cache.note ? `, ${cache.note}` : ''}${cache.command ? ':' : '.'}`)
+      if (cache.command) section.hints.push(`  ${cache.command}`)
+    }
   }
   if (native) return section
   // ~/.cache gathers the caches of every tool, and only its largest folders say which one to clear.

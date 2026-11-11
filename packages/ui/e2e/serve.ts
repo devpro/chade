@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createActions, createApi, startServer, type Root, type Run } from '@chade/daemon'
+import { createActions, createApi, startServer, type Report, type Root, type Run } from '@chade/daemon'
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 const stateFile = process.env.E2E_STATE
@@ -127,6 +127,38 @@ writeFileSync(join(work, 'draft.txt'), 'a new file\n')
 repository('windows', 'portal')
 repository('windows', 'local-only', { push: false })
 
+// The store, a subfolder of a repository of its own, with two machines: the one of the run, with three snapshots, and another one.
+const notes = join(root, 'store')
+const store = join(notes, 'systems')
+function stored(path: string, content: string | Buffer | undefined): void {
+  const file = join(store, path)
+  if (content === undefined) return rmSync(file)
+  mkdirSync(join(file, '..'), { recursive: true })
+  writeFileSync(file, content)
+}
+function snapshot(subject: string): void {
+  git(notes, 'add', '--all')
+  git(notes, 'commit', '--quiet', '--message', subject)
+}
+mkdirSync(store, { recursive: true })
+git(notes, 'init', '--quiet', '--initial-branch=main')
+stored('E2E-PC/wsl-ubuntu/files/etc/wsl.conf', '[boot]\nsystemd=true\n')
+stored('E2E-PC/wsl-ubuntu/files/etc/docker/daemon.json', '{\n  "log-driver": "local"\n}\n')
+stored('E2E-PC/wsl-ubuntu/inventories/apt-manual.txt', 'curl\ngit\nvim\n')
+stored('E2E-PC/windows/files/C/Users/e2e/.wslconfig', '[wsl2]\nmemory=8GB\n')
+stored('E2E-PC/windows/inventories/winget.json', '{\n  "Packages": ["Git.Git"]\n}\n')
+snapshot('E2E-PC: snapshot of windows, wsl-ubuntu, 2026-11-09 08:30')
+stored('OLD-LAPTOP/linux/files/etc/hostname', 'old-laptop\n')
+stored('OLD-LAPTOP/linux/files/icon.bin', Buffer.from([0x89, 0x50, 0x00, 0x01]))
+snapshot('OLD-LAPTOP: snapshot of linux, 2026-11-09 19:00')
+stored('E2E-PC/wsl-ubuntu/inventories/apt-manual.txt', 'curl\ngit\njq\nvim\n')
+stored('E2E-PC/windows/files/C/Users/e2e/.wslconfig', '[wsl2]\nmemory=12GB\nswap=0\n')
+snapshot('E2E-PC: snapshot of windows, wsl-ubuntu, 2026-11-10 18:12')
+stored('E2E-PC/wsl-ubuntu/files/etc/docker/daemon.json', undefined)
+stored('E2E-PC/wsl-ubuntu/files/etc/wsl.conf', '[boot]\nsystemd=true\n\n[interop]\nappendWindowsPath=false\n')
+stored('E2E-PC/wsl-ubuntu/inventories/snap.txt', 'core22 20260101\n')
+snapshot('E2E-PC: snapshot of windows, wsl-ubuntu, 2026-11-11 09:00')
+
 const roots: Root[] = ['windows', 'wsl-ubuntu', 'sandbox', 'missing'].map((system) => ({
   system: system === 'missing' ? 'wsl-ubuntu' : system,
   folder: join(root, system),
@@ -144,12 +176,66 @@ const run: Run = async (command, args, options = {}) => {
   }
 }
 
-const options = { version: '0.0.0', machine: 'E2E-PC', roots: async () => roots, run }
+// A report with what the page tells apart: sizes, details, a hint with its commands, and a section with nothing to clean.
+// It counts its runs, so a test sees that it was measured again.
+let measured = 0
+const report = async (): Promise<Report> => {
+  measured++
+  await new Promise((resolve) => setTimeout(resolve, 300))
+  return {
+    machine: 'E2E-PC',
+    date: new Date().toISOString(),
+    sections: [
+      {
+        title: 'Windows disk',
+        measures: [
+          { label: 'C:', detail: '615.8 GB used of 1.0 TB, 406.3 GB free' },
+          { label: 'Ubuntu disk image', bytes: 352_500_000_000, detail: 'C:\\Users\\e2e\\AppData\\Local\\Packages\\Ubuntu\\LocalState\\ext4.vhdx' },
+        ],
+        hints: ['Ubuntu uses 275.9 GB of an image of 352.5 GB on C:, so 76.6 GB come back once trimmed and compacted:', '  sudo fstrim -av', 'Then, from an administrator prompt on Windows:', '  wsl --shutdown', '  diskpart', '  select vdisk file="C:\\Users\\e2e\\AppData\\Local\\Packages\\CanonicalGroupLimited.Ubuntu\\LocalState\\ext4.vhdx"', '  attach vdisk readonly', '  compact vdisk', '  detach vdisk', '  exit'],
+        guide: 'disk-image-compaction',
+      },
+      {
+        title: 'Memory',
+        measures: [
+          { label: 'RAM', detail: `5.9 GB used of 44.2 GB, measured ${measured} time${measured === 1 ? '' : 's'}` },
+          { label: 'Swap', detail: '0 B used of 12.9 GB' },
+          { label: 'process java', bytes: 2_255_000_000 },
+          { label: 'process node', bytes: 410_000_000 },
+        ],
+        hints: [],
+      },
+      {
+        title: 'Docker',
+        measures: [
+          { label: 'Images', bytes: 48_200_000_000, detail: '31.0 GB unused' },
+          { label: 'Build cache', bytes: 9_100_000_000, detail: '9.1 GB unused' },
+          { label: 'Volumes', bytes: 1_200_000_000 },
+        ],
+        hints: ['31.0 GB of images are unused, and removed with:', '  docker image prune -a --filter until=168h -f'],
+        guide: 'docker',
+      },
+      { title: 'Journal', measures: [{ label: 'systemd journal', bytes: 839_500_000 }], hints: [] },
+      {
+        title: 'Repositories',
+        measures: [
+          { label: '3 repositories', bytes: 5_400_000_000 },
+          { label: '~/repos/chade', bytes: 3_100_000_000 },
+          { label: '~/repos/istarci', bytes: 2_000_000_000 },
+          { label: '~/repos/notes', bytes: 300_000_000 },
+        ],
+        hints: [],
+      },
+    ],
+  }
+}
+
+const options = { version: '0.0.0', machine: 'E2E-PC', roots: async () => roots, store: async () => store, report, run }
 const server = await startServer({
   port: Number(process.env.E2E_PORT ?? 7899),
   uiDir: join(here, '..', 'dist'),
   api: createApi(options),
   actions: createActions(options),
 })
-writeFileSync(stateFile, JSON.stringify({ url: server.url, root }))
+writeFileSync(stateFile, JSON.stringify({ url: server.url, root, store }))
 console.log(`chade e2e server on ${server.address}, repositories in ${root}`)

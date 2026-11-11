@@ -89,7 +89,7 @@ before(async () => {
   await writeFile(join(work, 'a.txt'), 'one\n2\nthree\n')
   await writeFile(join(work, 'new.txt'), 'new\n')
   root = { system: 'linux', folder: join(folder, 'repos'), path: join(folder, 'repos'), separator: process.platform === 'win32' ? '\\' : '/', git: 'git' }
-  api = createApi({ version: '1.2.3', machine: 'TEST-PC', roots: async () => [root], run })
+  api = createApi({ version: '1.2.3', machine: 'TEST-PC', roots: async () => [root], store: async () => '', report: async () => ({ machine: 'TEST-PC', date: '', sections: [] }), run })
 })
 
 test('a repository gives its branches, its history from the newest commit, and the files changed', async () => {

@@ -70,6 +70,14 @@ export class RepositoriesPage {
     await expect(this.tab(system)).toHaveAttribute('aria-selected', 'true')
   }
 
+  get storeTab(): Locator {
+    return this.page.getByRole('link', { name: /^Store/ })
+  }
+
+  get reportTab(): Locator {
+    return this.page.getByRole('link', { name: 'Report', exact: true })
+  }
+
   // Opens the page of a repository, through the link of its name.
   async openRepository(name: string): Promise<void> {
     await this.page.getByRole('link', { name, exact: true }).click()

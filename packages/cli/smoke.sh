@@ -110,7 +110,12 @@ check((await fetch(address + "/app.js")).ok && (await fetch(address + "/app.css"
 check((await fetch(address + "/api/state")).status === 401, "the API answers without the token")
 const state = await (await fetch(address + "/api/state", { headers: { Authorization: "Bearer " + token } })).json()
 check(state.repositories?.some((repository) => repository.name === "store" && repository.branch === "main"), "the store is not listed: " + JSON.stringify(state))
-' "$url" || fail 'chade ui does not serve the interface and the repositories'
+const headers = { Authorization: "Bearer " + token }
+const store = await (await fetch(address + "/api/store", { headers })).json()
+check(store.machines?.[0]?.snapshots?.length > 0 && store.repository?.path, "the store gives no machine with its snapshots: " + JSON.stringify(store))
+const report = await (await fetch(address + "/api/report", { headers })).json()
+check(report.sections?.some((section) => section.title === "Memory"), "the report has no Memory section: " + JSON.stringify(report))
+' "$url" || fail 'chade ui does not serve the interface, the repositories, the store and the report'
 "$chade" daemon stop | grep -q '^Stopped the server' || fail 'chade daemon stop did not stop the server'
 ui=
 if "$chade" daemon status >/dev/null; then fail 'the server still answers after chade daemon stop'; fi

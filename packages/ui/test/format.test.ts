@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { Repository } from '@chade/daemon'
-import { ago, changes, matches, needsAttention, summary, sync, tone } from '../src/format.js'
+import { ago, bytes, changes, matches, needsAttention, summary, sync, tone } from '../src/format.js'
 
 const clean: Repository = {
   system: 'linux',
@@ -69,4 +69,12 @@ test('the summary counts what there is to do', () => {
     summary([clean, { ...clean, changed: 1, ahead: 1 }, { ...clean, behind: 2 }, { ...clean, upstream: undefined }, { ...clean, error: 'broken' }]),
     '5 repositories, 1 with changes, 1 ahead, 1 behind, 1 without upstream, 1 unreadable',
   )
+})
+
+test('a size reads in the unit that keeps it short, in powers of 1000', () => {
+  assert.equal(bytes(0), '0 B')
+  assert.equal(bytes(999), '999 B')
+  assert.equal(bytes(1000), '1.0 kB')
+  assert.equal(bytes(352523911168), '352.5 GB')
+  assert.equal(bytes(2.5e15), '2500.0 TB')
 })

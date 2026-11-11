@@ -11,14 +11,22 @@ export class ApiError extends Error {
 }
 
 // What the address names after the #: the repository shown and the commit chosen, and the token when chade ui opened the page.
+// A page other than the list and a repository is named first, as in #store?machine=PC or #report, and read here as the value of page.
 export function route(): URLSearchParams {
-  return new URLSearchParams(location.hash.slice(1))
+  const hash = location.hash.slice(1)
+  const mark = hash.indexOf('?')
+  const name = mark < 0 ? hash : hash.slice(0, mark)
+  if (name === '' || name.includes('=')) return new URLSearchParams(hash)
+  const params = new URLSearchParams(mark < 0 ? '' : hash.slice(mark + 1))
+  params.set('page', name)
+  return params
 }
 
 export function address(values: Record<string, string | undefined>): string {
   const params = new URLSearchParams()
-  for (const [name, value] of Object.entries(values)) if (value !== undefined) params.set(name, value)
-  return `#${params}`
+  for (const [name, value] of Object.entries(values)) if (value !== undefined && name !== 'page') params.set(name, value)
+  if (values.page === undefined) return `#${params}`
+  return `#${values.page}${params.size > 0 ? `?${params}` : ''}`
 }
 
 // The token arrives in the fragment of the address chade ui opens, and leaves the address bar and the history at once.
@@ -28,7 +36,7 @@ function takeToken(): string | null {
   if (given) {
     sessionStorage.setItem(TOKEN_KEY, given)
     params.delete('token')
-    history.replaceState(null, '', location.pathname + (params.size > 0 ? `#${params}` : ''))
+    history.replaceState(null, '', location.pathname + (params.size > 0 ? address(Object.fromEntries(params)) : ''))
   }
   return sessionStorage.getItem(TOKEN_KEY)
 }

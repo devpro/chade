@@ -2,7 +2,7 @@
 
 CLI (`chade` on npmjs.org) that snapshots the configuration of a system into a git repository, the store, one folder per machine.
 chade is the tool, never the store: the snapshots live in a repository the user chooses, and nothing in this repository holds them.
-`chade ui` opens a local web interface over the git repositories of the machine: `packages/daemon` is its server, `packages/ui` its page, both bundled into the one published package.
+`chade ui` opens a local web interface over the git repositories of the machine, the store and the report: `packages/daemon` is its server, `packages/ui` its page, both bundled into the one published package.
 The interface changes a repository only through the actions of `packages/daemon/src/actions.ts`, where every value given to git is checked against what git itself lists.
 A change of the interface is checked with `task ui:screenshots`, and by looking at the screenshots it saves.
 CONTRIBUTING.md lists the tasks, `task check` runs what CI runs.

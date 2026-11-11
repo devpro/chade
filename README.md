@@ -13,6 +13,7 @@ and inventories: installed applications, VS Code extensions, services, scheduled
 
 chade only reads the system, it never changes it.
 `chade ui` opens a web interface served on the machine, which lists every git repository of the machine with what is left to commit, push or pull.
+The same interface shows the store, snapshot by snapshot, and the report.
 A git repository is the one thing chade changes, and only when asked at that interface: a fetch, a pull, a checkout, a new branch, a commit or a push.
 `chade report` measures what takes disk and memory, the space WSL takes on C: above all, and gives the command that gets each one back.
 It is the tool, the snapshots live in the store, a folder of a git repository chosen at `chade init`.
@@ -240,6 +241,7 @@ The configuration is read at each read of the repositories, so a folder added to
 
 Each system of the machine is a tab, with the number of its repositories and of those with something to do.
 A tab lists the git repositories found under `repos`, a Windows repository being read by the git of Windows, on WSL as well.
+Two more tabs open pages of their own: Store, with the number of its machines, and Report.
 
 Column       | Content
 -------------|----------------------------------------------------------------------------------------
@@ -256,6 +258,7 @@ The filter keeps the repositories whose name, path or branch holds every word ty
 The checkbox keeps those with something to commit, push, pull or fix.
 The page reads again by itself every 30 seconds while it is looked at, and when its tab comes back to the front, the list as well as the page of a repository.
 Refresh reads at once, without waiting for the next time.
+The report is the exception: it is measured when its page opens and at Refresh, and never by itself.
 The interface reads the repositories and changes nothing, and it fetches nothing either, so a count behind is the one of the last fetch.
 
 ### A repository
@@ -313,6 +316,36 @@ A double click on it brings the width back.
 The address names the repository, the commit and the file, so the back button of the browser returns to the one before.
 The changes of a file stop after 10,000 lines, and a patch of more than 2 MB is cut.
 
+### The store
+
+The Store tab opens the store of the configuration, laid out as the page of a repository.
+
+Part      | Content
+----------|------------------------------------------------------------------------------------------------------------------
+Machines  | Machine folders of the store, each with its systems and the number of its snapshots, the one of the server marked
+Snapshots | Commits that changed the folder of the machine chosen, from the newest
+Snapshot  | Message, author and date of the snapshot chosen, then its changes or its files, under the system they belong to
+
+The page opens on the machine the server runs on, and on its last snapshot.
+Changes lists what the snapshot changed since the one before on the same machine, and a file opens that comparison in place of the snapshots.
+The first snapshot of a machine is compared with nothing, so each of its files is added.
+Files lists every file the machine had at the snapshot, changed or not, and a file opens its content.
+A commit of the repository that changed no file of the machine is not one of its snapshots.
+When the repository holding the store is under `repos`, a link opens its page, where a snapshot is pushed from.
+The address names the page, then the machine, the snapshot and the file, as in `#store?machine=DESKTOP-9AMBHO5`, so the back button of the browser works as on a repository.
+The 300 last snapshots of a machine are listed, and a button at their end shows 300 older ones.
+
+The store is read from its last commit, and the page changes nothing: a snapshot is taken in a terminal, with `chade snapshot`.
+
+### The report
+
+The Report tab shows what `chade report` measures, a card for each section.
+A size is drawn as a bar against the largest of its card, when the card has more than one.
+A card with something to clean is marked, and gives the command or the setting, and the link to the step of [docs/cleanup.md](docs/cleanup.md).
+The report measures the machine the server runs on, which takes a few seconds, and the page can be left meanwhile.
+Its address is `#report`.
+Nothing of it is saved, and the page cleans nothing: `chade clean` does, in a terminal.
+
 ### Access
 
 - The server listens on `127.0.0.1` only, so no other machine reaches it.
@@ -323,18 +356,19 @@ The changes of a file stop after 10,000 lines, and a patch of more than 2 MB is 
 - A request named after another host, or sent by another site, is refused, so a web page open in the same browser can neither read the interface nor act through it.
 - An action is a JSON request with the token, which a form of another site cannot send.
 - An action names a repository among those under `repos`, a branch among those git lists, and a file among the changes git lists, so it reaches nothing else of the machine.
+- A read of the store names a machine among its folders, a snapshot among the commits of that machine, and a file among those of that snapshot, so it reaches nothing else of the repository holding the store.
 - A page opened without the token, or after a restart of the server, says so, and the next `chade ui` signs in again.
 
 ## Commands
 
 Command                     | Effect
-----------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+----------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 `chade init --store <path>` | Writes the configuration, creates the store folder, and a git repository when the folder is in none, `--force` overwrites an existing configuration
 `chade discover`            | Prints the known configuration files present on the system and missing from the configuration, and the Debian configuration files changed since their installation
 `chade snapshot`            | Collects, redacts, writes and commits, `--dry-run` lists only, `--push` pushes the repository of the store after the commit, `--no-secret-scan` skips gitleaks
 `chade clean`               | Runs the `cleanup` steps of the configuration after a confirmation, `--dry-run` shows them only, `--yes` skips the confirmation
 `chade report`              | Measures disk and memory and suggests what to clean, without changing anything, `--json` prints JSON
-`chade ui`                  | Opens the web interface, starting its server in the background when it is not running, `--no-open` only prints the address, `--port <number>` chooses the port of a server it starts
+`chade ui`                  | Opens the web interface over the repositories, the store and the report, starting its server in the background when it is not running, `--no-open` only prints the address, `--port <number>` chooses the port of a server it starts
 `chade daemon <action>`     | `start`, `stop`, `status` or `run` the server of the web interface
 `chade diff [rev]`          | Compares the last snapshot with the previous one, or with `rev`, `--since <date>` with the last one before that date, `--stat` lists the files, `--machine <name>` reads another machine folder
 
@@ -342,7 +376,6 @@ Command                     | Effect
 
 ## Roadmap
 
-- Web interface, store: machines, snapshots, files and differences, and the report
 - Web interface, links: run status of [IstarCI](https://github.com/devpro/istarci), then build status and repositories of GitHub and GitLab
 - Restore scripts generated from a snapshot, `winget import` and `code --install-extension` for instance
 

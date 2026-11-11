@@ -3,15 +3,19 @@ import { test as base } from '@playwright/test'
 import { join } from 'node:path'
 import { RepositoriesPage } from './pages/RepositoriesPage.js'
 import { RepositoryPage } from './pages/RepositoryPage.js'
+import { ReportPage } from './pages/ReportPage.js'
+import { StorePage } from './pages/StorePage.js'
 
 export interface Server {
   // The address chade ui opens, with the token in its fragment.
   url: string
   // Folder of the repositories the server reads, one subfolder per system.
   root: string
+  // Folder of the store the server reads.
+  store: string
 }
 
-export const test = base.extend<{ server: Server; repositories: RepositoriesPage; history: RepositoryPage }>({
+export const test = base.extend<{ server: Server; repositories: RepositoriesPage; history: RepositoryPage; store: StorePage; report: ReportPage }>({
   server: async ({}, use) => {
     const file = process.env.E2E_STATE
     if (!file) throw new Error('E2E_STATE is set by the Playwright configuration')
@@ -29,6 +33,18 @@ export const test = base.extend<{ server: Server; repositories: RepositoriesPage
     await history.signIn(server.url, 'wsl-ubuntu', join(server.root, 'wsl-ubuntu', 'history'))
     await history.expectOpen('history')
     await use(history)
+  },
+  // The page of the store, which has two machines, the one of the run with three snapshots.
+  store: async ({ page, server }, use) => {
+    const store = new StorePage(page)
+    await store.signIn(server.url)
+    await use(store)
+  },
+  // The page of the report, once measured.
+  report: async ({ page, server }, use) => {
+    const report = new ReportPage(page)
+    await report.signIn(server.url)
+    await use(report)
   },
 })
 

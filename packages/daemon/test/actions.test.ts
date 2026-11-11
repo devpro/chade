@@ -60,7 +60,7 @@ beforeEach(async () => {
   await git(work, 'push', '--quiet', '--set-upstream', 'origin', 'main')
   await git(folder, 'clone', '--quiet', origin, other)
   const root: Root = { system: 'linux', folder: join(folder, 'repos'), path: join(folder, 'repos'), separator: process.platform === 'win32' ? '\\' : '/', git: 'git' }
-  const actions = createActions({ version: '1.2.3', machine: 'TEST-PC', roots: async () => [root], run })
+  const actions = createActions({ version: '1.2.3', machine: 'TEST-PC', roots: async () => [root], store: async () => '', report: async () => ({ machine: 'TEST-PC', date: '', sections: [] }), run })
   action = (request) => actions.action({ system: 'linux', path: work, ...request }) as Promise<{ output: string }>
 })
 

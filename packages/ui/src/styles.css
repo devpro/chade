@@ -365,12 +365,12 @@ body.wide main {
   max-width: none;
 }
 
-#back {
+.back {
   color: var(--accent);
   text-decoration: none;
 }
 
-#back:hover,
+.back:hover,
 a.name:hover {
   text-decoration: underline;
 }
@@ -380,18 +380,18 @@ a.name {
   text-decoration: none;
 }
 
-#repository h2 {
+.page h2 {
   margin: 0;
   font-size: 18px;
 }
 
-#repository-state {
+.page-state {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-#repository-state .badge {
+.page-state .badge {
   margin-right: 0;
 }
 
@@ -412,16 +412,16 @@ a.name {
 }
 
 /* The history and the changes of a file take the same place, one at a time. */
-#branches,
-#history,
-#diff,
-#resize,
-#detail {
+.pane-side,
+.pane-list,
+.pane-file,
+.pane-resize,
+.pane-detail {
   grid-row: 1;
 }
 
-#history,
-#diff {
+.pane-list,
+.pane-file {
   grid-column: 2;
 }
 
@@ -471,12 +471,12 @@ a.name {
   background: var(--accent-soft);
 }
 
-#branches {
+.pane-side {
   margin-right: 10px;
   padding: 4px 6px 10px;
 }
 
-.workspace > #resize {
+.workspace > .pane-resize {
   overflow: visible;
   border: 0;
   border-radius: 4px;
@@ -485,7 +485,7 @@ a.name {
   touch-action: none;
 }
 
-#resize::before {
+.pane-resize::before {
   content: '';
   display: block;
   width: 2px;
@@ -495,9 +495,9 @@ a.name {
   background: transparent;
 }
 
-#resize:hover::before,
-#resize.dragging::before,
-#resize:focus-visible::before {
+.pane-resize:hover::before,
+.pane-resize.dragging::before,
+.pane-resize:focus-visible::before {
   background: var(--accent);
 }
 
@@ -721,17 +721,17 @@ h3 {
   color: var(--accent);
 }
 
-#detail {
+.pane-detail {
   padding: 4px 14px 16px;
 }
 
-#detail h2 {
+.pane-detail h2 {
   margin: 12px 0 6px;
   font-size: 15px;
   line-height: 1.4;
 }
 
-#detail h3 {
+.pane-detail h3 {
   margin: 16px 0 8px;
 }
 
@@ -868,8 +868,8 @@ h3 {
   font: 12.5px var(--mono);
 }
 
-#detail .empty,
-#history .empty {
+.pane-detail .empty,
+.pane-list .empty {
   padding: 20px;
 }
 
@@ -883,19 +883,19 @@ h3 {
     max-height: 70vh;
   }
 
-  .workspace > #resize {
+  .workspace > .pane-resize {
     display: none;
   }
 
-  #branches,
-  #history,
-  #diff,
-  #detail {
+  .pane-side,
+  .pane-list,
+  .pane-file,
+  .pane-detail {
     grid-row: auto;
     grid-column: 1;
   }
 
-  #branches {
+  .pane-side {
     margin-right: 0;
   }
 
@@ -1167,4 +1167,148 @@ h3.with-action .action {
   td.age::before {
     content: 'fetched ';
   }
+}
+
+/* The store: its machines in place of the branches, the snapshots of one in place of the history. */
+a.tab {
+  text-decoration: none;
+}
+
+.store-tab {
+  margin-left: 12px;
+}
+
+.hint {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.hint code {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--quiet-soft);
+  color: var(--text);
+  font: 12.5px var(--mono);
+}
+
+.branch-item.selected {
+  background: var(--accent-soft);
+}
+
+.machine-system {
+  padding: 1px 8px 1px 23px;
+  color: var(--muted);
+  font: 12px var(--mono);
+}
+
+.views {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.views .tab {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+/* The report: a card for each thing measured, marked when it comes with something to clean. */
+.cards {
+  columns: 420px;
+  column-gap: 12px;
+}
+
+/* Cards of unequal heights fill columns from the top, where rows would leave a gap under each short one. */
+.card {
+  break-inside: avoid;
+  margin-bottom: 12px;
+  padding: 4px 16px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.card.todo {
+  border-left: 3px solid var(--warn);
+}
+
+.card h3 {
+  margin: 12px 0 8px;
+}
+
+.measure {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1px 12px;
+  padding: 3px 0;
+  font-size: 13px;
+}
+
+.measure-size.value {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.measure-label {
+  overflow-wrap: anywhere;
+  font: 12.5px var(--mono);
+}
+
+.measure-size {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.measure-detail {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+
+.measure-bar {
+  grid-column: 1 / -1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--quiet-soft);
+}
+
+.measure-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.advice {
+  margin: 12px 0 6px;
+  color: var(--warn);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.commands {
+  margin: 0 0 6px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--background);
+  font: 12px/1.5 var(--mono);
+}
+
+/* A command longer than the card goes on under itself, indented, so the next command still reads as one. */
+.commands div {
+  padding-left: 2ch;
+  text-indent: -2ch;
+  overflow-wrap: anywhere;
+}
+
+.guide {
+  color: var(--accent);
+  font-size: 13px;
+}
+
+#report-state.measuring {
+  color: var(--accent);
 }

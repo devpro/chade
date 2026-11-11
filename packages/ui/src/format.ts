@@ -78,3 +78,15 @@ export function summary(repositories: Repository[]): string {
   add(count((repository) => repository.error !== undefined), 'unreadable')
   return parts.join(', ')
 }
+
+// A size as chade report prints it, in powers of 1000.
+export function bytes(value: number): string {
+  const units = ['B', 'kB', 'MB', 'GB', 'TB']
+  let size = value
+  let unit = 0
+  while (size >= 1000 && unit < units.length - 1) {
+    size /= 1000
+    unit++
+  }
+  return `${unit === 0 ? size : size.toFixed(1)} ${units[unit]}`
+}

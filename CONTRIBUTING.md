@@ -121,6 +121,8 @@ The Playwright specs of `packages/ui/e2e` drive Chromium against the server of `
 That server reads real repositories, made for the run in a temporary folder, one in each state the interface tells apart: clean, ahead, behind, changed, in conflict, never pushed, detached, unreadable.
 One more, `history`, has a merged branch, a tag, a renamed file and uncommitted changes, for the page of a repository.
 The last one, `work`, sits under a system of its own, `sandbox`, with a remote that is one commit ahead: `e2e/actions.spec.ts` fetches, pulls, commits, pushes and branches in it, each test from the state the one before left.
+The store of the run is a subfolder of one more repository, outside of the systems, with two machines and the three snapshots of the first.
+The report is a fixed one, which counts its runs, so the page does not depend on the machine of the run.
 A spec signs in the way `chade ui` does, with the address that carries the token, and reaches the page through the page objects of `e2e/pages`, so a change of markup is a change in one place.
 
 ```bash
