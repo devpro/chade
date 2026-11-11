@@ -239,9 +239,11 @@ A `chade ui` of another version of chade replaces the server an earlier version 
 The folder of the configuration holds its state, `daemon.json`, and its output, `daemon.log`.
 The configuration is read at each read of the repositories, so a folder added to `repos` shows without a restart.
 
+The top of every page names the machine, then links to the four pages of the interface: Repositories, Store, Report and Docs.
+
+Repositories is the page the interface opens on.
 Each system of the machine is a tab, with the number of its repositories and of those with something to do.
 A tab lists the git repositories found under `repos`, a Windows repository being read by the git of Windows, on WSL as well.
-Two more tabs open pages of their own: Store, with the number of its machines, and Report.
 
 Column       | Content
 -------------|----------------------------------------------------------------------------------------
@@ -318,7 +320,7 @@ The changes of a file stop after 10,000 lines, and a patch of more than 2 MB is 
 
 ### The store
 
-The Store tab opens the store of the configuration, laid out as the page of a repository.
+Store opens the store of the configuration, laid out as the page of a repository.
 
 Part      | Content
 ----------|------------------------------------------------------------------------------------------------------------------
@@ -339,12 +341,19 @@ The store is read from its last commit, and the page changes nothing: a snapshot
 
 ### The report
 
-The Report tab shows what `chade report` measures, a card for each section.
+Report shows what `chade report` measures, a card for each section.
 A size is drawn as a bar against the largest of its card, when the card has more than one.
-A card with something to clean is marked, and gives the command or the setting, and the link to the step of [docs/cleanup.md](docs/cleanup.md).
+A card with something to clean is marked, and gives the command or the setting, and a link to the step of [docs/cleanup.md](docs/cleanup.md), opened in the documentation of the interface.
 The report measures the machine the server runs on, which takes a few seconds, and the page can be left meanwhile.
 Its address is `#report`.
 Nothing of it is saved, and the page cleans nothing: `chade clean` does, in a terminal.
+
+### The documentation
+
+Docs shows this guide, [docs/cleanup.md](docs/cleanup.md) and [CONTRIBUTING.md](CONTRIBUTING.md), with the pages on one side and the headings of the page shown on the other.
+The pages are bundled with the interface, so they are those of the version installed, and read without a network.
+A link from a page to another opens it in the interface, and the address names the page and the heading, as in `#docs?name=cleanup&at=caches`.
+An image is not shown, as the interface loads nothing from another site.
 
 ### Access
 

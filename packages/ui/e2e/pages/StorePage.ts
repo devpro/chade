@@ -78,6 +78,6 @@ export class StorePage {
   }
 
   async back(): Promise<void> {
-    await this.page.locator('#store').getByRole('link', { name: '← Repositories' }).click()
+    await this.page.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: 'Repositories' }).click()
   }
 }

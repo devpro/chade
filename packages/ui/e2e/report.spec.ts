@@ -2,19 +2,21 @@ import { expect, test } from './fixtures.js'
 import { ReportPage } from './pages/ReportPage.js'
 import { shot } from './shot.js'
 
-test('the tab of the report opens its page, which says it measures, then shows what it measured', async ({ page, repositories }) => {
-  await repositories.reportTab.click()
+test('the top of the page opens the report, which says it measures, then shows what it measured', async ({ page, repositories }) => {
+  await repositories.menu('Report').click()
   const report = new ReportPage(page)
   await expect(page).toHaveURL(/#report$/)
   await expect(report.state).toHaveText('Measuring the machine, which takes a few seconds…')
   await expect(report.age).toHaveText('Measuring…')
   await report.expectMeasured()
   await expect(report.age).toHaveText('Read just now')
-  // The page is left while it measures as well, and returned to without measuring again.
+  // The page is left and returned to without measuring again.
+  const measured = await report.card('Memory').measure('RAM').textContent()
   await report.back()
   await expect(repositories.names.first()).toBeVisible()
-  await repositories.reportTab.click()
-  await expect(report.card('Memory').measure('RAM')).toContainText('measured 1 time')
+  await repositories.menu('Report').click()
+  await expect(report.card('Memory').measure('RAM')).toHaveText(measured ?? '')
+  await expect(report.state).toHaveText(/^Measured /)
 })
 
 test('the report shows each thing measured with its sizes, and what to clean with its commands @layout', async ({ report }, testInfo) => {
@@ -30,7 +32,7 @@ test('the report shows each thing measured with its sizes, and what to clean wit
   await expect(disk.commands).toHaveText(['sudo fstrim -av', 'wsl --shutdown', 'diskpart', /^select vdisk file=/, 'attach vdisk readonly', 'compact vdisk', 'detach vdisk', 'exit'])
   // A command longer than its card goes on under itself, and the card never scrolls sideways.
   expect(await disk.card.evaluate((card) => card.scrollWidth <= card.clientWidth)).toBe(true)
-  await expect(disk.guide).toHaveAttribute('href', 'https://github.com/devpro/chade/blob/main/docs/cleanup.md#disk-image-compaction')
+  await expect(disk.guide).toHaveAttribute('href', '#docs?name=cleanup&at=disk-image-compaction')
   await expect(report.card('Docker').advice).toHaveText('31.0 GB of images are unused, and removed with:')
   await expect(report.card('Docker').commands).toHaveText(['docker image prune -a --filter until=168h -f'])
   const memory = report.card('Memory')

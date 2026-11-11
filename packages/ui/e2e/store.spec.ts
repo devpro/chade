@@ -6,10 +6,13 @@ const FIRST = 'E2E-PC: snapshot of windows, wsl-ubuntu, 2026-11-09 08:30'
 const SECOND = 'E2E-PC: snapshot of windows, wsl-ubuntu, 2026-11-10 18:12'
 const THIRD = 'E2E-PC: snapshot of windows, wsl-ubuntu, 2026-11-11 09:00'
 
-test('the tab of the store counts its machines and opens its page, and the link back returns to the repositories', async ({ page, repositories }) => {
-  await expect(repositories.storeTab).toHaveText('Store2')
-  await expect(repositories.storeTab).toHaveAttribute('title', /^2 machines, last snapshot /)
-  await repositories.storeTab.click()
+test('the top of the page opens the store and marks it, and returns to the repositories', async ({ page, repositories }) => {
+  // The systems are the tabs of the repositories, and the store is no system.
+  await expect(repositories.tabs).toHaveCount(3)
+  await expect(repositories.menu('Repositories')).toHaveAttribute('aria-current', 'page')
+  await repositories.menu('Store').click()
+  await expect(repositories.menu('Store')).toHaveAttribute('aria-current', 'page')
+  await expect(repositories.menu('Repositories')).not.toHaveAttribute('aria-current', 'page')
   const store = new StorePage(page)
   await store.expectOpen()
   await expect(page).toHaveURL(/#store$/)

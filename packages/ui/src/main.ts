@@ -1,6 +1,7 @@
 import { ApiError, route } from './api.js'
 import { element } from './dom.js'
 import { ago } from './format.js'
+import { docs } from './docs.js'
 import { list } from './list.js'
 import { reportPage } from './report.js'
 import { repository } from './repository.js'
@@ -27,13 +28,22 @@ interface View {
   age?: () => string | undefined
 }
 
-const views: View[] = [list, repository, store, reportPage]
+const views: View[] = [list, repository, store, reportPage, docs]
+// The link of the top of the page each view is reached by, a repository being one of the repositories.
+const links = new Map<View, string>([
+  [list, 'repositories'],
+  [repository, 'repositories'],
+  [store, 'store'],
+  [reportPage, 'report'],
+  [docs, 'docs'],
+])
 
 // The view the address names: the store, the report, a repository when it gives one, the list otherwise.
 function current(): View {
   const page = route().get('page')
   if (page === 'store') return store
   if (page === 'report') return reportPage
+  if (page === 'docs') return docs
   return route().has('path') ? repository : list
 }
 
@@ -76,7 +86,16 @@ function fail(error: unknown): void {
   message(error.message)
 }
 
+function mark(): void {
+  const name = links.get(current())
+  for (const link of element('pages').querySelectorAll<HTMLElement>('a')) {
+    if (link.dataset.view === name) link.setAttribute('aria-current', 'page')
+    else link.removeAttribute('aria-current')
+  }
+}
+
 async function run(action: () => Promise<Read>): Promise<boolean> {
+  mark()
   if (loading) {
     queued = async () => void (await run(action))
     return true
@@ -91,7 +110,7 @@ async function run(action: () => Promise<Read>): Promise<boolean> {
     read = result !== undefined
     element('message').hidden = true
     for (const each of views) each.section.hidden = each !== view
-    document.body.classList.toggle('wide', view !== list)
+    document.body.classList.toggle('wide', view === repository || view === store || view === reportPage)
     loaded(result)
   } catch (error) {
     // A read that failed has said why, and is not tried again behind the message.

@@ -12,6 +12,12 @@
     <header>
       <h1><a href="#">chade</a></h1>
       <span id="machine"></span>
+      <nav id="pages" aria-label="Pages">
+        <a href="#" data-view="repositories">Repositories</a>
+        <a href="#store" data-view="store">Store</a>
+        <a href="#report" data-view="report">Report</a>
+        <a href="#docs" data-view="docs">Docs</a>
+      </nav>
       <span id="scanned"></span>
       <button id="refresh" type="button" title="The page reads again by itself every 30 seconds, and this reads now, or measures the report again">Refresh</button>
       <span id="version"></span>
@@ -58,7 +64,6 @@
       </section>
       <section id="store" class="page" hidden>
         <div class="bar">
-          <a class="back" href="#">← Repositories</a>
           <h2>Store</h2>
           <span id="store-path" class="path"></span>
           <span id="store-state" class="page-state"></span>
@@ -74,13 +79,17 @@
       </section>
       <section id="report" class="page" hidden>
         <div class="bar">
-          <a class="back" href="#">← Repositories</a>
           <h2>Report</h2>
           <span id="report-summary" class="page-state"></span>
           <span id="report-state" class="path"></span>
           <span class="hint">In a terminal: <code>chade report</code> prints this report, <code>chade clean</code> cleans up</span>
         </div>
         <div id="report-sections"></div>
+      </section>
+      <section id="docs" hidden>
+        <nav id="docs-nav" aria-label="Documentation"></nav>
+        <article id="docs-page"></article>
+        <nav id="docs-toc" aria-label="On this page"></nav>
       </section>
     </main>
     <div id="notice" role="status" hidden>

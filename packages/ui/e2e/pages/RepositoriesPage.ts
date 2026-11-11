@@ -70,12 +70,9 @@ export class RepositoriesPage {
     await expect(this.tab(system)).toHaveAttribute('aria-selected', 'true')
   }
 
-  get storeTab(): Locator {
-    return this.page.getByRole('link', { name: /^Store/ })
-  }
-
-  get reportTab(): Locator {
-    return this.page.getByRole('link', { name: 'Report', exact: true })
+  // A link of the top of the page, which every page shows: Repositories, Store, Report or Docs.
+  menu(name: 'Repositories' | 'Store' | 'Report' | 'Docs'): Locator {
+    return this.page.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name, exact: true })
   }
 
   // Opens the page of a repository, through the link of its name.

@@ -3,6 +3,7 @@ import { test as base } from '@playwright/test'
 import { join } from 'node:path'
 import { RepositoriesPage } from './pages/RepositoriesPage.js'
 import { RepositoryPage } from './pages/RepositoryPage.js'
+import { DocsPage } from './pages/DocsPage.js'
 import { ReportPage } from './pages/ReportPage.js'
 import { StorePage } from './pages/StorePage.js'
 
@@ -15,7 +16,7 @@ export interface Server {
   store: string
 }
 
-export const test = base.extend<{ server: Server; repositories: RepositoriesPage; history: RepositoryPage; store: StorePage; report: ReportPage }>({
+export const test = base.extend<{ server: Server; repositories: RepositoriesPage; history: RepositoryPage; store: StorePage; report: ReportPage; docs: DocsPage }>({
   server: async ({}, use) => {
     const file = process.env.E2E_STATE
     if (!file) throw new Error('E2E_STATE is set by the Playwright configuration')
@@ -39,6 +40,12 @@ export const test = base.extend<{ server: Server; repositories: RepositoriesPage
     const store = new StorePage(page)
     await store.signIn(server.url)
     await use(store)
+  },
+  // The documentation, on its first page.
+  docs: async ({ page, server }, use) => {
+    const docs = new DocsPage(page)
+    await docs.signIn(server.url)
+    await use(docs)
   },
   // The page of the report, once measured.
   report: async ({ page, server }, use) => {

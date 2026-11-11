@@ -59,6 +59,7 @@
    `npm unlink --global chade` removes it.
 
 `chade ui` serves the interface `task build` built, from a server that keeps running in the background.
+The build bundles `README.md`, `docs/cleanup.md` and this guide into the interface, as the pages of its documentation, so a change to one of them shows after `task build` as well.
 A change to `packages/ui` or to the server shows after `task build` and `task run -- daemon stop`, as the next `task run -- ui` starts a new server.
 `task run -- daemon run` keeps the server in the terminal instead, with its output.
 

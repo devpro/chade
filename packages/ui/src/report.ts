@@ -1,12 +1,12 @@
 import type { Report, Section } from '@chade/daemon'
 import { get } from './api.js'
+import { docsAddress } from './docs.js'
 import { element, node } from './dom.js'
 import { bytes } from './format.js'
 
 type Loaded = Omit<Report, 'date'> & { version: string; scannedAt: string }
 
 const SHORT = 24
-const GUIDE = 'https://github.com/devpro/chade/blob/main/docs/cleanup.md'
 
 let report: Loaded | undefined
 let measuring = false
@@ -47,9 +47,7 @@ function card(section: Section): HTMLElement {
   }
   if (section.hints.length > 0 && section.guide) {
     const guide = node('a', 'How to, step by step', 'guide') as HTMLAnchorElement
-    guide.href = `${GUIDE}#${section.guide}`
-    guide.target = '_blank'
-    guide.rel = 'noopener'
+    guide.href = docsAddress('cleanup', section.guide)
     created.append(guide)
   }
   return created
