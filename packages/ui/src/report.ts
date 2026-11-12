@@ -91,6 +91,7 @@ function measure(): void {
 // What chade report measures: what takes disk and memory, and what to do about it.
 export const reportPage = {
   section: element('report'),
+  title: (): string => 'Report',
   loaded: (): boolean => report !== undefined,
   clear: (): void => {
     report = undefined

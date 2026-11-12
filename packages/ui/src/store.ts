@@ -250,6 +250,7 @@ document.addEventListener('keydown', (event) => {
 // The store: its machines, the snapshots of one, and what a snapshot changed or held.
 export const store = {
   section: element('store'),
+  title: (params: URLSearchParams): string => (params.get('machine') ? `${params.get('machine')}, store` : 'Store'),
   loaded: (): boolean => loaded !== undefined,
   clear: (): void => {
     loaded = undefined

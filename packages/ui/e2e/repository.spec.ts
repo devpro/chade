@@ -9,6 +9,7 @@ test('the name of a repository opens its page, and the link back returns to the 
   const history = new RepositoryPage(page)
   await history.expectOpen('history')
   await expect(history.path).toHaveText(/wsl-ubuntu.history$/)
+  await expect(page).toHaveTitle('history · Chade')
   await history.back()
   await expect(repositories.tab('wsl-ubuntu')).toHaveAttribute('aria-selected', 'true')
   await expect(repositories.names).toHaveCount(9)

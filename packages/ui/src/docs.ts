@@ -71,6 +71,7 @@ export const docs = {
   },
   // The pages are read from the interface itself, at no moment in particular.
   age: (): string => '',
+  title: (params: URLSearchParams): string => (pages.find((candidate) => candidate.slug === params.get('name')) ?? pages[0]).title,
   async show(params: URLSearchParams): Promise<{ machine: string; version: string }> {
     const page = pages.find((candidate) => candidate.slug === params.get('name')) ?? pages[0]
     if (page !== shown) render(page)

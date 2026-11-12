@@ -152,6 +152,7 @@ for (const id of ['filter', 'attention']) element(id).addEventListener('input', 
 // The list of the repositories of the machine, a tab for each system.
 export const list = {
   section: element('list'),
+  title: (): string => 'Repositories',
   loaded: (): boolean => state !== undefined,
   clear: (): void => {
     state = undefined

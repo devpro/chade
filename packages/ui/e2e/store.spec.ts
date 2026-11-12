@@ -10,7 +10,10 @@ test('the top of the page opens the store and marks it, and returns to the repos
   // The systems are the tabs of the repositories, and the store is no system.
   await expect(repositories.tabs).toHaveCount(3)
   await expect(repositories.menu('Repositories')).toHaveAttribute('aria-current', 'page')
+  // The tab of the browser is named after the page it shows.
+  await expect(page).toHaveTitle('Repositories · Chade')
   await repositories.menu('Store').click()
+  await expect(page).toHaveTitle('Store · Chade')
   await expect(repositories.menu('Store')).toHaveAttribute('aria-current', 'page')
   await expect(repositories.menu('Repositories')).not.toHaveAttribute('aria-current', 'page')
   const store = new StorePage(page)

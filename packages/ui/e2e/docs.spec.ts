@@ -26,6 +26,7 @@ test('a link to another page of the documentation opens it in the interface, at 
   await expect(docs.pages.filter({ hasText: 'System clean-up' })).toHaveAttribute('aria-current', 'page')
   await docs.open('Contributor guide')
   await expect(docs.title).toHaveText('Contributor guide')
+  await expect(page).toHaveTitle('Contributor guide · Chade')
   // A note of GitHub shows its kind as a title.
   await expect(docs.article.locator('blockquote strong').first()).toHaveText('Note')
   await page.goBack()

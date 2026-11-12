@@ -534,6 +534,8 @@ document.addEventListener('keydown', (event) => {
 // One repository: its branches, its history as a graph, and the changes of the commit chosen.
 export const repository = {
   section: element('repository'),
+  // The last folder names a repository, whichever separator its system uses.
+  title: (params: URLSearchParams): string => (params.get('path') ?? '').split(/[\\/]/).filter(Boolean).pop() ?? 'Repository',
   loaded: (): boolean => detail !== undefined,
   clear: (): void => {
     detail = undefined

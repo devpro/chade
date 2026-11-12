@@ -26,6 +26,8 @@ interface View {
   // Asked by the Refresh button, or by the page reading itself again.
   reload: (asked?: boolean) => Promise<Read>
   age?: () => string | undefined
+  // What the tab of the browser is named while the view is shown, so that several tabs of the interface tell apart.
+  title: (params: URLSearchParams) => string
 }
 
 const views: View[] = [list, repository, store, reportPage, docs]
@@ -87,7 +89,9 @@ function fail(error: unknown): void {
 }
 
 function mark(): void {
-  const name = links.get(current())
+  const view = current()
+  document.title = `${view.title(route())} · Chade`
+  const name = links.get(view)
   for (const link of element('pages').querySelectorAll<HTMLElement>('a')) {
     if (link.dataset.view === name) link.setAttribute('aria-current', 'page')
     else link.removeAttribute('aria-current')
