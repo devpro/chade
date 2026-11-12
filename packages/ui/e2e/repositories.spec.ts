@@ -10,6 +10,8 @@ test('each system is a tab, with its repositories and how many have something to
   await expect(repositories.tab('windows')).toHaveAttribute('aria-selected', 'true')
   await expect(repositories.names).toHaveText(['local-only', 'portal'])
   await expect(repositories.summary).toHaveText('2 repositories, 1 without upstream')
+  await expect(repositories.repository('local-only').forge).toHaveAttribute('title', 'No remote')
+  await expect(repositories.repository('local-only').forge.locator('svg')).toHaveCount(0)
   await expect(repositories.warnings).toHaveText([/wsl-ubuntu: the repository folder .*missing does not exist/])
   await shot(page, testInfo, 'windows')
 })
@@ -26,6 +28,12 @@ test('a repository shows its branch, what there is to push and pull, and the sta
   await expect(clean.lastCommit).toHaveText('Start clean')
   await expect(clean.path).toHaveText(/wsl-ubuntu.clean$/)
   await expect(clean.row).toHaveClass('quiet')
+  // The host of the remote shows by its mark, a folder as git itself, and a repository without a remote by nothing.
+  await expect(clean.forge).toHaveClass('forge git')
+  await expect(clean.forge.locator('svg')).toHaveCount(1)
+  await expect(repositories.repository('dirty').forge).toHaveAttribute('title', 'origin on Azure DevOps')
+  await expect(repositories.repository('ahead').forge).toHaveAttribute('title', 'origin on GitLab')
+  await expect(repositories.repository('history').forge).toHaveAttribute('title', 'origin on GitHub')
 
   const ahead = repositories.repository('ahead')
   await expect(ahead.upstream).toHaveText('↑ 2')

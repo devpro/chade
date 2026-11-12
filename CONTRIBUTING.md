@@ -122,6 +122,7 @@ task test:e2e
 The Playwright specs of `packages/ui/e2e` drive Chromium against the server of `chade ui`, started by `e2e/serve.ts` over the built interface.
 That server reads real repositories, made for the run in a temporary folder, one in each state the interface tells apart: clean, ahead, behind, changed, in conflict, never pushed, detached, unreadable.
 One more, `history`, has a merged branch, a tag, a renamed file, uncommitted changes and a remote known by a GitHub address that `insteadOf` sends to the remote of the run, for the page of a repository.
+`ahead` and `dirty` are known the same way by a GitLab and an Azure DevOps address, for the mark of the forge in the list.
 The last one, `work`, sits under a system of its own, `sandbox`, with a remote that is one commit ahead: `e2e/actions.spec.ts` fetches, pulls, commits, pushes and branches in it, each test from the state the one before left.
 The store of the run is a subfolder of one more repository, outside of the systems, with two machines and the three snapshots of the first.
 The report is a fixed one, which counts its runs, so the page does not depend on the machine of the run.

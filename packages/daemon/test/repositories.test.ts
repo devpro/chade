@@ -86,6 +86,8 @@ test('each repository of a root is listed with its branch, its changes, its last
   assert.equal(repository.path, pushed)
   assert.equal(repository.branch, 'main')
   assert.equal(repository.upstream, 'origin/main')
+  // A remote that is a folder is plain git, with no host.
+  assert.deepEqual(repository.remote, { name: 'origin', forge: 'git' })
   assert.deepEqual([repository.ahead, repository.behind], [1, 0])
   assert.deepEqual([repository.changed, repository.untracked, repository.conflicts], [1, 1, 0])
   assert.equal(repository.commit?.subject, 'Second <b>commit</b>')

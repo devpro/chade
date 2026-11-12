@@ -8,16 +8,21 @@ export class RepositoryRow {
     return this.row.locator('.path')
   }
 
-  get branch(): Locator {
-    return this.row.locator('td').nth(1)
+  // The mark of the host of the remote, named by its title.
+  get forge(): Locator {
+    return this.row.locator('.forge')
   }
 
-  get upstream(): Locator {
+  get branch(): Locator {
     return this.row.locator('td').nth(2)
   }
 
-  get workingTree(): Locator {
+  get upstream(): Locator {
     return this.row.locator('td').nth(3)
+  }
+
+  get workingTree(): Locator {
+    return this.row.locator('td').nth(4)
   }
 
   get lastCommit(): Locator {

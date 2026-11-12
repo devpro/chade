@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { basename, join } from 'node:path'
+import { forgeOf, mainRemote, parseRemoteUrls, type Remote } from './remote.js'
 
 export interface Result {
   code: number
@@ -45,6 +46,8 @@ export interface Repository extends Status {
   commit?: { subject: string; date: string }
   // The last fetch or pull, which the ahead and behind counts are as old as.
   fetchedAt?: string
+  // Absent for a repository without a remote, or with several and none of them origin or tracked.
+  remote?: Remote
   error?: string
 }
 
@@ -112,6 +115,14 @@ export async function findRepository(roots: Root[], system: string, path: string
   return undefined
 }
 
+// The remote the upstream origin/feature/x is on, the longest name that fits, as a remote name can hold a slash.
+function remoteOf(urls: Map<string, string>, upstream?: string): Remote | undefined {
+  const names = [...urls.keys()]
+  const tracked = upstream ? names.filter((name) => upstream.startsWith(`${name}/`)).sort((a, b) => b.length - a.length)[0] : undefined
+  const name = mainRemote(names, tracked)
+  return name === undefined ? undefined : { name, ...forgeOf(urls.get(name) ?? '') }
+}
+
 export async function readRepository(root: Root, relative: string[], run: Run): Promise<Repository> {
   const path = repositoryPath(root, relative)
   const folder = join(root.folder, ...relative)
@@ -124,11 +135,14 @@ export async function readRepository(root: Root, relative: string[], run: Run): 
     return { ...identity, changed: 0, untracked: 0, conflicts: 0, error: reason || `${root.git} exited with ${status.code}` }
   }
   const repository: Repository = { ...identity, ...parseStatus(status.stdout) }
-  if (repository.head) {
-    const log = await git(['log', '-1', '--format=%cI%x00%s'])
+  // A repository without any remote has no such key, and git exits with 1.
+  const [log, urls] = await Promise.all([repository.head ? git(['log', '-1', '--format=%cI%x00%s']) : undefined, git(['config', '--get-regexp', '^remote\\..*\\.url$'])])
+  if (log) {
     const [date, subject] = log.stdout.trim().split('\0')
     if (log.code === 0 && subject !== undefined) repository.commit = { subject, date }
   }
+  const remote = remoteOf(urls.code === 0 ? parseRemoteUrls(urls.stdout) : new Map(), repository.upstream)
+  if (remote) repository.remote = remote
   // A worktree keeps its FETCH_HEAD elsewhere, and shows no fetch time.
   const fetched = await stat(join(folder, '.git', 'FETCH_HEAD')).catch(() => undefined)
   if (fetched) repository.fetchedAt = fetched.mtime.toISOString()

@@ -1,3 +1,4 @@
+import { mainRemote, webAddress } from './remote.js'
 import { GIT_TIMEOUT_MS, readRepository, repositoryPath, type Repository, type Root, type Run } from './repositories.js'
 
 export interface Commit {
@@ -56,33 +57,6 @@ export interface Diff {
   patch: string
   // The patch was cut, being larger than a page can show.
   truncated: boolean
-}
-
-// Where each forge shows a branch, after the address of the repository.
-const BRANCH_PAGES: Record<string, string> = { 'github.com': '/tree/', 'gitlab.com': '/-/tree/', 'bitbucket.org': '/src/' }
-
-// The page on the web of a repository whose remote is at the address given, git@host:owner/name.git or https://host/owner/name.git, at the branch given on the hosts that have a page for it.
-export function webAddress(remote: string, branch?: string): string | undefined {
-  let base: string
-  const scp = /^(?:[^@/]+@)?([^:/]+):(?!\/\/)(.+)$/.exec(remote)
-  if (scp) base = `https://${scp[1]}/${scp[2]}`
-  else {
-    let url: URL
-    try {
-      url = new URL(remote)
-    } catch {
-      return undefined
-    }
-    if (!['https:', 'http:', 'ssh:', 'git:'].includes(url.protocol)) return undefined
-    // The port of ssh is no port of the web, and the name and password of a remote stay out of a link.
-    base = url.protocol === 'http:' || url.protocol === 'https:' ? `${url.protocol}//${url.host}${url.pathname}` : `https://${url.hostname}${url.pathname}`
-  }
-  const web = new URL(base.replace(/\/+$/, '').replace(/\.git$/, ''))
-  // A host without a dot is a folder read as scp, C:/repos/name, or a name of the local network.
-  if (!web.hostname.includes('.') || web.pathname.split('/').filter(Boolean).length < 2) return undefined
-  const page = BRANCH_PAGES[web.hostname]
-  if (page && branch) web.pathname += page + branch.split('/').map(encodeURIComponent).join('/')
-  return web.href
 }
 
 export const DEFAULT_COMMITS = 300
@@ -190,7 +164,7 @@ async function readWeb(git: Git, branch: string | undefined): Promise<string | u
   ])
   const [remote, ref, track] = (tracked?.code === 0 ? tracked.stdout.trim() : '').split('\0')
   const names = remotes.code === 0 ? remotes.stdout.split('\n').filter(Boolean) : []
-  const name = remote && names.includes(remote) ? remote : names.includes('origin') ? 'origin' : names.length === 1 ? names[0] : undefined
+  const name = mainRemote(names, remote)
   if (!name) return undefined
   // The address as written in the configuration, as a rewrite of it by insteadOf reaches the same repository by another way, not its page.
   const url = await git(['config', '--get', `remote.${name}.url`])

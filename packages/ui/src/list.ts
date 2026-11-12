@@ -1,6 +1,7 @@
 import type { Repository, RepositoryCheck } from '@chade/daemon'
 import { address, get } from './api.js'
 import { element, node } from './dom.js'
+import { forgeIcon } from './forge.js'
 import { ago, changes, checkOf, matches, needsAttention, summary, sync, tone, type Badge } from './format.js'
 
 interface State {
@@ -69,7 +70,9 @@ function row(repository: Repository, now: number, withChecks: boolean): HTMLElem
   const commit = node('td', '', 'commit')
   if (repository.commit) commit.append(node('div', repository.commit.subject, 'subject'), node('div', ago(repository.commit.date, now), 'age'))
   else commit.append(node('span', 'no commit yet', 'age'))
-  line.append(branch, badges(sync(repository)), badges(changes(repository)), commit)
+  const remote = node('td', '', 'remote')
+  remote.append(forgeIcon(repository.remote))
+  line.append(remote, branch, badges(sync(repository)), badges(changes(repository)), commit)
   if (withChecks) line.append(checkCell(repository))
   line.append(node('td', repository.fetchedAt ? ago(repository.fetchedAt, now) : 'never', 'age'))
   return line
@@ -77,7 +80,7 @@ function row(repository: Repository, now: number, withChecks: boolean): HTMLElem
 
 // The column of IstarCI shows when it has a word on one of the repositories listed, so a list IstarCI says nothing of is as it is without it.
 function columns(withChecks: boolean): string[] {
-  return ['Repository', 'Branch', 'Upstream', 'Working tree', 'Last commit', ...(withChecks ? ['IstarCI'] : []), 'Fetched']
+  return ['Repository', 'Remote', 'Branch', 'Upstream', 'Working tree', 'Last commit', ...(withChecks ? ['IstarCI'] : []), 'Fetched']
 }
 
 const hasCheck = (repository: Repository): boolean => latest.has(keyOf(repository.system, repository.path))

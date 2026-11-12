@@ -246,8 +246,9 @@ Each system of the machine is a tab, with the number of its repositories and of 
 A tab lists the git repositories found under `repos`, a Windows repository being read by the git of Windows, on WSL as well.
 
 Column       | Content
--------------|----------------------------------------------------------------------------------------
+-------------|---------------------------------------------------------------------------------------------------------
 Repository   | Name and path
+Remote       | Mark of the host of the remote: GitHub, GitLab, Azure DevOps, or git for any other host and a folder
 Branch       | Checked out branch, or the commit of a detached HEAD
 Upstream     | Commits ahead (↑) and behind (↓) the upstream branch, `no upstream`, or `upstream gone`
 Working tree | Files changed, untracked and in conflict
@@ -255,6 +256,7 @@ Last commit  | Subject and age
 Fetched      | Age of the last fetch or pull, which the ahead and behind counts are as old as
 
 The mark at the start of a row is blue with commits to push, amber with something to commit or pull, and red with a conflict or a repository git cannot read.
+The remote of the column Remote is the one the branch tracks, or origin, or the only one, and no remote leaves the cell empty.
 The name of a repository opens its page.
 When its remote is on the web, a link next to its path opens the remote in a tab of the browser, at the branch checked out once pushed, on GitHub, GitLab and Bitbucket.
 The filter keeps the repositories whose name, path or branch holds every word typed.

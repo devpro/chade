@@ -6,7 +6,6 @@ export {
   parseCommits,
   repositoryDetail,
   repositoryDiff,
-  webAddress,
   type Branch,
   type Commit,
   type Detail,
@@ -16,6 +15,7 @@ export {
 } from './history.js'
 export { pathKey, readChecks, readRepositories, type Check, type CheckStatus, type IstarciServer, type RepositoryCheck } from './istarci.js'
 export type { Measure, Report, Section } from './report.js'
+export { forgeOf, mainRemote, parseRemoteUrls, webAddress, type Forge, type Remote } from './remote.js'
 export { findRepositories, findRepository, listRepositories, parseStatus, type Listing, type Repository, type Root, type Run, type Status } from './repositories.js'
 export { RequestError, startServer, type Server, type ServerOptions } from './server.js'
 export {

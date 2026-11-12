@@ -57,9 +57,16 @@ function repository(system: string, name: string, options: { push?: boolean } = 
   return folder
 }
 
+// Known by the address of a forge, which git still reaches through the remote of the run.
+function knownAs(folder: string, remote: string, url: string): void {
+  git(folder, 'config', `url.${join(root, 'remotes', `${remote}.git`)}.insteadOf`, url)
+  git(folder, 'remote', 'set-url', 'origin', url)
+}
+
 repository('wsl-ubuntu', 'clean')
 
 const ahead = repository('wsl-ubuntu', 'ahead')
+knownAs(ahead, 'wsl-ubuntu-ahead', 'git@gitlab.com:chade-e2e/ahead.git')
 commit(ahead, 'a.txt', 'one\n', 'Add a file that is not pushed yet')
 commit(ahead, 'a.txt', 'two\n', 'Change the file, which <b>is not</b> markup')
 
@@ -72,6 +79,7 @@ git(other, 'push', '--quiet')
 git(behind, 'fetch', '--quiet')
 
 const dirty = repository('wsl-ubuntu', 'dirty')
+knownAs(dirty, 'wsl-ubuntu-dirty', 'https://chade-e2e@dev.azure.com/chade-e2e/system/_git/dirty')
 writeFileSync(join(dirty, 'README.md'), '# dirty, edited\n')
 writeFileSync(join(dirty, 'notes.txt'), 'not tracked\n')
 writeFileSync(join(dirty, 'todo.txt'), 'not tracked either\n')
@@ -103,9 +111,7 @@ commit(history, 'guide.md', 'Install\nSet up\nRun\nStop\n', 'Change the guide\n\
 git(history, 'merge', '--quiet', '--no-ff', '--message', 'Merge feature/graph', 'feature/graph')
 git(history, 'tag', 'v1.0')
 git(history, 'push', '--quiet')
-// Known by the address of its page on GitHub, which git still reaches through the remote of the run.
-git(history, 'config', `url.${join(root, 'remotes', 'wsl-ubuntu-history.git')}.insteadOf`, 'https://github.com/chade-e2e/history.git')
-git(history, 'remote', 'set-url', 'origin', 'https://github.com/chade-e2e/history.git')
+knownAs(history, 'wsl-ubuntu-history', 'https://github.com/chade-e2e/history.git')
 git(history, 'mv', 'guide.md', 'manual.md')
 git(history, 'commit', '--quiet', '--message', 'Rename the guide')
 writeFileSync(join(history, 'staged.txt'), 'ready\n')
