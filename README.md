@@ -256,6 +256,7 @@ Fetched      | Age of the last fetch or pull, which the ahead and behind counts 
 
 The mark at the start of a row is blue with commits to push, amber with something to commit or pull, and red with a conflict or a repository git cannot read.
 The name of a repository opens its page.
+When its remote is on the web, a link next to its path opens the remote in a tab of the browser, at the branch checked out once pushed, on GitHub, GitLab and Bitbucket.
 The filter keeps the repositories whose name, path or branch holds every word typed.
 The checkbox keeps those with something to commit, push, pull or fix.
 The page reads again by itself every 30 seconds while it is looked at, and when its tab comes back to the front, the list as well as the page of a repository.

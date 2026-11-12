@@ -41,6 +41,8 @@ export interface Detail {
   changes: FileChange[]
   // The commit checked out, which an amend rewrites, absent before the first commit.
   last?: LastCommit
+  // The page of the remote on the web, absent for a remote that is a folder or a host whose pages are unknown.
+  web?: string
 }
 
 export interface LastCommit {
@@ -54,6 +56,33 @@ export interface Diff {
   patch: string
   // The patch was cut, being larger than a page can show.
   truncated: boolean
+}
+
+// Where each forge shows a branch, after the address of the repository.
+const BRANCH_PAGES: Record<string, string> = { 'github.com': '/tree/', 'gitlab.com': '/-/tree/', 'bitbucket.org': '/src/' }
+
+// The page on the web of a repository whose remote is at the address given, git@host:owner/name.git or https://host/owner/name.git, at the branch given on the hosts that have a page for it.
+export function webAddress(remote: string, branch?: string): string | undefined {
+  let base: string
+  const scp = /^(?:[^@/]+@)?([^:/]+):(?!\/\/)(.+)$/.exec(remote)
+  if (scp) base = `https://${scp[1]}/${scp[2]}`
+  else {
+    let url: URL
+    try {
+      url = new URL(remote)
+    } catch {
+      return undefined
+    }
+    if (!['https:', 'http:', 'ssh:', 'git:'].includes(url.protocol)) return undefined
+    // The port of ssh is no port of the web, and the name and password of a remote stay out of a link.
+    base = url.protocol === 'http:' || url.protocol === 'https:' ? `${url.protocol}//${url.host}${url.pathname}` : `https://${url.hostname}${url.pathname}`
+  }
+  const web = new URL(base.replace(/\/+$/, '').replace(/\.git$/, ''))
+  // A host without a dot is a folder read as scp, C:/repos/name, or a name of the local network.
+  if (!web.hostname.includes('.') || web.pathname.split('/').filter(Boolean).length < 2) return undefined
+  const page = BRANCH_PAGES[web.hostname]
+  if (page && branch) web.pathname += page + branch.split('/').map(encodeURIComponent).join('/')
+  return web.href
 }
 
 export const DEFAULT_COMMITS = 300
@@ -147,7 +176,28 @@ export async function repositoryDetail(root: Root, relative: string[], run: Run,
   const commits = parseCommits(log.stdout)
   const detail: Detail = { repository, branches: parseBranches(refs.stdout), commits: commits.slice(0, count), more: commits.length > count, changes: parseChanges(status.stdout) }
   if (repository.head) detail.last = { message: message.stdout.trim(), pushed: unpushed.stdout.trim() === '' }
+  const web = await readWeb(git, repository.branch)
+  if (web) detail.web = web
   return detail
+}
+
+// The page of the remote the branch checked out tracks, at that branch, or of origin, or of the only remote, when the branch tracks none.
+async function readWeb(git: Git, branch: string | undefined): Promise<string | undefined> {
+  // A branch name holds no character a pattern of for-each-ref reads as a wildcard.
+  const [tracked, remotes] = await Promise.all([
+    branch ? git(['for-each-ref', '--format=%(upstream:remotename)%00%(upstream:remoteref)%00%(upstream:track)', `refs/heads/${branch}`]) : undefined,
+    git(['remote']),
+  ])
+  const [remote, ref, track] = (tracked?.code === 0 ? tracked.stdout.trim() : '').split('\0')
+  const names = remotes.code === 0 ? remotes.stdout.split('\n').filter(Boolean) : []
+  const name = remote && names.includes(remote) ? remote : names.includes('origin') ? 'origin' : names.length === 1 ? names[0] : undefined
+  if (!name) return undefined
+  // The address as written in the configuration, as a rewrite of it by insteadOf reaches the same repository by another way, not its page.
+  const url = await git(['config', '--get', `remote.${name}.url`])
+  if (url.code !== 0) return undefined
+  // A branch that was never pushed, or whose upstream is gone, has no page on the remote yet.
+  const pushed = name === remote && ref?.startsWith('refs/heads/') && track !== '[gone]'
+  return webAddress(url.stdout.trim(), pushed ? ref.slice('refs/heads/'.length) : undefined)
 }
 
 // Prints HEAD when no remote branch holds it yet, and nothing once it is pushed.

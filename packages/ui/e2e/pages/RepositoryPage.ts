@@ -25,6 +25,7 @@ export class FileComparison {
 export class RepositoryPage {
   readonly name: Locator
   readonly path: Locator
+  readonly web: Locator
   readonly state: Locator
   readonly commits: Locator
   readonly subjects: Locator
@@ -48,6 +49,7 @@ export class RepositoryPage {
   constructor(readonly page: Page) {
     this.name = page.locator('#repository-name')
     this.path = page.locator('#repository-path')
+    this.web = page.locator('#repository-web')
     this.state = page.locator('#repository-state')
     this.commits = page.locator('#history .commit-row:not(.working-tree)')
     this.subjects = this.commits.locator('.subject')

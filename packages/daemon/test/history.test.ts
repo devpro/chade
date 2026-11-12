@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { before, test } from 'node:test'
-import { createApi, parseBranches, parseChanges, parseCommits, RequestError, type Detail, type Diff, type Root, type Run } from '../src/index.js'
+import { createApi, parseBranches, parseChanges, parseCommits, RequestError, webAddress, type Detail, type Diff, type Root, type Run } from '../src/index.js'
 
 const env = { ...process.env, GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null', GIT_CONFIG_NOSYSTEM: '1' }
 
@@ -56,6 +56,19 @@ test('changed files read with what is staged and what is not, a renamed one with
     { path: 'notes.txt', staged: ' ', unstaged: '?' },
     { path: 'conflict.txt', staged: 'U', unstaged: 'U' },
   ])
+})
+
+test('the page of a remote on the web, at a branch on the forges whose page of a branch is known', () => {
+  assert.equal(webAddress('git@github.com:ada/work.git', 'main'), 'https://github.com/ada/work/tree/main')
+  assert.equal(webAddress('https://github.com/ada/work', 'feature/graph #2'), 'https://github.com/ada/work/tree/feature/graph%20%232')
+  assert.equal(webAddress('ssh://git@gitlab.com:22/group/sub/work.git', 'main'), 'https://gitlab.com/group/sub/work/-/tree/main')
+  assert.equal(webAddress('https://ada:secret@bitbucket.org/ada/work.git/', 'main'), 'https://bitbucket.org/ada/work/src/main')
+  assert.equal(webAddress('https://git.example.test:8443/ada/work.git', 'main'), 'https://git.example.test:8443/ada/work')
+  assert.equal(webAddress('git@github.com:ada/work.git'), 'https://github.com/ada/work')
+  // A folder, a host of the local network, or a host alone, has no page.
+  for (const remote of ['/srv/git/work.git', 'C:\\repos\\work.git', 'file:///srv/git/work.git', 'nas:work.git', 'https://github.com/']) {
+    assert.equal(webAddress(remote, 'main'), undefined, remote)
+  }
 })
 
 let root: Root
@@ -118,6 +131,21 @@ test('a repository gives its branches, its history from the newest commit, and t
     { path: 'c.txt', staged: 'R', unstaged: ' ', from: 'b.txt' },
     { path: 'new.txt', staged: ' ', unstaged: '?' },
   ])
+})
+
+test('a repository gives the page of its remote, at the branch checked out once it is pushed', async () => {
+  const forge = join(root.folder, 'forge')
+  await mkdir(forge)
+  await git(forge, 'init', '--quiet', '--initial-branch=main')
+  await git(forge, 'commit', '--quiet', '--allow-empty', '-m', 'Start')
+  const web = async () => ((await api.repository(query({ system: 'linux', path: forge }))) as Detail).web
+  assert.equal(await web(), undefined)
+  await git(forge, 'remote', 'add', 'origin', 'git@github.com:ada/forge.git')
+  // Never pushed, so the page of the repository only.
+  assert.equal(await web(), 'https://github.com/ada/forge')
+  await git(forge, 'update-ref', 'refs/remotes/origin/main', 'HEAD')
+  await git(forge, 'branch', '--quiet', '--set-upstream-to=origin/main')
+  assert.equal(await web(), 'https://github.com/ada/forge/tree/main')
 })
 
 test('a history longer than asked says there is more', async () => {

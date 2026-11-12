@@ -6,6 +6,7 @@ export {
   parseCommits,
   repositoryDetail,
   repositoryDiff,
+  webAddress,
   type Branch,
   type Commit,
   type Detail,

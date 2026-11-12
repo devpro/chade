@@ -473,9 +473,21 @@ async function renderDetail(current: Loaded): Promise<void> {
   }
 }
 
+// The page of the remote, which opens in a tab of its own, and only on the web, as a link to anything else would leave the interface for the machine.
+function showWeb(web: string | undefined): void {
+  const link = element<HTMLAnchorElement>('repository-web')
+  const url = web ? new URL(web) : undefined
+  link.hidden = !url || (url.protocol !== 'https:' && url.protocol !== 'http:')
+  if (!url || link.hidden) return link.removeAttribute('href')
+  link.href = url.href
+  link.textContent = `${url.host} ↗`
+  link.title = `Open ${url.href}`
+}
+
 function render(current: Loaded): void {
   element('repository-name').textContent = current.repository.name
   element('repository-path').textContent = current.repository.path
+  showWeb(current.web)
   const state = element('repository-state')
   state.replaceChildren()
   if (current.repository.branch) state.append(node('span', current.repository.branch, 'branch'))
@@ -558,6 +570,7 @@ export const repository = {
     for (const id of ['branches', 'history', 'diff', 'detail', 'repository-state']) element(id).replaceChildren()
     element('repository-name').textContent = ''
     element('repository-path').textContent = params.get('path') ?? ''
+    showWeb(undefined)
     return this.reload()
   },
   async reload(): Promise<{ machine: string; version: string; scannedAt: string }> {

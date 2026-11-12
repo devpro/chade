@@ -103,6 +103,9 @@ commit(history, 'guide.md', 'Install\nSet up\nRun\nStop\n', 'Change the guide\n\
 git(history, 'merge', '--quiet', '--no-ff', '--message', 'Merge feature/graph', 'feature/graph')
 git(history, 'tag', 'v1.0')
 git(history, 'push', '--quiet')
+// Known by the address of its page on GitHub, which git still reaches through the remote of the run.
+git(history, 'config', `url.${join(root, 'remotes', 'wsl-ubuntu-history.git')}.insteadOf`, 'https://github.com/chade-e2e/history.git')
+git(history, 'remote', 'set-url', 'origin', 'https://github.com/chade-e2e/history.git')
 git(history, 'mv', 'guide.md', 'manual.md')
 git(history, 'commit', '--quiet', '--message', 'Rename the guide')
 writeFileSync(join(history, 'staged.txt'), 'ready\n')

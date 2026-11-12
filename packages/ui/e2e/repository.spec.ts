@@ -10,6 +10,9 @@ test('the name of a repository opens its page, and the link back returns to the 
   await history.expectOpen('history')
   await expect(history.path).toHaveText(/wsl-ubuntu.history$/)
   await expect(page).toHaveTitle('history · Chade')
+  // The remote is on GitHub, so its page opens at the branch checked out, in a tab of its own.
+  await expect(history.web).toHaveAttribute('href', 'https://github.com/chade-e2e/history/tree/main')
+  await expect(history.web).toHaveAttribute('target', '_blank')
   await history.back()
   await expect(repositories.tab('wsl-ubuntu')).toHaveAttribute('aria-selected', 'true')
   await expect(repositories.names).toHaveCount(9)
@@ -22,6 +25,14 @@ test('a click anywhere on the row of a repository opens its page', async ({ page
   await repositories.showSystem('wsl-ubuntu')
   await repositories.openRow('history')
   await new RepositoryPage(page).expectOpen('history')
+})
+
+test('a repository whose remote is a folder links to no page on the web', async ({ page, repositories }) => {
+  await repositories.showSystem('wsl-ubuntu')
+  await repositories.openRepository('clean')
+  const clean = new RepositoryPage(page)
+  await clean.expectOpen('clean')
+  await expect(clean.web).toBeHidden()
 })
 
 test('a file of a commit opens its changes in place of the history, and another file of the list takes its place', async ({ page, history }) => {

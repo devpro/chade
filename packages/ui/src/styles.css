@@ -288,6 +288,16 @@ tr.bad td.repository {
   font: 11.5px var(--mono);
 }
 
+.web {
+  color: var(--accent);
+  font-size: 12.5px;
+  text-decoration: none;
+}
+
+.web:hover {
+  text-decoration: underline;
+}
+
 .branch {
   padding: 2px 8px;
   border-radius: 5px;
