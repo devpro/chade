@@ -1,4 +1,4 @@
-import type { Branch, Check, Commit, Detail, Diff, FileChange } from '@chade/daemon'
+import type { Branch, Check, Commit, Detail, Diff, FileChange, LastCommit } from '@chade/daemon'
 import { address, get, post } from './api.js'
 import { parseDiff } from './diff.js'
 import { element, node, svg } from './dom.js'
@@ -62,6 +62,7 @@ const RUNNING: Record<string, string> = {
   stage: 'Staging…',
   unstage: 'Unstaging…',
   commit: 'Committing…',
+  amend: 'Amending…',
 }
 
 // Asks the server for one change in the repository shown, then reads the repository again.
@@ -112,21 +113,48 @@ message.rows = 3
 message.setAttribute('aria-label', 'Commit message')
 const commitButton = node('button', 'Commit', 'action') as HTMLButtonElement
 commitButton.type = 'button'
+// Amend puts what is staged into the last commit, under the message in the box, which starts as the message of that commit.
+const amend = node('input') as HTMLInputElement
+amend.type = 'checkbox'
+amend.id = 'amend'
+const amendLabel = node('label', '', 'amend')
+amendLabel.append(amend, ' Amend the last commit')
+const commitActions = node('div', '', 'commit-actions')
+commitActions.append(amendLabel, commitButton)
 const commitForm = node('div', '', 'commit-form')
-commitForm.append(message, commitButton)
+commitForm.append(message, commitActions)
 let stagedCount = 0
+let last: LastCommit | undefined
 
 function updateCommit(): void {
-  const off = stagedCount === 0 || message.value.trim() === ''
+  // A commit pushed meanwhile, from a terminal, is no longer amended.
+  if (!last || last.pushed) amend.checked = false
+  amend.disabled = !last || last.pushed
+  amendLabel.title = !last ? 'There is no commit to amend yet' : last.pushed ? 'The last commit is already pushed, so it is not amended' : 'Put what is staged into the last commit, and change its message'
+  const empty = message.value.trim() === ''
+  const off = empty || (!amend.checked && stagedCount === 0)
+  commitButton.textContent = amend.checked ? 'Amend' : 'Commit'
   commitButton.dataset.off = String(off)
   commitButton.disabled = off || acting
-  commitButton.title = stagedCount === 0 ? 'Stage a file to commit it' : message.value.trim() === '' ? 'Write a message to commit' : `Commit ${stagedCount} staged file${stagedCount === 1 ? '' : 's'}`
+  const staged = `${stagedCount} staged file${stagedCount === 1 ? '' : 's'}`
+  if (amend.checked) commitButton.title = empty ? 'Write a message to amend' : stagedCount === 0 ? 'Change the message of the last commit' : `Put ${staged} into the last commit`
+  else commitButton.title = stagedCount === 0 ? 'Stage a file to commit it' : empty ? 'Write a message to commit' : `Commit ${staged}`
 }
 
 message.addEventListener('input', updateCommit)
+amend.addEventListener('change', () => {
+  if (amend.checked && last && message.value.trim() === '') message.value = last.message
+  // The message of the last commit, left as it was, is not the start of a new one.
+  if (!amend.checked && message.value === last?.message) message.value = ''
+  updateCommit()
+})
 commitButton.addEventListener('click', () => {
-  void act({ action: 'commit', message: message.value }, 'Committed', commitButton).then((succeeded) => {
-    if (succeeded) message.value = ''
+  const action = amend.checked ? 'amend' : 'commit'
+  void act({ action, message: message.value }, action === 'amend' ? 'Amended' : 'Committed', commitButton).then((succeeded) => {
+    if (succeeded) {
+      message.value = ''
+      amend.checked = false
+    }
     updateCommit()
   })
 })
@@ -396,6 +424,7 @@ async function renderDetail(current: Loaded): Promise<void> {
       const paths = (files: FileChange[]): string[] => files.map((file) => file.path)
       const stage: FileAction = { text: '+', title: 'Stage', action: 'stage' }
       stagedCount = staged.length
+      last = current.last
       updateCommit()
       created.push(commitForm)
       if (staged.length > 0) {

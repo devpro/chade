@@ -11,6 +11,7 @@ export {
   type Detail,
   type Diff,
   type FileChange,
+  type LastCommit,
 } from './history.js'
 export { pathKey, readChecks, readRepositories, type Check, type CheckStatus, type IstarciServer, type RepositoryCheck } from './istarci.js'
 export type { Measure, Report, Section } from './report.js'

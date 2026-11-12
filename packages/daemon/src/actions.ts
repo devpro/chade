@@ -1,9 +1,9 @@
-import { parseBranches, parseChanges } from './history.js'
+import { parseBranches, parseChanges, UNPUSHED } from './history.js'
 import { GIT_TIMEOUT_MS, parseStatus, repositoryPath, type Root, type Run } from './repositories.js'
 import { RequestError } from './server.js'
 
 // What the interface asks to change in a repository, the only changes chade makes to it.
-export const ACTIONS = ['fetch', 'pull', 'push', 'checkout', 'branch', 'stage', 'unstage', 'commit'] as const
+export const ACTIONS = ['fetch', 'pull', 'push', 'checkout', 'branch', 'stage', 'unstage', 'commit', 'amend'] as const
 
 export interface ActionRequest {
   action: string
@@ -14,7 +14,7 @@ export interface ActionRequest {
   from?: string
   // stage, unstage: files among the changes, all of them when absent.
   files?: string[]
-  // commit: the message.
+  // commit, amend: the message.
   message?: string
 }
 
@@ -52,8 +52,15 @@ export async function runAction(root: Root, relative: string[], run: Run, reques
     case 'fetch':
       return { output: await git(['fetch', '--all', '--prune'], NETWORK_TIMEOUT_MS) }
     case 'pull':
-      // Fast forward only: a pull never makes a merge commit, nor rewrites one, and a branch that diverged is left to the terminal.
-      return { output: await git(['pull', '--ff-only'], NETWORK_TIMEOUT_MS) }
+      // Fast forward when it can, merge otherwise, whatever pull.rebase and pull.ff say, and never an editor for the message of the merge.
+      try {
+        return { output: await git(['pull', '--no-rebase', '--ff', '--no-edit'], NETWORK_TIMEOUT_MS) }
+      } catch (error) {
+        // A merge that stopped on a conflict is undone, so the repository is never left half merged.
+        if (!(error instanceof RequestError) || (await read(['rev-parse', '--quiet', '--verify', 'MERGE_HEAD']).catch(() => '')) === '') throw error
+        await git(['merge', '--abort'])
+        throw new RequestError(409, `${error.message}\nThe merge was aborted, and the branch is as it was before the pull.`)
+      }
     case 'push': {
       const status = parseStatus(await read(['status', '--porcelain=v2', '--branch']))
       if (!status.branch) invalid('no branch is checked out, so there is nothing to push')
@@ -107,6 +114,14 @@ export async function runAction(root: Root, relative: string[], run: Run, reques
       const changes = parseChanges(await read(['status', '--porcelain=v1', '-z']))
       if (!changes.some((change) => change.staged !== ' ' && change.staged !== 'U')) invalid('nothing is staged, so there is nothing to commit')
       return { output: await git(['commit', '--message', message]) }
+    }
+    case 'amend': {
+      const message = typeof request.message === 'string' ? request.message.trim() : ''
+      if (message === '') invalid('a commit needs a message')
+      if (!parseStatus(await read(['status', '--porcelain=v2', '--branch'])).head) invalid('there is no commit to amend yet')
+      // A commit a remote holds is never rewritten, as the next push would have to force.
+      if ((await read(UNPUSHED)).trim() === '') invalid('the last commit is already pushed, so it is not amended')
+      return { output: await git(['commit', '--amend', '--message', message]) }
     }
     default:
       return invalid(`${request.action} is not one of ${ACTIONS.join(', ')}`)

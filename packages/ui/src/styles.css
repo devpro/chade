@@ -1038,6 +1038,17 @@ td.ci {
   margin: 8px 0 4px;
 }
 
+.commit-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.commit-actions .amend {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 #commit-message {
   width: 100%;
   padding: 8px 10px;

@@ -75,7 +75,7 @@ test('a fetch brings what the remote has, and a pull moves the branch to it', as
   assert.equal(await git(work, 'log', '-1', '--format=%s'), 'Add b')
 })
 
-test('a pull never merges: a branch that diverged is refused, with what git says', async () => {
+test('a pull of a branch that diverged merges it, and a conflict aborts the merge with what git says', async () => {
   await writeFile(join(other, 'b.txt'), 'from elsewhere\n')
   await git(other, 'add', '.')
   await git(other, 'commit', '--quiet', '-m', 'Add b')
@@ -83,8 +83,22 @@ test('a pull never merges: a branch that diverged is refused, with what git says
   await writeFile(join(work, 'c.txt'), 'local\n')
   await git(work, 'add', '.')
   await git(work, 'commit', '--quiet', '-m', 'Add c')
-  await assert.rejects(action({ action: 'pull' }), (error: RequestError) => error.status === 409 && /fast-forward|diverg/i.test(error.message))
-  assert.equal(await git(work, 'log', '-1', '--format=%s'), 'Add c')
+  // A setting that would otherwise refuse, or rebase, is overridden.
+  await git(work, 'config', 'pull.ff', 'only')
+  await action({ action: 'pull' })
+  assert.equal(await git(work, 'log', '-1', '--format=%p'), `${await git(work, 'rev-parse', '--short', 'HEAD^1')} ${await git(work, 'rev-parse', '--short', 'origin/main')}`)
+  assert.equal(await git(work, 'status', '--porcelain'), '')
+
+  await writeFile(join(other, 'a.txt'), 'theirs\n')
+  await git(other, 'commit', '--quiet', '-am', 'Change a there')
+  await git(other, 'push', '--quiet')
+  await writeFile(join(work, 'a.txt'), 'ours\n')
+  await git(work, 'commit', '--quiet', '-am', 'Change a here')
+  const before = await git(work, 'rev-parse', 'HEAD')
+  await assert.rejects(action({ action: 'pull' }), (error: RequestError) => error.status === 409 && /CONFLICT/.test(error.message) && /aborted/.test(error.message))
+  assert.equal(await git(work, 'rev-parse', 'HEAD'), before)
+  assert.equal(await git(work, 'status', '--porcelain'), '')
+  assert.equal((await run('git', ['-C', work, 'rev-parse', '--quiet', '--verify', 'MERGE_HEAD'])).code, 1)
 })
 
 test('files are staged and unstaged by name or all at once, a renamed one with both its paths', async () => {
@@ -116,6 +130,25 @@ test('a commit takes what is staged, with its message, lines and all', async () 
   assert.equal(await git(work, 'status', '--porcelain'), '?? left.txt')
   assert.equal(await status({ action: 'commit', message: 'Nothing staged' }), 400)
   assert.equal(await status({ action: 'commit', message: '   ' }), 400)
+})
+
+test('an amend rewrites the last commit with what is staged and a new message, until it is pushed', async () => {
+  await writeFile(join(work, 'a.txt'), 'two\n')
+  await action({ action: 'stage' })
+  await action({ action: 'commit', message: 'Change a' })
+  await writeFile(join(work, 'b.txt'), 'forgotten\n')
+  await action({ action: 'stage' })
+  await action({ action: 'amend', message: 'Change a, and add b' })
+  assert.equal(await git(work, 'rev-list', '--count', 'origin/main..HEAD'), '1')
+  assert.equal(await git(work, 'log', '-1', '--format=%s'), 'Change a, and add b')
+  assert.equal(await git(work, 'show', '--format=', '--name-only', 'HEAD'), 'a.txt\nb.txt')
+  // Nothing staged: the message alone changes.
+  await action({ action: 'amend', message: 'Reworded' })
+  assert.equal(await git(work, 'log', '-1', '--format=%s'), 'Reworded')
+  assert.equal(await status({ action: 'amend', message: '  ' }), 400)
+  await action({ action: 'push' })
+  assert.equal(await status({ action: 'amend', message: 'Too late' }), 400)
+  assert.equal(await git(work, 'log', '-1', '--format=%s'), 'Reworded')
 })
 
 test('a push sends the branch, and gives a branch never pushed its upstream', async () => {

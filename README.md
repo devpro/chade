@@ -14,7 +14,7 @@ and inventories: installed applications, VS Code extensions, services, scheduled
 chade only reads the system, it never changes it.
 `chade ui` opens a web interface served on the machine, which lists every git repository of the machine with what is left to commit, push or pull.
 The same interface shows the store, snapshot by snapshot, and the report.
-A git repository is the one thing chade changes, and only when asked at that interface: a fetch, a pull, a checkout, a new branch, a commit or a push.
+A git repository is the one thing chade changes, and only when asked at that interface: a fetch, a pull, a checkout, a new branch, a commit, an amend or a push.
 `chade report` measures what takes disk and memory, the space WSL takes on C: above all, and gives the command that gets each one back.
 It is the tool, the snapshots live in the store, a folder of a git repository chosen at `chade init`.
 The store is a dedicated repository, or a subfolder of a repository that holds other things, such as personal notes.
@@ -318,7 +318,7 @@ The page of a repository changes it through these actions, and no other.
 Action       | Where                                    | What git runs
 -------------|------------------------------------------|-----------------------------------------------------------------------------------
 Fetch        | Top of the page                          | `git fetch --all --prune`
-Pull         | Top of the page                          | `git pull --ff-only`
+Pull         | Top of the page                          | `git pull --no-rebase --ff --no-edit`, and `git merge --abort` on a conflict
 Push         | Top of the page                          | `git push`, or `git push --set-upstream origin <branch>` for a branch never pushed
 New branch   | Top of the page, then a name             | `git switch --create <name>`, from the commit checked out
 Check out    | Beside a branch, when it is pointed at   | `git switch <branch>`, or `git switch --track <remote>/<branch>` for a remote one
@@ -327,6 +327,11 @@ Unstage, `−` | Beside a staged file                     | `git reset -- <file>
 Stage all    | Beside Not staged, or Untracked          | `git add --all -- <files>`
 Unstage all  | Beside Staged                            | `git reset`
 Commit       | Under the message, above the files       | `git commit --message <message>`, of what is staged
+Amend        | Under the message, Amend checked         | `git commit --amend --message <message>`, of a commit no remote holds
+
+A pull fast forwards when it can, and otherwise merges the upstream into the branch with a merge commit, whatever `pull.rebase` and `pull.ff` say.
+Checking Amend the last commit fills an empty box with the message of the commit checked out.
+What is staged joins that commit, and with nothing staged the message alone changes.
 
 While git works, the button that asked turns and a notice in a corner of the page says what is running.
 The notice then says what was done, or what git answered when it refused, a push the pre-push hook of IstarCI blocked for instance.
@@ -336,8 +341,9 @@ The list of the repositories reads again when it is returned to, so it shows a r
 
 What is left to the terminal, on purpose:
 
-- A pull only fast forwards, so a branch that diverged from its upstream is merged or rebased by hand.
-- Nothing is forced, discarded, deleted or rewritten: no force push, no reset of the working tree, no branch deletion, no amend.
+- A pull that meets a conflict is aborted, and the branch stays as it was, to be merged or rebased by hand.
+- Nothing is forced, discarded or deleted: no force push, no reset of the working tree, no branch deletion.
+- A commit a remote holds is never rewritten, so Amend is off once the last commit is pushed.
 - A conflict is resolved in an editor.
 
 git runs as the user, with the credentials of the user: the SSH agent and the credential helper already set up.

@@ -79,11 +79,35 @@ test('a message being written stays, with its caret, while the page reads the re
   await expect(work.commitMessage).toHaveValue('Half a message')
 })
 
-test('a push sends the commits, and the branch is in sync again', async () => {
+test('an amend puts what is staged into the last commit, under the message it starts from', async ({ page }, testInfo) => {
+  writeFileSync(join(folder, 'forgotten.txt'), 'forgotten\n')
+  await page.getByRole('button', { name: 'Refresh' }).click()
+  await work.workingTree.click()
+  await work.stage('forgotten.txt')
+  await work.amend.check()
+  await expect(work.commitMessage).toHaveValue('An empty commit')
+  await work.commitMessage.fill('Add the forgotten file')
+  await shot(page, testInfo, 'ready-to-amend')
+  await work.amendButton.click()
+  await expect(work.notice).toHaveText('Amended')
+  await expect(work.subjects.first()).toHaveText('mainAdd the forgotten file')
+  await expect(work.state).toHaveText('main↑ 21 untracked')
+  await expect(work.commitMessage).toHaveValue('')
+  await expect(work.amend).not.toBeChecked()
+  expect(git('show', '--format=%s', '--name-only', 'HEAD')).toBe('Add the forgotten file\n\nforgotten.txt')
+  // Unchecked again, the message of the last commit leaves the box.
+  await work.amend.check()
+  await work.amend.uncheck()
+  await expect(work.commitMessage).toHaveValue('')
+})
+
+test('a push sends the commits, and the branch is in sync again, its last commit no longer amended', async () => {
   await expect(work.state).toHaveText('main↑ 21 untracked')
   await work.run('Push', 'Pushed')
   await expect(work.state).toHaveText('mainin sync1 untracked')
   expect(git('rev-list', '--count', 'origin/main..main')).toBe('0')
+  await work.workingTree.click()
+  await expect(work.amend).toBeDisabled()
 })
 
 test('a new branch is checked out as it is created, and its first push gives it an upstream', async ({ page }, testInfo) => {

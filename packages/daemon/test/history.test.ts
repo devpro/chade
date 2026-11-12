@@ -111,6 +111,8 @@ test('a repository gives its branches, its history from the newest commit, and t
   assert.equal(merge.author, 'Ada')
   assert.equal(detail.commits.at(-1)?.subject, 'Start')
   assert.equal(detail.more, false)
+  // No remote holds the commit checked out, so it can be amended.
+  assert.deepEqual(detail.last, { message: 'Merge feature', pushed: false })
   assert.deepEqual(detail.changes, [
     { path: 'a.txt', staged: ' ', unstaged: 'M' },
     { path: 'c.txt', staged: 'R', unstaged: ' ', from: 'b.txt' },

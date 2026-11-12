@@ -41,6 +41,8 @@ export class RepositoryPage {
   readonly noticeText: Locator
   readonly commitMessage: Locator
   readonly commitButton: Locator
+  readonly amend: Locator
+  readonly amendButton: Locator
   readonly message: Locator
 
   constructor(readonly page: Page) {
@@ -62,6 +64,8 @@ export class RepositoryPage {
     this.noticeText = page.locator('#notice-text')
     this.commitMessage = page.getByRole('textbox', { name: 'Commit message' })
     this.commitButton = page.getByRole('button', { name: 'Commit', exact: true })
+    this.amend = page.getByRole('checkbox', { name: 'Amend the last commit' })
+    this.amendButton = page.getByRole('button', { name: 'Amend', exact: true })
     this.message = page.locator('#message')
   }
 

@@ -39,6 +39,14 @@ export interface Detail {
   // The history goes on after the commits listed.
   more: boolean
   changes: FileChange[]
+  // The commit checked out, which an amend rewrites, absent before the first commit.
+  last?: LastCommit
+}
+
+export interface LastCommit {
+  message: string
+  // On a remote branch already, so rewriting it would need a force push.
+  pushed: boolean
 }
 
 export interface Diff {
@@ -122,20 +130,28 @@ export async function repositoryDetail(root: Root, relative: string[], run: Run,
   const repository = await readRepository(root, relative, run)
   if (repository.error !== undefined) return { repository, branches: [], commits: [], more: false, changes: [] }
   const count = Math.min(Math.max(1, Math.floor(limit) || DEFAULT_COMMITS), MAX_COMMITS)
-  const [refs, log, status] = await Promise.all([
+  const none = Promise.resolve({ code: 0, stdout: '', stderr: '' })
+  const [refs, log, status, message, unpushed] = await Promise.all([
     git(['for-each-ref', '--format=%(refname)%00%(objectname)%00%(upstream:short)%00%(upstream:track,nobracket)%00%(HEAD)', 'refs/heads', 'refs/remotes']),
     // Every branch and tag, and HEAD for a detached one, but not the stash, whose commits are no history.
     repository.head
       ? git(['log', '--branches', '--remotes', '--tags', 'HEAD', '--date-order', `--max-count=${count + 1}`, '--format=%H%x00%P%x00%an%x00%cI%x00%D%x00%s'])
-      : Promise.resolve({ code: 0, stdout: '', stderr: '' }),
+      : none,
     git(['status', '--porcelain=v1', '-z', '--untracked-files=all']),
+    repository.head ? git(['log', '-1', '--format=%B', 'HEAD']) : none,
+    repository.head ? git(UNPUSHED) : none,
   ])
-  for (const result of [refs, log, status]) {
+  for (const result of [refs, log, status, message, unpushed]) {
     if (result.code !== 0) throw new Error((result.stderr || result.stdout).trim().split('\n')[0] || `${root.git} exited with ${result.code}`)
   }
   const commits = parseCommits(log.stdout)
-  return { repository, branches: parseBranches(refs.stdout), commits: commits.slice(0, count), more: commits.length > count, changes: parseChanges(status.stdout) }
+  const detail: Detail = { repository, branches: parseBranches(refs.stdout), commits: commits.slice(0, count), more: commits.length > count, changes: parseChanges(status.stdout) }
+  if (repository.head) detail.last = { message: message.stdout.trim(), pushed: unpushed.stdout.trim() === '' }
+  return detail
 }
+
+// Prints HEAD when no remote branch holds it yet, and nothing once it is pushed.
+export const UNPUSHED = ['rev-list', '--max-count=1', 'HEAD', '--not', '--remotes']
 
 export const DIFF_OPTIONS = ['--patch', '--no-color', '--no-ext-diff', '--no-textconv', '--find-renames']
 
