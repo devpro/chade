@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Chade</title>
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <header>
+      <h1><a href="#">chade</a></h1>
+      <span id="machine"></span>
+      <nav id="pages" aria-label="Pages">
+        <a href="#" data-view="repositories">Repositories</a>
+        <a href="#store" data-view="store">Store</a>
+        <a href="#report" data-view="report">Report</a>
+        <a href="#docs" data-view="docs">Docs</a>
+      </nav>
+      <span id="scanned"></span>
+      <button id="refresh" type="button" title="The page reads again by itself every 30 seconds, and this reads now, or measures the report again">Refresh</button>
+      <span id="version"></span>
+    </header>
+    <main>
+      <p id="message" hidden></p>
+      <section id="list" hidden>
+        <div class="bar">
+          <nav id="tabs" role="tablist" aria-label="Systems of the machine"></nav>
+        </div>
+        <div class="bar">
+          <input id="filter" type="search" placeholder="Filter by name, path or branch" aria-label="Filter the repositories" />
+          <label><input id="attention" type="checkbox" /> Only those with something to do</label>
+          <span id="summary"></span>
+        </div>
+        <ul id="warnings"></ul>
+        <div id="content"></div>
+      </section>
+      <section id="repository" class="page" hidden>
+        <div class="bar">
+          <a id="back" class="back" href="#">← Repositories</a>
+          <h2 id="repository-name"></h2>
+          <span id="repository-path" class="path"></span>
+          <a id="repository-web" class="web" target="_blank" rel="noopener noreferrer" hidden></a>
+          <span id="repository-state" class="page-state"></span>
+          <span id="actions">
+            <button class="action" type="button" data-action="fetch" title="Bring what the remotes have, without changing any branch">Fetch</button>
+            <button class="action" type="button" data-action="pull" title="Move the branch to its upstream, when that is a fast forward">Pull</button>
+            <button class="action" type="button" data-action="push" title="Send the branch to its upstream, or to origin when it was never pushed">Push</button>
+            <button class="action" type="button" id="new-branch" title="Create a branch from the commit checked out, and check it out">New branch</button>
+          </span>
+        </div>
+        <form id="branch-form" class="bar" hidden>
+          <input id="branch-name" type="text" placeholder="Name of the new branch" aria-label="Name of the new branch" autocomplete="off" spellcheck="false" />
+          <button class="action" type="submit">Create branch</button>
+          <button type="button" id="branch-cancel">Cancel</button>
+        </form>
+        <div class="workspace">
+          <nav id="branches" class="pane-side" aria-label="Branches"></nav>
+          <div id="history" class="pane-list" aria-label="History"></div>
+          <div id="diff" class="pane-file" aria-label="Changes of a file" hidden></div>
+          <div id="resize" class="pane-resize" role="separator" aria-orientation="vertical" aria-label="Width of the history" tabindex="0" title="Drag to resize, double click to reset"></div>
+          <div id="detail" class="pane-detail" aria-label="Changes"></div>
+        </div>
+      </section>
+      <section id="store" class="page" hidden>
+        <div class="bar">
+          <h2>Store</h2>
+          <span id="store-path" class="path"></span>
+          <span id="store-state" class="page-state"></span>
+          <span id="store-hint" class="hint">In a terminal: <code>chade snapshot</code> takes a snapshot</span>
+        </div>
+        <div class="workspace">
+          <nav id="store-machines" class="pane-side" aria-label="Machines"></nav>
+          <div id="store-snapshots" class="pane-list" aria-label="Snapshots"></div>
+          <div id="store-file" class="pane-file" aria-label="File of a snapshot" hidden></div>
+          <div id="store-resize" class="pane-resize" role="separator" aria-orientation="vertical" aria-label="Width of the snapshots" tabindex="0" title="Drag to resize, double click to reset"></div>
+          <div id="store-detail" class="pane-detail" aria-label="Snapshot"></div>
+        </div>
+      </section>
+      <section id="report" class="page" hidden>
+        <div class="bar">
+          <h2>Report</h2>
+          <span id="report-summary" class="page-state"></span>
+          <span id="report-state" class="path"></span>
+          <span class="hint">In a terminal: <code>chade report</code> prints this report, <code>chade clean</code> cleans up</span>
+        </div>
+        <div id="report-sections"></div>
+      </section>
+      <section id="docs" hidden>
+        <nav id="docs-nav" aria-label="Documentation"></nav>
+        <article id="docs-page"></article>
+        <nav id="docs-toc" aria-label="On this page"></nav>
+      </section>
+    </main>
+    <div id="notice" role="status" hidden>
+      <strong id="notice-title"></strong>
+      <pre id="notice-text"></pre>
+      <button id="notice-close" type="button">Dismiss</button>
+    </div>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

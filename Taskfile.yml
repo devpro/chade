@@ -1,0 +1,85 @@
+version: '3'
+
+# Every workflow of CONTRIBUTING.md as a single command, `task` alone lists them.
+# Arguments for the CLI come after --, for example: task run -- snapshot --dry-run
+
+tasks:
+
+  default:
+    cmds:
+      - task --list
+
+  # ── Setup ───────────────────────────────────────────────────────────────────
+
+  install:
+    desc: Install the npm workspaces
+    cmds:
+      - npm install
+
+  # ── Build ───────────────────────────────────────────────────────────────────
+
+  build:
+    desc: Typecheck and bundle the CLI into packages/cli/dist, and the web interface into its ui folder
+    cmds:
+      - npm run build
+
+  run:
+    desc: "Run the CLI from its sources, arguments after --, for example: task run -- snapshot --dry-run"
+    cmds:
+      - npm run dev --workspace=packages/cli -- {{.CLI_ARGS}}
+
+  link:
+    desc: Put the chade command of this working tree on the PATH, from a fresh build
+    deps: [build]
+    cmds:
+      - npm link --workspace=packages/cli
+
+  # ── Tests ───────────────────────────────────────────────────────────────────
+
+  typecheck:
+    desc: Typecheck the sources and the tests of every package, which tsx runs without checking
+    cmds:
+      - npm run typecheck
+
+  test:
+    desc: Unit tests of every package, which need git and nothing else, and never reach Windows
+    aliases: [test:unit]
+    cmds:
+      - npm run test:unit
+
+  test:coverage:
+    desc: Unit tests with a coverage report in the terminal and in packages/cli/coverage/lcov.info
+    cmds:
+      - npm run test:coverage
+
+  test:e2e:
+    desc: Web interface end to end tests in Chromium, against the built server and repositories made for the run
+    cmds:
+      - npm run test:e2e
+
+  ui:screenshots:
+    desc: Runs the end to end tests on the two target screens and in the dark theme, and saves a screenshot of each state in packages/ui/e2e/screenshots
+    cmds:
+      - npm run ui:screenshots
+
+  test:pkg:
+    desc: Packaging smoke test, packs the tarball and installs it into an empty project the way a first install would
+    cmds:
+      - npm run test:pkg
+
+  check:
+    desc: What CI runs, typecheck, build, unit tests, packaging smoke test and end to end tests
+    cmds:
+      - task: typecheck
+      - task: build
+      - task: test
+      - task: test:pkg
+      - task: test:e2e
+
+  # ── Publication ─────────────────────────────────────────────────────────────
+
+  # pkg.yaml publishes on a push to main only when the version of packages/cli is not on the registry yet, so a change meant for release bumps first.
+  dev:bump:
+    desc: Bump chade to the next patch version in packages/cli/package.json and package-lock.json
+    cmds:
+      - npm version patch --no-git-tag-version --workspace=packages/cli

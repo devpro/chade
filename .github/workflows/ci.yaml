@@ -1,24 +1,15 @@
-﻿name: CI
+name: CI
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 # purpose: Continuous Integration pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   pull_request:
-    branches: [ main ]
-  workflow_dispatch:
-    inputs:
-      run-code-quality:
-        description: 'Check code quality?'
-        required: false
-        type: boolean
-        default: false
-      run-image-scan:
-        description: 'Scan container image?'
-        required: false
-        type: boolean
-        default: false
+    branches:
+      - main
+  workflow_dispatch: {}
 
 concurrency:
   group: "${{ github.ref }}-ci"
@@ -26,53 +17,56 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
-  git-check:
-    name: Git
-    uses: ./.github/workflows/reusable-git-check.yml
-    with:
-      is-pull-request: ${{ github.event_name == 'pull_request' }}
-
   markup-lint:
     name: Markup
-    uses: devpro/github-workflow-parts/.github/workflows/reusable-markup-lint.yml@c90ba46a93ca90123f57744b47e49c1a73962cea
+    uses: devpro/github-workflow-parts/.github/workflows/reusable-markup-lint.yml@5379b9d0052e3b233ec2e56ba8678e827361b89e
 
-  code-quality:
-    name: Code
-    needs: git-check
-    if: needs.git-check.outputs.app_changed == 'true' || (github.event_name == 'workflow_dispatch' && inputs.run-code-quality)
-    uses: devpro/github-workflow-parts/.github/workflows/reusable-dotnet-quality.yml@c90ba46a93ca90123f57744b47e49c1a73962cea
+  # A change to the documentation alone needs the markup checked, not the build and the tests.
+  git-check:
+    name: Git
+    uses: devpro/github-workflow-parts/.github/workflows/reusable-git-check.yml@5379b9d0052e3b233ec2e56ba8678e827361b89e
     with:
-      dotnet-test-args: "--report-xunit-trx --coverage --coverage-output-format cobertura"
+      paths: ". :(exclude)*.md :(exclude)docs"
+      workflow-parts-version: 5379b9d0052e3b233ec2e56ba8678e827361b89e
+
+  build-test:
+    name: Build & Test
+    needs: git-check
+    if: needs.git-check.outputs.changed == 'true'
+    uses: devpro/github-workflow-parts/.github/workflows/reusable-node-quality.yml@5379b9d0052e3b233ec2e56ba8678e827361b89e
+    with:
+      # The end to end tests run with their screenshots, copied where the job keeps its test results.
+      custom-tests: npm run test:pkg && npm run ui:screenshots && mkdir -p report && cp -r packages/ui/e2e/screenshots report/
+      job-name: Build & Test
       sonar-enabled: true
-      sonar-exclusions: "samples/**"
+      sonar-host-url: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
       sonar-organization: ${{ vars.SONAR_ORG }}
       sonar-project-key: ${{ vars.SONAR_PROJECT_KEY }}
       sonar-project-name: Chade
-      workflow-parts-version: c90ba46a93ca90123f57744b47e49c1a73962cea
+      # The unit tests, with the lcov report the Sonar analysis reads.
+      test-script: test:coverage
+      workflow-parts-version: 5379b9d0052e3b233ec2e56ba8678e827361b89e
     secrets:
       sonar-token: ${{ secrets.SONAR_TOKEN }}
-    permissions:
-      contents: read
-      pull-requests: write
 
-  image-scan:
-    name: "Image ${{ matrix.name }}"
+  # chade also runs on Windows itself, where the tests of a Linux host are skipped and the smoke test runs with a windows section.
+  build-test-windows:
+    name: Build & Test (Windows)
     needs: git-check
-    if: needs.git-check.outputs.app_changed == 'true' || (github.event_name == 'workflow_dispatch' && inputs.run-image-scan)
-    strategy:
-      matrix:
-        include:
-          - name: "Console App"
-            image-name: "chade-console"
-            image-definition: "src/ConsoleApp/Dockerfile"
-    uses: devpro/github-workflow-parts/.github/workflows/reusable-container-scan.yml@c90ba46a93ca90123f57744b47e49c1a73962cea
+    if: needs.git-check.outputs.changed == 'true'
+    uses: devpro/github-workflow-parts/.github/workflows/reusable-node-quality.yml@5379b9d0052e3b233ec2e56ba8678e827361b89e
     with:
-      image-definition: ${{ matrix.image-definition }}
-      image-name: ${{ matrix.image-name }}
-      image-path: ${{ vars.CONTAINER_REGISTRY_PATH }}
-      image-tag: "${{ needs.git-check.outputs.version_major_minor }}.${{ github.run_id }}"
-      max-high-cves: 0
-      max-medium-cves: 0
+      custom-tests: npm run test:pkg
+      # npm runs the scripts with cmd.exe on Windows, and they are bash scripts.
+      # The runner image sets core.autocrlf, which would check out the scripts with CRLF, and the git environment overrides it before the checkout.
+      extra-vars: |
+        npm_config_script_shell=C:\Program Files\Git\bin\bash.exe
+        GIT_CONFIG_COUNT=1
+        GIT_CONFIG_KEY_0=core.autocrlf
+        GIT_CONFIG_VALUE_0=false
+      job-name: Build & Test (Windows)
+      operating-system: windows-latest
+      test-script: test:unit
+      workflow-parts-version: 5379b9d0052e3b233ec2e56ba8678e827361b89e

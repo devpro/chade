@@ -1,0 +1,1591 @@
+:root {
+  color-scheme: light dark;
+  --background: #f4f5f7;
+  --surface: #ffffff;
+  --border: #dfe2e7;
+  --text: #1b1f26;
+  --muted: #6a7280;
+  --accent: #2456c9;
+  --accent-soft: #e6edfc;
+  --warn: #8a5300;
+  --warn-soft: #fdf0d5;
+  --bad: #b3261e;
+  --bad-soft: #fde7e5;
+  --quiet-soft: #eef0f3;
+  --good: #1a7f37;
+  --mono: ui-monospace, 'Cascadia Code', 'SF Mono', Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #131519;
+    --surface: #1b1e24;
+    --border: #2f343d;
+    --text: #e5e8ed;
+    --muted: #8f98a7;
+    --accent: #8fb0ff;
+    --accent-soft: #1f2c4d;
+    --warn: #f0b95a;
+    --warn-soft: #3d2f12;
+    --bad: #f49088;
+    --bad-soft: #472320;
+    --quiet-soft: #262a32;
+    --good: #6fcf8a;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--text);
+  font: 14px/1.45 system-ui, sans-serif;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+h1 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: 0.2px;
+}
+
+h1 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+#machine {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--quiet-soft);
+  font: 12.5px var(--mono);
+}
+
+#machine:empty {
+  display: none;
+}
+
+#scanned {
+  margin-left: auto;
+}
+
+#version {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+#message {
+  margin: 0;
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--bad);
+  text-align: center;
+}
+
+main {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 16px 24px 48px;
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-bottom: 12px;
+}
+
+#tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-right: auto;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 6px 6px 0 0;
+  background: none;
+  color: var(--muted);
+  font: 600 14px system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab[aria-selected='true'] {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+}
+
+.count {
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--quiet-soft);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.count.todo {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+#scanned,
+#summary {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+#scanned.stale {
+  color: var(--bad);
+}
+
+#summary {
+  margin-left: auto;
+}
+
+#refresh {
+  margin-left: 0;
+}
+
+#filter {
+  flex: 1 1 260px;
+  max-width: 380px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#refresh {
+  padding: 5px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+#refresh:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+#refresh:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+#warnings {
+  margin: 0 0 12px;
+  padding: 8px 12px 8px 30px;
+  border-radius: 8px;
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+#warnings:empty {
+  display: none;
+}
+
+#content {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+tbody tr:hover {
+  background: var(--background);
+}
+
+th {
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+/* A mark on the rows with something to do, which the eye follows down the list. */
+td.repository {
+  border-left: 3px solid transparent;
+}
+
+tr.info td.repository {
+  border-left-color: var(--accent);
+}
+
+tr.warn td.repository {
+  border-left-color: var(--warn);
+}
+
+tr.bad td.repository {
+  border-left-color: var(--bad);
+}
+
+.name {
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.path {
+  color: var(--muted);
+  font: 11.5px var(--mono);
+}
+
+.forge {
+  display: inline-flex;
+  vertical-align: middle;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--muted);
+}
+
+.forge svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+.web {
+  color: var(--accent);
+  font-size: 12.5px;
+  text-decoration: none;
+}
+
+.web:hover {
+  text-decoration: underline;
+}
+
+.branch {
+  padding: 2px 8px;
+  border-radius: 5px;
+  background: var(--quiet-soft);
+  font: 12.5px var(--mono);
+}
+
+.branch.detached {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.badge {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.badge.quiet {
+  padding-left: 0;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.badge.info {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.badge.warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.badge.bad {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+td.commit {
+  width: 40%;
+  max-width: 0;
+}
+
+.subject {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.age {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.error {
+  color: var(--bad);
+  white-space: normal;
+}
+
+.empty,
+p.error {
+  margin: 0;
+  padding: 28px;
+  color: var(--muted);
+  text-align: center;
+}
+
+p.error {
+  color: var(--bad);
+}
+
+/* One repository: its branches, its history and the changes of a commit, side by side, each scrolling on its own. */
+body.wide main {
+  max-width: none;
+}
+
+.back {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.back:hover,
+a.name:hover {
+  text-decoration: underline;
+}
+
+a.name {
+  color: inherit;
+  text-decoration: none;
+}
+
+.page h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.page-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-state .badge {
+  margin-right: 0;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 190px minmax(240px, var(--history-width, 2fr)) 8px minmax(320px, 1fr);
+  gap: 2px;
+  height: calc(100vh - 166px);
+  min-height: 420px;
+}
+
+.workspace > * {
+  min-width: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+/* The history and the changes of a file take the same place, one at a time. */
+.pane-side,
+.pane-list,
+.pane-file,
+.pane-resize,
+.pane-detail {
+  grid-row: 1;
+}
+
+.pane-list,
+.pane-file {
+  grid-column: 2;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.diff-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--background);
+  font: 12.5px var(--mono);
+}
+
+.close {
+  margin-left: 12px;
+  padding: 3px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: 13px system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.close:hover {
+  border-color: var(--accent);
+}
+
+.diff-head .file-path {
+  margin-right: auto;
+  font-weight: 600;
+}
+
+.diff-head .additions,
+.diff-head .deletions {
+  margin-left: 0;
+}
+
+.file-link.selected {
+  background: var(--accent-soft);
+}
+
+.pane-side {
+  margin-right: 10px;
+  padding: 4px 6px 10px;
+}
+
+.workspace > .pane-resize {
+  overflow: visible;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.pane-resize::before {
+  content: '';
+  display: block;
+  width: 2px;
+  height: 100%;
+  margin: 0 auto;
+  border-radius: 2px;
+  background: transparent;
+}
+
+.pane-resize:hover::before,
+.pane-resize.dragging::before,
+.pane-resize:focus-visible::before {
+  background: var(--accent);
+}
+
+tbody tr {
+  cursor: pointer;
+}
+
+.file-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.file-link:hover {
+  background: var(--background);
+}
+
+.files.index li {
+  padding: 0;
+}
+
+.files.index {
+  margin-bottom: 12px;
+}
+
+.file {
+  scroll-margin-top: 8px;
+}
+
+h3 {
+  margin: 14px 8px 6px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.branch-item,
+.commit-row,
+.more {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.branch-item {
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font: 12.5px var(--mono);
+}
+
+.branch-item:hover,
+.commit-row:hover {
+  background: var(--background);
+}
+
+.branch-item.head {
+  font-weight: 700;
+}
+
+.branch-item.head::before {
+  content: '●';
+  color: var(--accent);
+  font-size: 9px;
+}
+
+.branch-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track {
+  margin-left: auto;
+  font: 600 11.5px system-ui, sans-serif;
+}
+
+.track + .track {
+  margin-left: 0;
+}
+
+.track.info {
+  color: var(--accent);
+}
+
+.track.warn {
+  color: var(--warn);
+}
+
+.commit-row {
+  gap: 10px;
+  height: 28px;
+  padding: 0 12px 0 4px;
+  white-space: nowrap;
+}
+
+.commit-row.selected {
+  background: var(--accent-soft);
+}
+
+.commit-row.working-tree .subject {
+  color: var(--warn);
+  font-style: italic;
+}
+
+.lane.pending {
+  stroke: var(--warn);
+  stroke-dasharray: 3 3;
+}
+
+/* Named with its row, to come after the color every other dot takes from its lane. */
+.working-tree .dot.pending {
+  fill: var(--surface);
+  stroke: var(--warn);
+  stroke-width: 2;
+}
+
+.commit-row .subject {
+  flex: 1;
+  min-width: 0;
+}
+
+.commit-row .check {
+  flex: 0 0 14px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.check.good,
+.check-link.good .check {
+  color: var(--good);
+}
+
+.check.bad,
+.check-link.bad .check {
+  color: var(--bad);
+}
+
+.check.info,
+.check-link.info .check {
+  color: var(--accent);
+}
+
+.check.quiet,
+.check-link.quiet .check {
+  color: var(--muted);
+}
+
+.check-fact {
+  margin: -6px 0 12px;
+  font-size: 12.5px;
+}
+
+.check-link {
+  display: inline-flex;
+  gap: 6px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.check-link.quiet {
+  color: var(--muted);
+}
+
+td.ci {
+  white-space: nowrap;
+  font-size: 16px;
+}
+
+.check-link:hover span:last-child {
+  text-decoration: underline;
+}
+
+.commit-row .author {
+  flex: 0 0 96px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+}
+
+.commit-row .age {
+  flex: 0 0 104px;
+  text-align: right;
+}
+
+.graph {
+  flex: none;
+}
+
+.lane {
+  fill: none;
+  stroke-width: 2;
+}
+
+.dot {
+  stroke: var(--surface);
+  stroke-width: 1.5;
+}
+
+.dot.merge {
+  fill: var(--surface);
+  stroke-width: 2;
+}
+
+.lane-0 { stroke: #3b76e0; }
+.lane-1 { stroke: #d97a1c; }
+.lane-2 { stroke: #2f9e63; }
+.lane-3 { stroke: #b455c9; }
+.lane-4 { stroke: #d1495b; }
+.lane-5 { stroke: #1f9fb0; }
+.lane-6 { stroke: #a08a1f; }
+.lane-7 { stroke: #7d6ee0; }
+.dot.lane-0 { fill: #3b76e0; }
+.dot.lane-1 { fill: #d97a1c; }
+.dot.lane-2 { fill: #2f9e63; }
+.dot.lane-3 { fill: #b455c9; }
+.dot.lane-4 { fill: #d1495b; }
+.dot.lane-5 { fill: #1f9fb0; }
+.dot.lane-6 { fill: #a08a1f; }
+.dot.lane-7 { fill: #7d6ee0; }
+.dot.merge.lane-0, .dot.merge.lane-1, .dot.merge.lane-2, .dot.merge.lane-3, .dot.merge.lane-4, .dot.merge.lane-5, .dot.merge.lane-6, .dot.merge.lane-7 { fill: var(--surface); }
+.dot:not(.merge) { stroke: var(--surface); }
+
+.ref {
+  margin-right: 6px;
+  padding: 1px 7px;
+  border-radius: 5px;
+  font: 600 11.5px var(--mono);
+}
+
+.ref.head {
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.ref.local {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.ref.remote {
+  background: var(--quiet-soft);
+  color: var(--muted);
+}
+
+.ref.tag {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.more {
+  justify-content: center;
+  padding: 10px;
+  color: var(--accent);
+}
+
+.pane-detail {
+  padding: 4px 14px 16px;
+}
+
+.pane-detail h2 {
+  margin: 12px 0 6px;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.pane-detail h3 {
+  margin: 16px 0 8px;
+}
+
+.body {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font: 13px/1.5 system-ui, sans-serif;
+  white-space: pre-wrap;
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.facts .hash {
+  margin-left: -4px;
+  padding: 0 4px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-family: var(--mono);
+  cursor: copy;
+}
+
+.facts .hash:hover {
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.file {
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.file summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--background);
+  cursor: pointer;
+  font: 12.5px var(--mono);
+}
+
+.file-path {
+  overflow-wrap: anywhere;
+}
+
+.status {
+  flex: none;
+  width: 18px;
+  border-radius: 4px;
+  background: var(--quiet-soft);
+  color: var(--muted);
+  font: 700 11.5px/18px var(--mono);
+  text-align: center;
+}
+
+.status.added,
+.additions {
+  color: #2f9e63;
+}
+
+.status.deleted,
+.deletions {
+  color: var(--bad);
+}
+
+.status.renamed {
+  color: var(--accent);
+}
+
+.additions {
+  margin-left: auto;
+}
+
+.additions + .deletions {
+  margin-left: 0;
+}
+
+.deletions:not(.additions + .deletions) {
+  margin-left: auto;
+}
+
+.lines {
+  overflow-x: auto;
+  font: 12px/1.5 var(--mono);
+}
+
+.line {
+  display: flex;
+  width: max-content;
+  min-width: 100%;
+}
+
+.number {
+  flex: none;
+  width: 42px;
+  padding-right: 8px;
+  color: var(--muted);
+  text-align: right;
+  user-select: none;
+}
+
+.line .text {
+  padding-left: 8px;
+  white-space: pre;
+}
+
+.line.add {
+  background: color-mix(in srgb, #2f9e63 16%, transparent);
+}
+
+.line.del {
+  background: color-mix(in srgb, #d1495b 16%, transparent);
+}
+
+.line.hunk {
+  background: var(--accent-soft);
+  color: var(--muted);
+}
+
+.line.note {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.files {
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.files li {
+  display: flex;
+  gap: 8px;
+  padding: 3px 0;
+  font: 12.5px var(--mono);
+}
+
+.pane-detail .empty,
+.pane-list .empty {
+  padding: 20px;
+}
+
+@media (max-width: 1100px) {
+  .workspace {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .workspace > * {
+    max-height: 70vh;
+  }
+
+  .workspace > .pane-resize {
+    display: none;
+  }
+
+  .pane-side,
+  .pane-list,
+  .pane-file,
+  .pane-detail {
+    grid-row: auto;
+    grid-column: 1;
+  }
+
+  .pane-side {
+    margin-right: 0;
+  }
+
+  .workspace {
+    gap: 12px;
+  }
+}
+
+/* What changes a repository: the buttons, the line that names a new branch, the commit box, and the notice of what git answered. */
+#actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.action,
+#branch-cancel,
+#notice-close {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: 13px system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.action:hover:not(:disabled),
+#branch-cancel:hover,
+#notice-close:hover {
+  border-color: var(--accent);
+}
+
+.action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.busy .action:disabled {
+  cursor: progress;
+}
+
+.action.small {
+  flex: none;
+  padding: 0 8px;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+#branch-name {
+  flex: 0 1 340px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: 13px var(--mono);
+}
+
+.branch-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 6px;
+}
+
+.branch-line .branch-item {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The button shows when its branch is pointed at or reached with the keyboard, so the list stays a list of names. */
+.checkout {
+  display: none;
+}
+
+.branch-line:hover .checkout,
+.branch-line:focus-within .checkout {
+  display: block;
+}
+
+.commit-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+
+.commit-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.commit-actions .amend {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+#commit-message {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--text);
+  font: 13px/1.45 system-ui, sans-serif;
+  resize: vertical;
+}
+
+h3.with-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+h3.with-action .action {
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.files.index li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.files.index .file-link {
+  flex: 1;
+  min-width: 0;
+}
+
+#notice {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 16px;
+  max-width: min(640px, calc(100vw - 40px));
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-left: 4px solid #2f9e63;
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
+}
+
+#notice.failed {
+  border-left-color: var(--bad);
+}
+
+#notice.running {
+  border-left-color: var(--accent);
+}
+
+/* A turning ring, on the button that asked and in the notice, for as long as git works. */
+#notice.running #notice-title::before,
+.action.running::after {
+  content: '';
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--accent);
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -1px;
+  animation: turn 0.7s linear infinite;
+}
+
+#notice.running #notice-title::before {
+  margin-right: 8px;
+}
+
+.action.running::after {
+  margin-left: 7px;
+}
+
+.action.running:disabled {
+  opacity: 1;
+}
+
+#notice.running #notice-close {
+  display: none;
+}
+
+@keyframes turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+#notice-text {
+  grid-column: 1 / -1;
+  max-height: 40vh;
+  margin: 0;
+  overflow: auto;
+  color: var(--muted);
+  font: 12px/1.5 var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+#notice-text:empty {
+  display: none;
+}
+
+#notice-close {
+  grid-column: 2;
+  grid-row: 1;
+  padding: 1px 10px;
+  font-size: 12px;
+}
+
+/* A narrow window has no room for columns, so a repository becomes a block: its name, then what there is to do, then its last commit. */
+@media (max-width: 760px) {
+  thead {
+    display: none;
+  }
+
+  table,
+  tbody {
+    display: block;
+  }
+
+  tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    border-left: 3px solid transparent;
+  }
+
+  tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  tr.info {
+    border-left-color: var(--accent);
+  }
+
+  tr.warn {
+    border-left-color: var(--warn);
+  }
+
+  tr.bad {
+    border-left-color: var(--bad);
+  }
+
+  td {
+    padding: 0;
+    border: 0;
+    white-space: normal;
+  }
+
+  td:empty {
+    display: none;
+  }
+
+  td.repository,
+  td.commit {
+    flex: 1 1 100%;
+    width: auto;
+    max-width: none;
+    border-left: 0;
+  }
+
+  .path {
+    overflow-wrap: anywhere;
+  }
+
+  .badge:last-child {
+    margin-right: 0;
+  }
+
+  td.age::before {
+    content: 'fetched ';
+  }
+}
+
+/* The store: its machines in place of the branches, the snapshots of one in place of the history. */
+a.tab {
+  text-decoration: none;
+}
+
+.hint {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.hint code {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--quiet-soft);
+  color: var(--text);
+  font: 12.5px var(--mono);
+}
+
+.branch-item.selected {
+  background: var(--accent-soft);
+}
+
+.machine-system {
+  padding: 1px 8px 1px 23px;
+  color: var(--muted);
+  font: 12px var(--mono);
+}
+
+.views {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.views .tab {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+/* The report: a card for each thing measured, marked when it comes with something to clean. */
+.cards {
+  columns: 420px;
+  column-gap: 12px;
+}
+
+/* Cards of unequal heights fill columns from the top, where rows would leave a gap under each short one. */
+.card {
+  break-inside: avoid;
+  margin-bottom: 12px;
+  padding: 4px 16px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.card.todo {
+  border-left: 3px solid var(--warn);
+}
+
+.card h3 {
+  margin: 12px 0 8px;
+}
+
+.measure {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1px 12px;
+  padding: 3px 0;
+  font-size: 13px;
+}
+
+.measure-size.value {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.measure-label {
+  overflow-wrap: anywhere;
+  font: 12.5px var(--mono);
+}
+
+.measure-size {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.measure-detail {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+
+.measure-bar {
+  grid-column: 1 / -1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--quiet-soft);
+}
+
+.measure-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.advice {
+  margin: 12px 0 6px;
+  color: var(--warn);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.commands {
+  margin: 0 0 6px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--background);
+  font: 12px/1.5 var(--mono);
+}
+
+/* A command longer than the card goes on under itself, indented, so the next command still reads as one. */
+.commands div {
+  padding-left: 2ch;
+  text-indent: -2ch;
+  overflow-wrap: anywhere;
+}
+
+.guide {
+  color: var(--accent);
+  font-size: 13px;
+}
+
+#report-state.measuring {
+  color: var(--accent);
+}
+
+/* The pages of the interface, at its top, beside the machine they are about. */
+#pages {
+  display: flex;
+  gap: 2px;
+  margin-left: 8px;
+}
+
+#pages a {
+  padding: 5px 12px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+#pages a:hover {
+  color: var(--text);
+}
+
+#pages a[aria-current='page'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* The documentation: where to go in it, the page, and where to go in the page. */
+#docs {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr) 220px;
+  align-items: start;
+  gap: 32px;
+}
+
+#docs-nav,
+#docs-toc {
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+
+#docs-nav h3,
+#docs-toc h3 {
+  margin: 4px 10px 6px;
+}
+
+#docs-nav a,
+#docs-toc a {
+  padding: 4px 10px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+#docs-nav a:hover,
+#docs-toc a:hover {
+  color: var(--text);
+}
+
+#docs-nav a[aria-current='page'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+#docs-toc {
+  border-left: 1px solid var(--border);
+}
+
+#docs-page {
+  min-width: 0;
+  padding: 8px 32px 32px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  line-height: 1.65;
+}
+
+#docs-page h1 {
+  margin: 16px 0;
+  font-size: 24px;
+}
+
+#docs-page h2 {
+  margin: 32px 0 10px;
+  font-size: 19px;
+  scroll-margin-top: 12px;
+}
+
+#docs-page h3,
+#docs-page h4 {
+  margin: 24px 0 8px;
+  color: var(--text);
+  font-size: 15px;
+  letter-spacing: 0;
+  text-transform: none;
+  scroll-margin-top: 12px;
+}
+
+#docs-page p,
+#docs-page ul,
+#docs-page ol,
+#docs-page pre,
+#docs-page blockquote,
+#docs-page .table-wrap {
+  margin: 0 0 12px;
+}
+
+#docs-page li > pre,
+#docs-page li > p {
+  margin: 8px 0;
+}
+
+#docs-page a {
+  color: var(--accent);
+}
+
+#docs-page pre {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--background);
+  overflow-x: auto;
+  font: 12.5px/1.5 var(--mono);
+}
+
+#docs-page :not(pre) > code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--quiet-soft);
+  font: 12.5px var(--mono);
+}
+
+#docs-page blockquote {
+  padding: 8px 16px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  background: var(--accent-soft);
+}
+
+#docs-page blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+#docs-page .table-wrap {
+  overflow-x: auto;
+}
+
+#docs-page table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#docs-page th,
+#docs-page td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+#docs-page tbody tr {
+  cursor: auto;
+}
+
+@media (max-width: 1100px) {
+  #docs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #docs-nav,
+  #docs-toc {
+    position: static;
+    max-height: none;
+  }
+}

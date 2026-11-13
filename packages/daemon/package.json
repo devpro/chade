@@ -1,0 +1,18 @@
+{
+  "name": "@chade/daemon",
+  "version": "0.1.0",
+  "description": "Local HTTP server of chade, bundled into the chade package and never published on its own",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "test": "../../scripts/with_test_tmpdir.sh node --import tsx --test --test-reporter=dot test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3"
+  }
+}
