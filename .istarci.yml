@@ -2,11 +2,8 @@ runner:
   image: ghcr.io/devpro/ubuntu-node:latest
   images:
     "markup-lint*": ghcr.io/devpro/ubuntu-node:latest
-    # The end to end tests drive Chromium, whose system libraries the job cannot install as an ordinary user.
-    # The pattern stops at the job of Linux, as the Windows one has no image and is skipped.
     "build-test__*": ghcr.io/devpro/ubuntu-node-playwright:latest
   docker: ["image-scan*"]
-  # The analysis runs against the SonarQube IstarCI starts on this machine, with a token made there.
   sonarqube: true
 
 workflow:
@@ -20,7 +17,6 @@ workflow:
     - pkg.yaml
 
 vars:
-  # The local SonarQube has no organizations, and a non-empty one is what turns the analysis on.
   SONAR_ORG: local
   SONAR_PROJECT_KEY: chade
   CONTAINER_REGISTRY_PATH: devprofr

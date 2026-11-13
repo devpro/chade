@@ -1,4 +1,7 @@
 import cleanup from '../../../docs/cleanup.md'
+import commands from '../../../docs/commands.md'
+import configuration from '../../../docs/configuration.md'
+import webInterface from '../../../docs/web-interface.md'
 import contributing from '../../../CONTRIBUTING.md'
 import readme from '../../../README.md'
 import { address, get } from './api.js'
@@ -16,6 +19,9 @@ interface Page {
 // The documentation of the repository, bundled with the interface, so the two never drift apart and it reads without a network.
 const pages: Page[] = [
   { slug: 'guide', file: 'README.md', title: 'User guide', source: readme },
+  { slug: 'commands', file: 'docs/commands.md', title: 'Commands', source: commands },
+  { slug: 'configuration', file: 'docs/configuration.md', title: 'Configuration', source: configuration },
+  { slug: 'web-interface', file: 'docs/web-interface.md', title: 'Web interface', source: webInterface },
   { slug: 'cleanup', file: 'docs/cleanup.md', title: 'System clean-up', source: cleanup },
   { slug: 'contributing', file: 'CONTRIBUTING.md', title: 'Contributor guide', source: contributing },
 ]

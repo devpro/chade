@@ -1,30 +1,23 @@
 # chade
 
-Command line tool that snapshots the configuration of a system into a git repository, one folder per machine.
+Command line tool and local web interface that keep track of a machine and its git repositories.
 
-A snapshot holds configuration files and inventories: installed applications, VS Code extensions, services, scheduled tasks and git repositories.
-It runs on Linux, on WSL, where one run captures the distribution and its Windows host, and on Windows.
-chade only reads the system, it never changes it.
-Its web interface also runs git in a repository when asked: fetch, pull, checkout, new branch, commit and push.
+- `chade snapshot` commits the configuration of the system, files and inventories, into a git repository, the store, one folder per machine.
+- `chade ui` lists every git repository of the machine with what is left to commit, push or pull, and shows the store and the report.
+- `chade report` measures what takes disk and memory, and `chade clean` gets it back.
 
-## Installation
+chade never changes the system, and changes a git repository only when asked in the web interface.
+
+## Quick start
 
 ```bash
 npm install --global chade
-```
-
-## Usage
-
-```bash
-chade init --store ~/system-snapshots   # configuration in ~/.chade/config.yml, store created when missing
-chade discover                          # configuration files present and not configured yet
-chade snapshot                          # collect, redact secrets, commit
-chade ui                                # web interface over the git repositories, the store and the report
-chade diff                              # what changed since the previous snapshot
-chade report                            # disk and memory taken, and how to get them back
-chade clean                             # run the clean-up steps of the configuration, after a confirmation
+chade init --store ~/system-snapshots
+chade discover
+chade snapshot
+chade ui
 ```
 
 ## Documentation
 
-The configuration, the inventories and the handling of secrets are documented in the [repository](https://github.com/devpro/chade#readme).
+The [user guide](https://github.com/devpro/chade#readme) links to every page, which `chade ui` also shows, offline.

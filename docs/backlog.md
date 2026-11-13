@@ -14,6 +14,10 @@ What is left to do, in the order agreed.
 - chade started from Windows reads no IstarCI running in WSL, its configuration being in the home of WSL.
   It could be read through `\\wsl.localhost\<distro>\home\<user>\.istarci\config.yml`, once the distribution to read is chosen.
 
+## Restore
+
+- Restore scripts generated from a snapshot, `winget import` and `code --install-extension` for instance.
+
 ## Web interface
 
 - The graph draws at most 12 lanes.

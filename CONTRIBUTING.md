@@ -1,39 +1,35 @@
 # Contributor guide
 
-## Requirements
-
-- Node.js 24 or later, with npm
-- git
-- [Task](https://taskfile.dev) 3.x, which runs every workflow of this guide
-- [gitleaks](https://github.com/gitleaks/gitleaks), optional, the test of the secret scan is skipped without it
-
 ## Repository layout
 
 ```txt
 ├── .github/workflows/
-│   ├── ci.yaml             markup lint, build and tests
-│   └── pkg.yaml            publication of chade to npmjs.org
+│   ├── ci.yaml               markup lint, build and tests
+│   └── pkg.yaml              publication of chade to npmjs.org
 ├── docs/
-│   ├── backlog.md          what is left to do
-│   └── cleanup.md          clean-up steps the report links to
+│   ├── backlog.md            what is left to do
+│   ├── cleanup.md            report, clean, and the clean-up steps the report links to
+│   ├── commands.md           commands and their options
+│   ├── configuration.md      configuration, store, inventories and secrets
+│   └── web-interface.md      chade ui
 ├── packages/
-│   ├── cli/                chade, the published package
-│   │   ├── bin/chade.js    entry point of the chade command
-│   │   ├── src/            sources, bundled into dist/bin.js
-│   │   ├── test/           unit tests
-│   │   └── smoke.sh        packaging smoke test
-│   ├── daemon/             HTTP server of chade ui and reading of the git repositories, bundled into dist/bin.js
+│   ├── cli/                  chade, the published package
+│   │   ├── bin/chade.js      entry point of the chade command
+│   │   ├── src/              sources, bundled into dist/bin.js
+│   │   ├── test/             unit tests
+│   │   └── smoke.sh          packaging smoke test
+│   ├── daemon/               HTTP server of chade ui and reading of the git repositories, bundled into dist/bin.js
 │   │   ├── src/
 │   │   └── test/
-│   └── ui/                 web interface, built into dist/ui of the published package
-│       ├── e2e/            end to end tests, their page objects and their server
-│       ├── public/         page and its icon
-│       ├── src/            script and style sheet
-│       └── test/           unit tests
-├── scripts/                scripts shared by the packages
-├── package.json            npm workspaces root, never published
+│   └── ui/                   web interface, built into dist/ui of the published package
+│       ├── e2e/              end to end tests, their page objects and their server
+│       ├── public/           page and its icon
+│       ├── src/              script and style sheet
+│       └── test/             unit tests
+├── scripts/                  scripts shared by the packages
+├── package.json              npm workspaces root, never published
 ├── sonar-project.properties  Sonar analysis settings
-└── Taskfile.yml            every workflow below as a task
+└── Taskfile.yml              every workflow below as a task
 ```
 
 ## Local development
@@ -60,7 +56,7 @@
    `npm unlink --global chade` removes it.
 
 `chade ui` serves the interface `task build` built, from a server that keeps running in the background.
-The build bundles `README.md`, `docs/cleanup.md` and this guide into the interface, as the pages of its documentation, so a change to one of them shows after `task build` as well.
+The build bundles `README.md`, the pages of `docs/` but the backlog, and this guide into the interface, as the pages of its documentation, so a change to one of them shows after `task build` as well.
 A change to `packages/ui` or to the server shows after `task build` and `task run -- daemon stop`, as the next `task run -- ui` starts a new server.
 `task run -- daemon run` keeps the server in the terminal instead, with its output.
 

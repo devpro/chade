@@ -1,10 +1,19 @@
 # chade: agent context
 
-CLI (`chade` on npmjs.org) that snapshots the configuration of a system into a git repository, the store, one folder per machine.
+CLI (`chade` on npmjs.org) and local web interface that keep track of a machine and its git repositories:
+it snapshots the configuration of the system into a git repository, the store, one folder per machine, lists every git repository of the machine, and measures what takes disk and memory.
+
 chade is the tool, never the store: the snapshots live in a repository the user chooses, and nothing in this repository holds them.
-`chade ui` opens a local web interface over the git repositories of the machine, the store, the report and the documentation: `packages/daemon` is its server, `packages/ui` its page, both bundled into the one published package.
+
+`chade ui` opens a local web interface over the git repositories of the machine, the store, the report and the documentation:
+`packages/daemon` is its server, `packages/ui` its page, both bundled into the one published package.
+
 The interface changes a repository only through the actions of `packages/daemon/src/actions.ts`, where every value given to git is checked against what git itself lists.
+
+The README stays short, and the reference lives in `docs/`, bundled as the Docs page of the interface.
+
 A change of the interface is checked with `task ui:screenshots`, and by looking at the screenshots it saves.
+
 CONTRIBUTING.md lists the tasks, `task check` runs what CI runs.
 
 ## Working rules
