@@ -40,7 +40,7 @@ function numbered(lines: { kind: string; text: string; before?: number; after?: 
     // A file read as it is has one number per line, and a comparison the number before and the one after.
     if (line.kind !== 'content') created.append(node('span', line.before === undefined ? '' : String(line.before), 'number'))
     created.append(node('span', line.after === undefined ? '' : String(line.after), 'number'))
-    created.append(node('span', line.kind === 'note' ? `\\ ${line.text}` : line.text, 'text'))
+    created.append(node('span', line.kind === 'note' ? String.raw`\ ${line.text}` : line.text, 'text'))
     block.append(created)
   }
   return lines.length > MAX_LINES ? [block, node('p', `The first ${MAX_LINES} lines of ${what} are shown.`, 'empty')] : [block]

@@ -46,7 +46,7 @@ export function layout(commits: { hash: string; parents: string[] }[]): GraphRow
     })
     const through = before.flatMap((hash, index) => (hash !== null && hash !== commit.hash && !moved.some(([from]) => from === index) ? [index] : []))
     const width = Math.max(before.length, lanes.length, column + 1)
-    while (lanes.length > 0 && lanes[lanes.length - 1] === null) lanes.pop()
+    while (lanes.length > 0 && lanes.at(-1) === null) lanes.pop()
     return { column, into, out, through, moved, width }
   })
 }

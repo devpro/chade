@@ -124,7 +124,8 @@ program
     for (const { system, files } of discoveries) {
       if (files.length === 0) continue
       log.info(`${system.kind}:\n  files:`)
-      for (const file of files) log.info(`    - ${system.kind === 'windows' ? `'${file}'` : file}`)
+      const quoted = system.kind === 'windows' ? files.map((file) => `'${file}'`) : files
+      for (const file of quoted) log.info(`    - ${file}`)
     }
   })
 
@@ -165,7 +166,8 @@ program
     const before = await diskUsage(disk)
     const result = await runCleanup(planned, runInherit, log.info)
     const after = await diskUsage(disk)
-    log.info(`\n${result.ran.length} step(s) ran${result.failed.length > 0 ? `, ${result.failed.join(', ')} failed` : ''}`)
+    const failures = result.failed.length > 0 ? `, ${result.failed.join(', ')} failed` : ''
+    log.info(`\n${result.ran.length} step(s) ran${failures}`)
     if (before && after) log.info(`Free space on ${disk}: ${formatBytes(before.available)} before, ${formatBytes(after.available)} after`)
     if (result.failed.length > 0) process.exitCode = 1
   })
@@ -271,7 +273,9 @@ daemon
     log.info(`chade serves ${host.machine} on ${server.address}`)
   })
 
-program.parseAsync().catch((error: unknown) => {
+try {
+  await program.parseAsync()
+} catch (error) {
   console.error(`chade: ${error instanceof Error ? error.message : String(error)}`)
   process.exitCode = 1
-})
+}

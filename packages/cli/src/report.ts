@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { lstat, readdir, readFile, stat, statfs } from 'node:fs/promises'
 import { freemem, totalmem } from 'node:os'
 import { join } from 'node:path'
-import { findRepositories, type Measure, type Report, type Section } from '@chade/daemon'
+import { findRepositories, trimTrailing, type Measure, type Report, type Section } from '@chade/daemon'
 import type { Config } from './config.js'
 import { NOT_FOUND } from './exec.js'
 import { expandHome } from './paths.js'
@@ -26,7 +26,7 @@ export async function report(config: Config | undefined, host: Host): Promise<Re
   const native = isNativeWindows(host)
   const linuxRoot = native ? undefined : await diskUsage('/')
   if (host.windows) {
-    const lxss = await host.windows.exec(['reg', 'query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss', '/s'])
+    const lxss = await host.windows.exec(['reg', 'query', String.raw`HKCU\Software\Microsoft\Windows\CurrentVersion\Lxss`, '/s'])
     const distributions = parseLxss(lxss.stdout)
     add(await windowsDisk(host, linuxRoot, native, distributions))
     // A Windows without a distribution has no use for the settings of WSL.
@@ -99,8 +99,8 @@ export function parseLxss(output: string): Distribution[] {
   const distributions: Distribution[] = []
   let current: Partial<Distribution> = {}
   for (const line of output.split(/\r?\n/)) {
-    if (/^HKEY_/.test(line)) current = {}
-    const value = /^\s+(DistributionName|BasePath)\s+REG_\w+\s+(.+)$/.exec(line)
+    if (line.startsWith('HKEY_')) current = {}
+    const value = /^\s+(DistributionName|BasePath)\s+REG_\w+\s+(\S.*)$/.exec(line)
     if (value?.[1] === 'DistributionName') current.name = value[2].trim()
     // A distribution moved or imported keeps its path in the \\?\ form of long Windows paths.
     if (value?.[1] === 'BasePath') current.basePath = value[2].trim().replace(/^\\\\\?\\/, '')
@@ -113,7 +113,7 @@ export function parseIni(text: string): Record<string, string> {
   const values: Record<string, string> = {}
   let section = ''
   for (const raw of text.split(/\r?\n/)) {
-    const line = raw.replace(/[#;].*$/, '').trim()
+    const line = raw.split(/[#;]/, 1)[0].trim()
     const header = /^\[(.+)\]$/.exec(line)
     if (header) section = header[1].trim().toLowerCase()
     const pair = /^([^=]+)=(.*)$/.exec(line)
@@ -134,7 +134,7 @@ export function scheduledTimers(output: string): string[] {
     .split('\n')
     .map((line) => line.trim().split(/\s+/))
     .filter((tokens) => tokens.length >= 2 && tokens[0] !== '-' && tokens[0] !== '')
-    .map((tokens) => tokens[tokens.length - 2])
+    .map((tokens) => tokens.at(-2) ?? '')
 }
 
 export interface Process {
@@ -144,7 +144,7 @@ export interface Process {
 
 // A line of ps -eo rss=,comm= is the resident memory in kB, then the command.
 export function parsePs(output: string): Process[] {
-  return [...output.matchAll(/^\s*(\d+)\s+(.+)$/gm)].map((match) => ({ name: match[2].trim(), bytes: Number(match[1]) * 1024 }))
+  return [...output.matchAll(/^[ \t]*(\d+)[ \t]+(\S.*)$/gm)].map((match) => ({ name: match[2].trim(), bytes: Number(match[1]) * 1024 }))
 }
 
 // A line of tasklist /fo csv /nh is image, PID, session, session number and memory in kB, written with the digit grouping of the locale.
@@ -209,7 +209,7 @@ async function windowsDisk(host: Host, linuxRoot: Usage | undefined, native: boo
   const windows = host.windows!
   const current = process.env.WSL_DISTRO_NAME
   for (const distribution of distributions) {
-    const image = `${distribution.basePath}\\ext4.vhdx`
+    const image = String.raw`${distribution.basePath}\ext4.vhdx`
     const info = await stat(await windows.linuxPath(image)).catch(() => undefined)
     if (!info) continue
     section.measures.push({ label: `${distribution.name} disk image`, bytes: info.size, detail: image })
@@ -236,13 +236,13 @@ async function wslConfig(host: Host): Promise<Section> {
   const windows = host.windows!
   const profile = await windows.env('USERPROFILE')
   if (!profile) return section
-  const file = await windows.linuxPath(`${profile}\\.wslconfig`)
+  const file = await windows.linuxPath(String.raw`${profile}\.wslconfig`)
   const values = parseIni(await readFile(file, 'utf8').catch(() => ''))
   for (const key of ['wsl2.memory', 'wsl2.swap', 'experimental.automemoryreclaim']) {
     section.measures.push({ label: key, detail: values[key] ?? 'not set' })
   }
-  if (!values['wsl2.memory']) section.hints.push('Without memory in [wsl2] of %USERPROFILE%\\.wslconfig, WSL may take half of the RAM of Windows, a limit applied with wsl --shutdown.')
-  if (!values['experimental.automemoryreclaim']) section.hints.push('autoMemoryReclaim=gradual in [experimental] of %USERPROFILE%\\.wslconfig gives the cache memory of Linux back to Windows.')
+  if (!values['wsl2.memory']) section.hints.push(String.raw`Without memory in [wsl2] of %USERPROFILE%\.wslconfig, WSL may take half of the RAM of Windows, a limit applied with wsl --shutdown.`)
+  if (!values['experimental.automemoryreclaim']) section.hints.push(String.raw`autoMemoryReclaim=gradual in [experimental] of %USERPROFILE%\.wslconfig gives the cache memory of Linux back to Windows.`)
   return section
 }
 
@@ -336,7 +336,7 @@ export function disabledSnaps(output: string): { name: string; revision: string 
   return output
     .split('\n')
     .map((line) => line.trim().split(/\s+/))
-    .filter((tokens) => tokens.length >= 6 && tokens[tokens.length - 1].split(',').includes('disabled'))
+    .filter((tokens) => tokens.length >= 6 && tokens.at(-1)?.split(',').includes('disabled'))
     .map((tokens) => ({ name: tokens[0], revision: tokens[2] }))
 }
 
@@ -381,19 +381,15 @@ const WINDOWS_CACHES: Cache[] = [
   { path: '~/AppData/Local/ms-playwright', command: 'npx playwright uninstall --all', note: 'the browsers the projects use are installed again after it' },
 ]
 
-async function caches(host: Host, native: boolean): Promise<Section> {
-  const section: Section = { title: 'Caches', measures: [], hints: [], guide: 'caches' }
-  for (const cache of native ? WINDOWS_CACHES : CACHES) {
-    const bytes = await folderSize(host, expandHome(cache.path, host.home))
-    if (bytes === undefined) continue
-    section.measures.push({ label: cache.path, bytes })
-    if (bytes > WORTH) {
-      section.hints.push(`${cache.path} holds ${formatBytes(bytes)}${cache.note ? `, ${cache.note}` : ''}${cache.command ? ':' : '.'}`)
-      if (cache.command) section.hints.push(`  ${cache.command}`)
-    }
-  }
-  if (native) return section
-  // ~/.cache gathers the caches of every tool, and only its largest folders say which one to clear.
+function cacheHints(cache: Cache, bytes: number): string[] {
+  if (bytes <= WORTH) return []
+  const note = cache.note ? `, ${cache.note}` : ''
+  const hint = `${cache.path} holds ${formatBytes(bytes)}${note}${cache.command ? ':' : '.'}`
+  return cache.command ? [hint, `  ${cache.command}`] : [hint]
+}
+
+// ~/.cache gathers the caches of every tool, and only its largest folders say which one to clear.
+async function largestCaches(host: Host): Promise<Measure[]> {
   const cache = join(host.home, '.cache')
   const children: Measure[] = []
   for (const entry of await readdir(cache, { withFileTypes: true }).catch(() => [])) {
@@ -401,31 +397,53 @@ async function caches(host: Host, native: boolean): Promise<Section> {
     const bytes = await folderSize(host, join(cache, entry.name))
     if (bytes !== undefined && bytes > GB / 10) children.push({ label: `~/.cache/${entry.name}`, bytes })
   }
-  section.measures.push(...children.sort((a, b) => (b.bytes ?? 0) - (a.bytes ?? 0)).slice(0, 5).filter((child) => !CACHES.some((known) => known.path === child.label)))
+  return children
+    .toSorted((a, b) => (b.bytes ?? 0) - (a.bytes ?? 0))
+    .slice(0, 5)
+    .filter((child) => !CACHES.some((known) => known.path === child.label))
+}
+
+async function caches(host: Host, native: boolean): Promise<Section> {
+  const section: Section = { title: 'Caches', measures: [], hints: [], guide: 'caches' }
+  for (const cache of native ? WINDOWS_CACHES : CACHES) {
+    const bytes = await folderSize(host, expandHome(cache.path, host.home))
+    if (bytes === undefined) continue
+    section.measures.push({ label: cache.path, bytes })
+    section.hints.push(...cacheHints(cache, bytes))
+  }
+  if (!native) section.measures.push(...(await largestCaches(host)))
   return section
 }
 
-// Transcripts of Claude Code sessions, kept for cleanupPeriodDays, 30 by default.
-async function agentSessions(host: Host): Promise<Section | undefined> {
-  const folder = join(host.home, '.claude', 'projects')
-  if (!existsSync(folder)) return undefined
-  const monthAgo = Date.now() - 30 * 24 * 3600 * 1000
-  let count = 0
-  let old = 0
-  let oldBytes = 0
+interface Sessions {
+  count: number
+  old: number
+  oldBytes: number
+}
+
+async function countSessions(folder: string, before: number): Promise<Sessions> {
+  const sessions: Sessions = { count: 0, old: 0, oldBytes: 0 }
   for (const project of await readdir(folder, { withFileTypes: true })) {
     if (!project.isDirectory()) continue
     for (const file of await readdir(join(folder, project.name)).catch(() => [])) {
       if (!file.endsWith('.jsonl')) continue
       const info = await stat(join(folder, project.name, file)).catch(() => undefined)
       if (!info) continue
-      count++
-      if (info.mtimeMs < monthAgo) {
-        old++
-        oldBytes += info.size
+      sessions.count++
+      if (info.mtimeMs < before) {
+        sessions.old++
+        sessions.oldBytes += info.size
       }
     }
   }
+  return sessions
+}
+
+// Transcripts of Claude Code sessions, kept for cleanupPeriodDays, 30 by default.
+async function agentSessions(host: Host): Promise<Section | undefined> {
+  const folder = join(host.home, '.claude', 'projects')
+  if (!existsSync(folder)) return undefined
+  const { count, old, oldBytes } = await countSessions(folder, Date.now() - 30 * 24 * 3600 * 1000)
   const section: Section = {
     title: 'Agent sessions',
     guide: 'agent-sessions',
@@ -447,7 +465,7 @@ async function repositories(config: Config | undefined, host: Host): Promise<Sec
     if (!existsSync(folder)) continue
     for (const relative of await findRepositories(folder)) {
       const bytes = await folderSize(host, join(folder, ...relative))
-      if (bytes !== undefined) sizes.push({ label: [root.replace(/\/+$/, ''), ...relative].join('/'), bytes })
+      if (bytes !== undefined) sizes.push({ label: [trimTrailing(root, '/'), ...relative].join('/'), bytes })
     }
   }
   sizes.sort((a, b) => (b.bytes ?? 0) - (a.bytes ?? 0))

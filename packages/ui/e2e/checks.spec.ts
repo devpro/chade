@@ -32,12 +32,13 @@ test('a repository of Windows is marked as well', async ({ page, server }) => {
 
 test('an IstarCI that does not answer leaves the page as it is without it', async ({ page, server }) => {
   const detached = new RepositoryPage(page)
+  // IstarCI is given up on after a second, and the answer of chade then holds no check.
+  const answered = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/checks')
   await detached.signIn(server.url, 'wsl-ubuntu', `${server.root}/wsl-ubuntu/detached`)
   await detached.expectOpen('detached')
   await expect(detached.subjects).toContainText(['Start detached'])
   await detached.choose('Start detached')
-  // IstarCI is given up on after a second, and the page then stays as it was.
-  await page.waitForTimeout(1500)
+  await answered
   await expect(detached.check('Start detached')).toHaveText('')
   await expect(detached.checkLink).toHaveCount(0)
   await expect(detached.notice).toBeHidden()

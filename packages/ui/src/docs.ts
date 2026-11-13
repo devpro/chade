@@ -60,7 +60,7 @@ function render(page: Page): void {
   // The headings of a fenced block are no headings of the page.
   const headings = [...page.source.replace(/^```[\s\S]*?^```/gm, '').matchAll(/^## (.*)$/gm)].map((match) => match[1])
   const toc = headings.map((heading) => {
-    const link = node('a', heading.replace(/`/g, '')) as HTMLAnchorElement
+    const link = node('a', heading.replaceAll('`', '')) as HTMLAnchorElement
     link.href = docsAddress(page.slug, slugify(heading))
     return link
   })

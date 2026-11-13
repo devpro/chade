@@ -4,7 +4,8 @@ runner:
     "markup-lint*": ghcr.io/devpro/ubuntu-node:latest
     "build-test__*": ghcr.io/devpro/ubuntu-node-playwright:latest
   docker: ["image-scan*"]
-  sonarqube: true
+  sonarqube:
+    gate: true
 
 workflow:
   onDisallowedAction: fail

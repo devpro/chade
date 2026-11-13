@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { findRepositories } from '@chade/daemon'
+import { findRepositories, trimTrailing } from '@chade/daemon'
 import { NOT_FOUND, type Result, type Run } from './exec.js'
 import { expandHome } from './paths.js'
 import { redactUrl } from './redact.js'
@@ -190,7 +190,7 @@ async function winget(context: Context): Promise<string> {
   const temp = await windows.env('TEMP')
   if (!temp) throw new Error('the Windows TEMP variable is not defined')
   // winget.exe is a Windows program, so the export file has to be on the Windows side, then read through its WSL path.
-  const exportPath = `${temp}\\chade-winget-${process.pid}.json`
+  const exportPath = String.raw`${temp}\chade-winget-${process.pid}.json`
   const result = await context.run('winget.exe', ['export', '--output', exportPath, '--accept-source-agreements', '--disable-interactivity'], {
     cwd: windows.cwd(),
   })
@@ -214,7 +214,7 @@ async function gitRepos(context: Context, kind: Kind): Promise<string> {
     }
     const separator = kind === 'linux' ? '/' : '\\'
     for (const relative of await findRepositories(folder)) {
-      const display = [root.replace(/[\\/]+$/, ''), ...relative].join(separator)
+      const display = [trimTrailing(root, String.raw`\/`), ...relative].join(separator)
       const remotes = await context.run('git', ['-C', join(folder, ...relative), 'remote', '-v'])
       const fetches = remotes.stdout
         .split('\n')

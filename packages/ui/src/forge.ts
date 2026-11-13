@@ -29,7 +29,8 @@ export function forgeIcon(remote: Remote | undefined): HTMLElement {
     return holder
   }
   const { label, path } = MARKS[remote.forge]
-  holder.title = remote.host ? `${remote.name} on ${remote.forge === 'git' ? remote.host : label}` : `${remote.name}, a folder or a host of the local network`
+  const where = remote.forge === 'git' ? remote.host : label
+  holder.title = remote.host ? `${remote.name} on ${where}` : `${remote.name}, a folder or a host of the local network`
   holder.setAttribute('role', 'img')
   holder.setAttribute('aria-label', holder.title)
   const icon = svg('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' })

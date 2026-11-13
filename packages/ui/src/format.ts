@@ -51,8 +51,8 @@ export function changes(repository: Repository): Badge[] {
 // The most pressing thing about a repository: bad to fix, warn to commit or pull, info to push, quiet when there is nothing to do.
 export function tone(repository: Repository): Badge['tone'] {
   if (repository.error !== undefined) return 'bad'
-  const tones = [...sync(repository), ...changes(repository)].map((badge) => badge.tone)
-  return (['bad', 'warn', 'info'] as const).find((candidate) => tones.includes(candidate)) ?? 'quiet'
+  const tones = new Set([...sync(repository), ...changes(repository)].map((badge) => badge.tone))
+  return (['bad', 'warn', 'info'] as const).find((candidate) => tones.has(candidate)) ?? 'quiet'
 }
 
 export function needsAttention(repository: Repository): boolean {
@@ -103,11 +103,13 @@ export function duration(ms: number): string {
 // What IstarCI did with a commit: the mark of its line in the history, and the sentence that tells it.
 export function checkOf(check: Check): { mark: string; tone: 'good' | 'bad' | 'info' | 'quiet'; text: string } {
   const took = check.durationMs === undefined ? '' : ` in ${duration(check.durationMs)}`
+  const after = check.durationMs === undefined ? '' : ` after ${duration(check.durationMs)}`
+  const reason = check.reason ? `: ${check.reason}` : ''
   switch (check.status) {
     case 'success':
       return { mark: '✓', tone: 'good', text: `Passed on IstarCI${took}` }
     case 'failure':
-      return { mark: '✕', tone: 'bad', text: `Failed on IstarCI${check.durationMs === undefined ? '' : ` after ${duration(check.durationMs)}`}` }
+      return { mark: '✕', tone: 'bad', text: `Failed on IstarCI${after}` }
     case 'running':
       return { mark: '●', tone: 'info', text: 'Running on IstarCI' }
     case 'queued':
@@ -117,6 +119,6 @@ export function checkOf(check: Check): { mark: string; tone: 'good' | 'bad' | 'i
     case 'skipped':
       return { mark: '◌', tone: 'quiet', text: 'Skipped by IstarCI' }
     case 'not-run':
-      return { mark: '◌', tone: 'quiet', text: `Not run by IstarCI${check.reason ? `: ${check.reason}` : ''}` }
+      return { mark: '◌', tone: 'quiet', text: `Not run by IstarCI${reason}` }
   }
 }
