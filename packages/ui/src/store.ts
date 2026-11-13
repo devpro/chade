@@ -1,7 +1,7 @@
 import type { Machine, SnapshotDetail, Store, StoredFile } from '@chade/daemon'
 import { address, get } from './api.js'
 import { parseDiff, type DiffFile } from './diff.js'
-import { element, node, svg } from './dom.js'
+import { copyHash, element, node, svg } from './dom.js'
 import { contentLines, counts, diffLines, fileHead, label, resizable, statusOf } from './files.js'
 import { ago } from './format.js'
 
@@ -171,8 +171,7 @@ async function renderDetail(current: Loaded, machine: Machine | undefined, commi
     const created: HTMLElement[] = [node('h2', subject)]
     if (body.join('\n').trim()) created.push(node('pre', body.join('\n').trim(), 'body'))
     const facts = node('p', '', 'facts')
-    const hash = node('code', commit.slice(0, 10))
-    hash.title = commit
+    const hash = copyHash(commit)
     const before = machine.snapshots.find((snapshot) => snapshot.hash === detail.previous)
     const compared = detail.previous ? `Compared with the snapshot of ${before ? new Date(before.date).toLocaleString() : detail.previous.slice(0, 10)}` : `First snapshot of ${machine.name}`
     facts.append(hash, node('span', detail.commit?.author ?? ''), node('span', detail.commit ? new Date(detail.commit.date).toLocaleString() : ''), node('span', compared))

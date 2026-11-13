@@ -34,6 +34,7 @@ export class RepositoryPage {
   readonly changes: Locator
   readonly heading: Locator
   readonly body: Locator
+  readonly hash: Locator
   readonly files: Locator
   readonly comparison: FileComparison
   readonly history: Locator
@@ -58,6 +59,7 @@ export class RepositoryPage {
     this.changes = page.locator('#detail')
     this.heading = this.changes.locator('h2')
     this.body = this.changes.locator('.body')
+    this.hash = this.changes.locator('.facts .hash')
     this.files = this.changes.locator('.index .file-link')
     this.comparison = new FileComparison(page.locator('#diff'))
     this.history = page.locator('#history')

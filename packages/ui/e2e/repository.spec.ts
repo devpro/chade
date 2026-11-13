@@ -123,6 +123,17 @@ test('a commit shows its message and its files, stays chosen when the page is lo
   await shot(page, testInfo, 'file')
 })
 
+test('the short hash of a commit copies its full hash, for a pipeline or a command that needs it', async ({ page, context, history }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  await history.choose('Change the guide')
+  const full = new URL(page.url()).hash.match(/commit=([0-9a-f]{40})$/)?.[1] ?? ''
+  await expect(history.hash).toHaveText(full.slice(0, 10))
+  await history.hash.click()
+  await expect(history.hash).toHaveText('Copied')
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(full)
+  await expect(history.hash).toHaveText(full.slice(0, 10))
+})
+
 test('a merge shows what the branch brought, and a rename the two names of the file', async ({ history }) => {
   await history.choose('Merge feature/graph')
   await expect(history.files).toHaveText(['Agraph.txt+1'])

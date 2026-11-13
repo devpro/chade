@@ -1,7 +1,7 @@
 import type { Branch, Check, Commit, Detail, Diff, FileChange, LastCommit } from '@chade/daemon'
 import { address, get, post } from './api.js'
 import { parseDiff } from './diff.js'
-import { element, node, svg } from './dom.js'
+import { copyHash, element, node, svg } from './dom.js'
 import { counts, diffLines, fileHead, fileOf, label, resizable, statusOf } from './files.js'
 import { ago, changes, checkOf, sync } from './format.js'
 import { layout, type GraphRow } from './graph.js'
@@ -448,8 +448,7 @@ async function renderDetail(current: Loaded): Promise<void> {
       created.push(node('h2', subject))
       if (body.join('\n').trim()) created.push(node('pre', body.join('\n').trim(), 'body'))
       const facts = node('p', '', 'facts')
-      const hash = node('code', shown.slice(0, 10))
-      hash.title = shown
+      const hash = copyHash(shown)
       facts.append(hash, node('span', diff.commit?.author ?? ''), node('span', diff.commit ? new Date(diff.commit.date).toLocaleString() : ''))
       created.push(facts)
       const fact = node('p', '', 'check-fact')

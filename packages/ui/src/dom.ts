@@ -13,3 +13,24 @@ export function svg(tag: string, attributes: Record<string, string | number>): S
   for (const [name, value] of Object.entries(attributes)) created.setAttribute(name, String(value))
   return created
 }
+
+// The short hash is what reads, the full hash is what a pipeline or a command needs, so a click copies the full one.
+export function copyHash(hash: string): HTMLElement {
+  const shown = hash.slice(0, 10)
+  const button = node('button', shown, 'hash')
+  button.title = `${hash}\nCopy the full hash`
+  button.setAttribute('aria-label', `Copy the full hash ${hash}`)
+  let timer: ReturnType<typeof setTimeout> | undefined
+  button.addEventListener('click', () => {
+    const said = (text: string): void => {
+      clearTimeout(timer)
+      button.textContent = text
+      timer = setTimeout(() => (button.textContent = shown), 1500)
+    }
+    navigator.clipboard.writeText(hash).then(
+      () => said('Copied'),
+      () => said('Copy failed'),
+    )
+  })
+  return button
+}

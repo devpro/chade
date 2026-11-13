@@ -829,8 +829,21 @@ td.ci {
   font-size: 12.5px;
 }
 
-.facts code {
+.facts .hash {
+  margin-left: -4px;
+  padding: 0 4px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
   font-family: var(--mono);
+  cursor: copy;
+}
+
+.facts .hash:hover {
+  border-color: var(--border);
+  color: var(--text);
 }
 
 .file {
