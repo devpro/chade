@@ -18,6 +18,10 @@ npm init -y >/dev/null 2>&1
 npm install --no-audit --no-fund "$tmp/$tarball" >/dev/null 2>&1
 
 fail() { echo "smoke: $1" >&2; exit 1; }
+# grep -q quits on its first match, and a command still writing to the pipe then dies of SIGPIPE, which pipefail reports as a failure.
+# The tr of uutils, the coreutils of Ubuntu 26.04, writes each line as it comes and so loses that race, where GNU tr writes once at the end.
+# The output is read whole first, without the carriage returns of Windows.
+outputs() { local pattern=$1 message=$2 out; shift 2; out=$("$chade" "$@" | tr -d '\r') || fail "chade $* failed"; grep -q "$pattern" <<<"$out" || fail "$message"; }
 
 # Git Bash on Windows, where chade reads and writes Windows paths, and runs commands through cmd.exe.
 windows=false
@@ -84,12 +88,12 @@ stored="$tmp/store/smoke/$system/files$path"
 grep -q "$kernel" "$tmp/store/smoke/$system/inventories/kernel.txt" || fail 'the custom inventory was not written'
 [ "$(git -C "$tmp/store" rev-list --count HEAD)" = 1 ] || fail 'the snapshot was not committed'
 
-"$chade" snapshot --no-secret-scan | grep -q 'No change' || fail 'a second snapshot of an unchanged system should commit nothing'
-"$chade" diff --stat | grep -q 'kernel.txt' || fail 'chade diff does not show the first snapshot'
+outputs 'No change' 'a second snapshot of an unchanged system should commit nothing' snapshot --no-secret-scan
+outputs 'kernel.txt' 'chade diff does not show the first snapshot' diff --stat
 
 # A custom step only, which removes nothing, and --yes, since stdin is no terminal here.
-"$chade" clean --dry-run | grep -q 'echo cleaned by the smoke test' || fail 'chade clean --dry-run does not show the custom step'
-"$chade" clean --yes | tr -d '\r' | grep -q '^cleaned by the smoke test$' || fail 'chade clean --yes did not run the custom step'
+outputs 'echo cleaned by the smoke test' 'chade clean --dry-run does not show the custom step' clean --dry-run
+outputs '^cleaned by the smoke test$' 'chade clean --yes did not run the custom step' clean --yes
 
 # The report reads the machine as it is, the Windows host included on WSL, and changes nothing.
 "$chade" report --json | node -e 'const r = JSON.parse(require("fs").readFileSync(0, "utf8")); if (!r.sections.some((s) => s.title === "Memory")) process.exit(1)' \
@@ -116,7 +120,7 @@ check(store.machines?.[0]?.snapshots?.length > 0 && store.repository?.path, "the
 const report = await (await fetch(address + "/api/report", { headers })).json()
 check(report.sections?.some((section) => section.title === "Memory"), "the report has no Memory section: " + JSON.stringify(report))
 ' "$url" || fail 'chade ui does not serve the interface, the repositories, the store and the report'
-"$chade" daemon stop | grep -q '^Stopped the server' || fail 'chade daemon stop did not stop the server'
+outputs '^Stopped the server' 'chade daemon stop did not stop the server' daemon stop
 ui=
 if "$chade" daemon status >/dev/null; then fail 'the server still answers after chade daemon stop'; fi
 
