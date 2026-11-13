@@ -11,7 +11,7 @@ chade never changes the system, and changes a git repository only when asked in 
 ## Quick start
 
 ```bash
-npm install --global chade
+npm install --global @devprofr/chade
 chade init --store ~/system-snapshots
 chade discover
 chade snapshot

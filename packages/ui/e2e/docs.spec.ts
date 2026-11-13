@@ -8,7 +8,7 @@ test('the documentation shows the pages of the repository, with tables, code and
   await expect(page.locator('#machine')).toHaveText('E2E-PC')
   await expect(docs.headings.first()).toHaveText('Requirements')
   // A step of a list keeps the block of code under it, and a table its cells.
-  await expect(docs.article.locator('ol > li').first().locator('pre')).toHaveText('npm install --global chade')
+  await expect(docs.article.locator('ol > li').first().locator('pre')).toHaveText('npm install --global @devprofr/chade')
   // An image comes from another site, which the page loads nothing from.
   await expect(docs.article.locator('img')).toHaveCount(0)
   await shot(page, testInfo, 'docs')

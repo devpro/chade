@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/devpro/chade/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/devpro/chade/actions/workflows/ci.yaml)
 [![PKG](https://github.com/devpro/chade/actions/workflows/pkg.yaml/badge.svg?branch=main)](https://github.com/devpro/chade/actions/workflows/pkg.yaml)
-[![npm](https://img.shields.io/npm/v/chade?label=npm&logo=npm)](https://www.npmjs.com/package/chade)
+[![npm](https://img.shields.io/npm/v/@devprofr/chade?label=npm&logo=npm)](https://www.npmjs.com/package/@devprofr/chade)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=devpro_chade&metric=alert_status)](https://sonarcloud.io/dashboard?id=devpro_chade)
 
 Command line tool and local web interface to get insights on one machine and manage its git repositories:
@@ -25,7 +25,7 @@ Command line tool and local web interface to get insights on one machine and man
 1. Install chade.
 
    ```bash
-   npm install --global chade
+   npm install --global @devprofr/chade
    ```
 
 2. Create the store and the configuration file, `~/.chade/config.yml`.

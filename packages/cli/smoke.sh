@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Packs the tarball, installs it into an empty project, and runs the binary the way someone who typed `npm install -g chade` would.
+# Packs the tarball, installs it into an empty project, and runs the binary the way someone who typed `npm install -g @devprofr/chade` would.
 #
 # The unit tests import ../src directly and never go near the packaged layout,
 # so a missing `bin` entry, a file left out of `files`, a bin that is not executable or a dependency the bundle expects but the manifest omits

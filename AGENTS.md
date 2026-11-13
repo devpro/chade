@@ -1,6 +1,6 @@
 # chade: agent context
 
-CLI (`chade` on npmjs.org) and local web interface that keep track of a machine and its git repositories:
+CLI (`@devprofr/chade` on npmjs.org, run as `chade`) and local web interface that keep track of a machine and its git repositories:
 it snapshots the configuration of the system into a git repository, the store, one folder per machine, lists every git repository of the machine, and measures what takes disk and memory.
 
 chade is the tool, never the store: the snapshots live in a repository the user chooses, and nothing in this repository holds them.

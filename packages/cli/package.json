@@ -1,6 +1,6 @@
 {
-  "name": "chade",
-  "version": "0.1.0",
+  "name": "@devprofr/chade",
+  "version": "0.1.1",
   "description": "Snapshot the configuration of a system, files, installed applications, extensions, services and repositories, into a git repository, one folder per machine",
   "type": "module",
   "license": "MIT",
@@ -54,5 +54,8 @@
   "bugs": {
     "url": "https://github.com/devpro/chade/issues"
   },
-  "homepage": "https://github.com/devpro/chade#readme"
+  "homepage": "https://github.com/devpro/chade#readme",
+  "publishConfig": {
+    "access": "public"
+  }
 }
