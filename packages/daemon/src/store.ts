@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs'
+import { realpath } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { cutPatch, DEFAULT_COMMITS, DIFF_OPTIONS, MAX_COMMITS, readCommit, type Diff, type Git } from './history.js'
 import { findRepositories, GIT_TIMEOUT_MS, repositoryPath, type Root, type Run } from './repositories.js'
@@ -131,11 +132,13 @@ export async function readStore(store: string, run: Run, limit = DEFAULT_COMMITS
 export async function storeRepository(store: string, roots: Root[], run: Run): Promise<Store['repository']> {
   const top = await gitOf(store, run)(['rev-parse', '--show-toplevel'])
   if (top.code !== 0) return undefined
-  const folder = resolve(top.stdout.trim())
+  // Git gives the long name of each folder, where a root on Windows can hold a short one, RUNNER~1 for runneradmin, so both sides are compared as the system resolves them.
+  const real = (path: string) => realpath(path).catch(() => resolve(path))
+  const folder = await real(top.stdout.trim())
   for (const root of roots) {
     if (!existsSync(root.folder)) continue
     for (const relative of await findRepositories(root.folder)) {
-      if (resolve(join(root.folder, ...relative)) === folder) return { system: root.system, path: repositoryPath(root, relative) }
+      if ((await real(join(root.folder, ...relative))) === folder) return { system: root.system, path: repositoryPath(root, relative) }
     }
   }
   return undefined
