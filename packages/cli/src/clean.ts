@@ -64,9 +64,7 @@ export async function planCleanup(entries: (string | CustomStep)[], host: Host, 
     ...STEPS.filter((step) => step.name === 'fstrim' && entries.includes(step.name)),
   ]
   const native = isNativeWindows(host)
-  const planned: Planned[] = []
-  for (const step of ordered) planned.push(await planStep(step, host, native, root))
-  return planned
+  return Promise.all(ordered.map((step) => planStep(step, host, native, root)))
 }
 
 // The commands as they run: through cmd.exe on Windows, and through sudo for a step that needs root when chade is not.
