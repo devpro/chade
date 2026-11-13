@@ -75,3 +75,11 @@ tasks:
       - task: test
       - task: test:pkg
       - task: test:e2e
+
+  # ── Publication ─────────────────────────────────────────────────────────────
+
+  # pkg.yaml publishes on a push to main only when the version of packages/cli is not on the registry yet, so a change meant for release bumps first.
+  dev:bump:
+    desc: Bump chade to the next patch version in packages/cli/package.json and package-lock.json
+    cmds:
+      - npm version patch --no-git-tag-version --workspace=packages/cli

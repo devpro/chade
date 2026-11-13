@@ -85,6 +85,7 @@ Task                      | Effect
 `task ui:screenshots`     | Runs them on the two target screens and in the dark theme, and saves a screenshot of each state for review
 `task test:pkg`           | Runs the packaging smoke test
 `task check`              | Runs what CI runs: typecheck, build, unit tests, packaging smoke test, end to end tests
+`task dev:bump`           | Bumps `chade` to the next patch version, in `packages/cli/package.json` and `package-lock.json`
 
 ## Testing
 
@@ -226,5 +227,5 @@ It skips the Windows job, which `scripts/run_on_windows.sh --check` runs on the 
 ### Publication
 
 `.github/workflows/pkg.yaml` publishes `chade` to npmjs.org on every push to `main`, when the version of `packages/cli/package.json` is not published yet.
-A release is a change of that version.
+A release is a change of that version, `task dev:bump` for the next patch version.
 The publication uses npm trusted publishing, configured on npmjs.com for the `devpro/chade` repository and the `pkg.yaml` workflow, so no token is stored.
