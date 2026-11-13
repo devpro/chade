@@ -1,6 +1,6 @@
 {
   "name": "@devprofr/chade",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Snapshot the configuration of a system, files, installed applications, extensions, services and repositories, into a git repository, one folder per machine",
   "type": "module",
   "license": "MIT",

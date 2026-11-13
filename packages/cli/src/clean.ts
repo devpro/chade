@@ -64,29 +64,24 @@ export async function planCleanup(entries: (string | CustomStep)[], host: Host, 
     ...STEPS.filter((step) => step.name === 'fstrim' && entries.includes(step.name)),
   ]
   const native = isNativeWindows(host)
-  const planned: Planned[] = []
-  for (const step of ordered) {
-    if ('command' in step) {
-      planned.push({ name: step.name, description: 'custom step', commands: [native ? cmd(step.command) : ['sh', '-c', step.command]] })
-      continue
-    }
-    if (native && step.linux) {
-      planned.push({ name: step.name, description: step.description, commands: [], skipped: 'for Linux only' })
-      continue
-    }
-    const commands = await step.commands(host)
-    const program = commands[0]?.[0] ?? (step.name === 'snap-revisions' ? 'snap' : '')
-    let skipped: string | undefined
-    if (!(await installed(host.run, program, native))) skipped = `${program} is not installed`
-    else if (commands.length === 0) skipped = 'nothing to remove'
-    planned.push({
-      name: step.name,
-      description: step.description,
-      commands: native ? commands.map((command) => cmd(command.join(' '))) : step.sudo && !root ? commands.map((command) => ['sudo', ...command]) : commands,
-      skipped,
-    })
-  }
-  return planned
+  return Promise.all(ordered.map((step) => planStep(step, host, native, root)))
+}
+
+// The commands as they run: through cmd.exe on Windows, and through sudo for a step that needs root when chade is not.
+function runnable(commands: string[][], native: boolean, sudo: boolean): string[][] {
+  if (native) return commands.map((command) => cmd(command.join(' ')))
+  return sudo ? commands.map((command) => ['sudo', ...command]) : commands
+}
+
+async function planStep(step: Step | CustomStep, host: Host, native: boolean, root: boolean): Promise<Planned> {
+  if ('command' in step) return { name: step.name, description: 'custom step', commands: [native ? cmd(step.command) : ['sh', '-c', step.command]] }
+  if (native && step.linux) return { name: step.name, description: step.description, commands: [], skipped: 'for Linux only' }
+  const commands = await step.commands(host)
+  const program = commands[0]?.[0] ?? (step.name === 'snap-revisions' ? 'snap' : '')
+  let skipped: string | undefined
+  if (!(await installed(host.run, program, native))) skipped = `${program} is not installed`
+  else if (commands.length === 0) skipped = 'nothing to remove'
+  return { name: step.name, description: step.description, commands: runnable(commands, native, !!step.sudo && !root), skipped }
 }
 
 export type Inherit = (command: string, args: string[]) => Promise<number>
@@ -127,7 +122,8 @@ export function renderPlan(planned: Planned[]): string {
   const width = Math.max(...planned.map((step) => step.name.length), 0)
   return planned
     .map((step) => {
-      const head = `  ${step.name.padEnd(width)}  ${step.skipped ? `skipped, ${step.skipped}` : step.description}`
+      const what = step.skipped ? `skipped, ${step.skipped}` : step.description
+      const head = `  ${step.name.padEnd(width)}  ${what}`
       return step.skipped ? head : [head, ...step.commands.map((command) => `  ${' '.repeat(width)}  $ ${shown(command)}`)].join('\n')
     })
     .join('\n')

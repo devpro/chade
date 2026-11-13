@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { forgeOf, mainRemote, parseRemoteUrls, type Remote } from './remote.js'
+import { trimTrailing } from './text.js'
 
 export interface Result {
   code: number
@@ -68,40 +69,53 @@ export async function findRepositories(folder: string, relative: string[] = [], 
   if (depth === 0) return []
   const found: string[][] = []
   const children = entries.filter((entry) => entry.isDirectory() && !entry.name.startsWith('.') && !SKIPPED_FOLDERS.has(entry.name))
-  for (const child of children.sort((a, b) => a.name.localeCompare(b.name))) {
+  for (const child of children.toSorted((a, b) => a.name.localeCompare(b.name))) {
     found.push(...(await findRepositories(folder, [...relative, child.name], depth - 1)))
   }
   return found
 }
 
+// The headers of git status --porcelain=v2 --branch, each read into the status from the value after its name.
+const HEADERS = new Map<string, (value: string, status: Status) => void>([
+  ['branch.oid', (oid, status) => {
+    if (oid !== '(initial)') status.head = oid.slice(0, 7)
+  }],
+  ['branch.head', (head, status) => {
+    if (head !== '(detached)') status.branch = head
+  }],
+  ['branch.upstream', (upstream, status) => {
+    status.upstream = upstream
+  }],
+  ['branch.ab', (counts, status) => {
+    const match = /\+(\d+) -(\d+)/.exec(counts)
+    if (match) {
+      status.ahead = Number(match[1])
+      status.behind = Number(match[2])
+    }
+  }],
+])
+
+// The first character of an entry tells its kind: an ordinary change, a rename or a copy, a conflict, a file not tracked.
+const ENTRIES = new Map<string, 'changed' | 'conflicts' | 'untracked'>([['1', 'changed'], ['2', 'changed'], ['u', 'conflicts'], ['?', 'untracked']])
+
 // Reads the output of git status --porcelain=v2 --branch.
 export function parseStatus(text: string): Status {
   const status: Status = { changed: 0, untracked: 0, conflicts: 0 }
   for (const line of text.split('\n')) {
-    if (line.startsWith('# branch.oid ')) {
-      const oid = line.slice('# branch.oid '.length).trim()
-      if (oid !== '(initial)') status.head = oid.slice(0, 7)
-    } else if (line.startsWith('# branch.head ')) {
-      const head = line.slice('# branch.head '.length).trim()
-      if (head !== '(detached)') status.branch = head
-    } else if (line.startsWith('# branch.upstream ')) {
-      status.upstream = line.slice('# branch.upstream '.length).trim()
-    } else if (line.startsWith('# branch.ab ')) {
-      const match = /\+(\d+) -(\d+)/.exec(line)
-      if (match) {
-        status.ahead = Number(match[1])
-        status.behind = Number(match[2])
-      }
-    } else if (line.startsWith('1 ') || line.startsWith('2 ')) status.changed++
-    else if (line.startsWith('u ')) status.conflicts++
-    else if (line.startsWith('? ')) status.untracked++
+    if (line.startsWith('# ')) {
+      const space = line.indexOf(' ', 2)
+      if (space > 0) HEADERS.get(line.slice(2, space))?.(line.slice(space + 1).trim(), status)
+      continue
+    }
+    const kind = line[1] === ' ' ? ENTRIES.get(line[0]) : undefined
+    if (kind) status[kind]++
   }
   return status
 }
 
 // The path the system knows a repository of a root by.
 export function repositoryPath(root: Root, relative: string[]): string {
-  return [root.path.replace(/[\\/]+$/, ''), ...relative].join(root.separator)
+  return [trimTrailing(root.path, String.raw`\/`), ...relative].join(root.separator)
 }
 
 // A repository named by a request, found only among those the roots hold, so a request reaches no other folder of the machine.
@@ -136,7 +150,7 @@ export async function readRepository(root: Root, relative: string[], run: Run): 
   }
   const repository: Repository = { ...identity, ...parseStatus(status.stdout) }
   // A repository without any remote has no such key, and git exits with 1.
-  const [log, urls] = await Promise.all([repository.head ? git(['log', '-1', '--format=%cI%x00%s']) : undefined, git(['config', '--get-regexp', '^remote\\..*\\.url$'])])
+  const [log, urls] = await Promise.all([repository.head ? git(['log', '-1', '--format=%cI%x00%s']) : undefined, git(['config', '--get-regexp', String.raw`^remote\..*\.url$`])])
   if (log) {
     const [date, subject] = log.stdout.trim().split('\0')
     if (log.code === 0 && subject !== undefined) repository.commit = { subject, date }

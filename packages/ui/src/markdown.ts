@@ -70,80 +70,123 @@ const cells = (line: string): string[] =>
 
 const ITEM = /^(\s*)([-*]|\d+\.) (.*)/
 
+// A block of the page, and the index of the first line after it.
+interface Parsed {
+  block: HTMLElement
+  next: number
+}
+
+type BlockParser = (lines: string[], index: number, link: Linker) => Parsed | undefined
+
+function fence(lines: string[], index: number): Parsed | undefined {
+  if (!lines[index].startsWith('```')) return undefined
+  const code: string[] = []
+  let next = index + 1
+  for (; next < lines.length && !lines[next].startsWith('```'); next++) code.push(lines[next])
+  return { block: wrap('pre', [node('code', code.join('\n'))]), next: next + 1 }
+}
+
+function heading(lines: string[], index: number, link: Linker): Parsed | undefined {
+  const match = /^(#{1,4}) (.*)/.exec(lines[index])
+  if (!match) return undefined
+  const created = wrap(`h${match[1].length}`, inline(match[2], link))
+  created.id = slugify(match[2])
+  return { block: created, next: index + 1 }
+}
+
+function quote(lines: string[], index: number, link: Linker): Parsed | undefined {
+  if (!lines[index].startsWith('>')) return undefined
+  const quoted: string[] = []
+  let next = index
+  for (; next < lines.length && lines[next].startsWith('>'); next++) quoted.push(lines[next].replace(/^> ?/, ''))
+  // A note of GitHub starts with its kind between brackets, which is shown as its title.
+  const kind = /^\[!(\w+)\]$/.exec(quoted[0].trim())?.[1]
+  const body = markdown(quoted.slice(kind ? 1 : 0).join('\n'), link)
+  return { block: wrap('blockquote', kind ? [node('strong', `${kind[0]}${kind.slice(1).toLowerCase()}`), ...body] : body), next }
+}
+
+function table(lines: string[], index: number, link: Linker): Parsed | undefined {
+  if (!lines[index].includes('|') || !/^\s*(\|\s*)?:?-{3,}/.test(lines[index + 1] ?? '')) return undefined
+  const head = cells(lines[index])
+  const rows: string[][] = []
+  let next = index + 2
+  for (; next < lines.length && lines[next].includes('|'); next++) rows.push(cells(lines[next]))
+  const row = (tag: string, values: string[]): HTMLElement =>
+    wrap(
+      'tr',
+      values.map((value) => wrap(tag, inline(value, link))),
+    )
+  return { block: wrap('div', [wrap('table', [wrap('thead', [row('th', head)]), wrap('tbody', rows.map((values) => row('td', values)))])], 'table-wrap'), next }
+}
+
+// What is indented under an item belongs to it: the rest of its text, a block of code, a deeper item, and a blank line before more of them.
+function inList(lines: string[], index: number): boolean {
+  const line = lines[index]
+  if (ITEM.test(line) || /^\s{2,}\S/.test(line)) return true
+  return !line.trim() && /^\s{2,}\S|^(\s*)([-*]|\d+\.) /.test(lines[index + 1] ?? '')
+}
+
+function itemList(lines: string[], index: number, link: Linker): Parsed | undefined {
+  if (!ITEM.test(lines[index])) return undefined
+  const root: Item = { ordered: false, blocks: [], children: [] }
+  const stack: { indent: number; item: Item }[] = [{ indent: -1, item: root }]
+  let last = root
+  let next = index
+  for (; next < lines.length && inList(lines, next); next++) {
+    const item = ITEM.exec(lines[next])
+    if (!item) {
+      last.blocks.push(lines[next].replace(/^\s+/, (spaces) => spaces.slice(Math.min(spaces.length, stack.at(-1)!.indent + 3))))
+      continue
+    }
+    while (item[1].length <= stack.at(-1)!.indent) stack.pop()
+    last = { ordered: /\d/.test(item[2]), blocks: [item[3]], children: [] }
+    stack.at(-1)!.item.children.push(last)
+    stack.push({ indent: item[1].length, item: last })
+  }
+  return { block: list(root.children, link), next }
+}
+
+const BLOCKS: BlockParser[] = [fence, heading, quote, table, itemList]
+
+// A sentence starts on its own line in the sources, so a paragraph is the lines up to a blank one or another block.
+function paragraph(lines: string[], index: number, link: Linker): { nodes: (Node | string)[]; next: number } {
+  const nodes: (Node | string)[] = []
+  let next = index
+  for (; next < lines.length && lines[next].trim() && !/^(```|#{1,4} |>|\s*([-*]|\d+\.) )/.test(lines[next]); next++) {
+    if (nodes.length > 0) nodes.push(' ')
+    nodes.push(...inline(lines[next].trim(), link))
+  }
+  return { nodes, next }
+}
+
 // The Markdown the documentation of chade uses: headings, paragraphs, notes, lists with code under an item, tables and fenced code.
-// A sentence starts on its own line in the sources, so a paragraph is the lines up to a blank one.
 export function markdown(source: string, link: Linker, tight = false): HTMLElement[] {
   const lines = source.split('\n')
   const blocks: HTMLElement[] = []
   let index = 0
   while (index < lines.length) {
-    const line = lines[index]
-    if (!line.trim()) {
+    if (!lines[index].trim()) {
       index++
       continue
     }
-    if (line.startsWith('```')) {
-      const code: string[] = []
-      for (index++; index < lines.length && !lines[index].startsWith('```'); index++) code.push(lines[index])
-      index++
-      blocks.push(wrap('pre', [node('code', code.join('\n'))]))
+    const parsed = firstBlock(lines, index, link)
+    if (parsed) {
+      blocks.push(parsed.block)
+      index = parsed.next
       continue
     }
-    const heading = /^(#{1,4}) (.*)/.exec(line)
-    if (heading) {
-      const created = wrap(`h${heading[1].length}`, inline(heading[2], link))
-      created.id = slugify(heading[2])
-      blocks.push(created)
-      index++
-      continue
-    }
-    if (line.startsWith('>')) {
-      const quoted: string[] = []
-      for (; index < lines.length && lines[index].startsWith('>'); index++) quoted.push(lines[index].replace(/^> ?/, ''))
-      // A note of GitHub starts with its kind between brackets, which is shown as its title.
-      const kind = /^\[!(\w+)\]$/.exec(quoted[0].trim())?.[1]
-      const body = markdown(quoted.slice(kind ? 1 : 0).join('\n'), link)
-      blocks.push(wrap('blockquote', kind ? [node('strong', `${kind[0]}${kind.slice(1).toLowerCase()}`), ...body] : body))
-      continue
-    }
-    if (line.includes('|') && /^\s*\|?\s*:?-{3,}/.test(lines[index + 1] ?? '')) {
-      const head = cells(line)
-      const rows: string[][] = []
-      for (index += 2; index < lines.length && lines[index].includes('|'); index++) rows.push(cells(lines[index]))
-      const row = (tag: string, values: string[]): HTMLElement =>
-        wrap(
-          'tr',
-          values.map((value) => wrap(tag, inline(value, link))),
-        )
-      blocks.push(wrap('div', [wrap('table', [wrap('thead', [row('th', head)]), wrap('tbody', rows.map((values) => row('td', values)))])], 'table-wrap'))
-      continue
-    }
-    if (ITEM.test(line)) {
-      const root: Item = { ordered: false, blocks: [], children: [] }
-      const stack: { indent: number; item: Item }[] = [{ indent: -1, item: root }]
-      let last = root
-      // What is indented under an item belongs to it: the rest of its text, a block of code, a deeper item.
-      for (; index < lines.length && (ITEM.test(lines[index]) || /^\s{2,}\S/.test(lines[index]) || (!lines[index].trim() && /^\s{2,}\S|^(\s*)([-*]|\d+\.) /.test(lines[index + 1] ?? ''))); index++) {
-        const next = ITEM.exec(lines[index])
-        if (!next) {
-          last.blocks.push(lines[index].replace(/^\s+/, (spaces) => spaces.slice(Math.min(spaces.length, stack.at(-1)!.indent + 3))))
-          continue
-        }
-        while (next[1].length <= stack.at(-1)!.indent) stack.pop()
-        last = { ordered: /\d/.test(next[2]), blocks: [next[3]], children: [] }
-        stack.at(-1)!.item.children.push(last)
-        stack.push({ indent: next[1].length, item: last })
-      }
-      blocks.push(list(root.children, link))
-      continue
-    }
-    const paragraph: (Node | string)[] = []
-    for (; index < lines.length && lines[index].trim() && !/^(```|#{1,4} |>|\s*([-*]|\d+\.) )/.test(lines[index]); index++) {
-      if (paragraph.length > 0) paragraph.push(' ')
-      paragraph.push(...inline(lines[index].trim(), link))
-    }
+    const { nodes, next } = paragraph(lines, index, link)
     // The one line of a list item needs no paragraph of its own.
-    blocks.push(wrap(tight && blocks.length === 0 ? 'span' : 'p', paragraph))
+    blocks.push(wrap(tight && blocks.length === 0 ? 'span' : 'p', nodes))
+    index = next
   }
   return blocks
+}
+
+function firstBlock(lines: string[], index: number, link: Linker): Parsed | undefined {
+  for (const parse of BLOCKS) {
+    const parsed = parse(lines, index, link)
+    if (parsed) return parsed
+  }
+  return undefined
 }

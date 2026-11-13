@@ -33,7 +33,6 @@ let noticeTimer: ReturnType<typeof setTimeout> | undefined
 
 // What an action did, or why git refused it, in the words of git, in a corner of the page.
 function notify(title: string, text: string, state: 'running' | 'done' | 'failed'): void {
-  const failed = state === 'failed'
   clearTimeout(noticeTimer)
   const notice = element('notice')
   notice.hidden = false
@@ -126,19 +125,33 @@ commitForm.append(message, commitActions)
 let stagedCount = 0
 let last: LastCommit | undefined
 
+function amendTitle(): string {
+  if (!last) return 'There is no commit to amend yet'
+  return last.pushed ? 'The last commit is already pushed, so it is not amended' : 'Put what is staged into the last commit, and change its message'
+}
+
+// What the button would do, or what is missing for it to do anything.
+function commitTitle(empty: boolean): string {
+  const staged = `${stagedCount} staged file${stagedCount === 1 ? '' : 's'}`
+  if (amend.checked) {
+    if (empty) return 'Write a message to amend'
+    return stagedCount === 0 ? 'Change the message of the last commit' : `Put ${staged} into the last commit`
+  }
+  if (stagedCount === 0) return 'Stage a file to commit it'
+  return empty ? 'Write a message to commit' : `Commit ${staged}`
+}
+
 function updateCommit(): void {
   // A commit pushed meanwhile, from a terminal, is no longer amended.
   if (!last || last.pushed) amend.checked = false
   amend.disabled = !last || last.pushed
-  amendLabel.title = !last ? 'There is no commit to amend yet' : last.pushed ? 'The last commit is already pushed, so it is not amended' : 'Put what is staged into the last commit, and change its message'
+  amendLabel.title = amendTitle()
   const empty = message.value.trim() === ''
   const off = empty || (!amend.checked && stagedCount === 0)
   commitButton.textContent = amend.checked ? 'Amend' : 'Commit'
   commitButton.dataset.off = String(off)
   commitButton.disabled = off || acting
-  const staged = `${stagedCount} staged file${stagedCount === 1 ? '' : 's'}`
-  if (amend.checked) commitButton.title = empty ? 'Write a message to amend' : stagedCount === 0 ? 'Change the message of the last commit' : `Put ${staged} into the last commit`
-  else commitButton.title = stagedCount === 0 ? 'Stage a file to commit it' : empty ? 'Write a message to commit' : `Commit ${staged}`
+  commitButton.title = commitTitle(empty)
 }
 
 message.addEventListener('input', updateCommit)
@@ -178,7 +191,7 @@ function graphCell(row: GraphRow, width: number, merge: boolean): SVGElement {
 
 function refBadges(commit: Commit, branches: Branch[]): HTMLElement[] {
   return commit.refs
-    .filter((ref) => !/\/HEAD$/.test(ref))
+    .filter((ref) => !ref.endsWith('/HEAD'))
     .map((ref) => {
       if (ref.startsWith('tag: ')) return node('span', ref.slice('tag: '.length), 'ref tag')
       if (ref.startsWith('HEAD -> ')) return node('span', ref.slice('HEAD -> '.length), 'ref head')
@@ -396,6 +409,64 @@ async function renderFile(current: Loaded): Promise<void> {
   }
 }
 
+async function workingTreeBlocks(current: Loaded): Promise<HTMLElement[]> {
+  const created: HTMLElement[] = []
+  const staged = current.changes.filter((file) => file.staged !== ' ' && file.staged !== 'U')
+  const conflicts = current.changes.filter((file) => file.staged === 'U' || file.unstaged === 'U')
+  const unstaged = current.changes.filter((file) => file.unstaged !== ' ' && file.unstaged !== '?' && file.unstaged !== 'U' && file.staged !== 'U')
+  const untracked = current.changes.filter((file) => file.unstaged === '?')
+  created.push(node('h2', 'Uncommitted changes'))
+  if (current.changes.length === 0) created.push(node('p', 'The working tree is clean.', 'empty'))
+  created.push(...fileList('In conflict', conflicts, 'U'))
+  // A title of a part of the working tree, with the button that stages or unstages all of it.
+  const title = (text: string, button?: HTMLButtonElement): HTMLElement => {
+    const heading = node('h3', text, 'with-action')
+    if (button) heading.append(button)
+    return heading
+  }
+  const paths = (files: FileChange[]): string[] => files.map((file) => file.path)
+  const stage: FileAction = { text: '+', title: 'Stage', action: 'stage' }
+  stagedCount = staged.length
+  last = current.last
+  updateCommit()
+  created.push(commitForm)
+  if (staged.length > 0) {
+    const all = actionButton('Unstage all', 'Take every file out of the index', (button) => void act({ action: 'unstage' }, 'Unstaged every file', button))
+    created.push(title(`Staged (${staged.length})`, all), ...fileIndex(await patch(current, 'staged'), 'staged', { text: '−', title: 'Unstage', action: 'unstage' }))
+  }
+  if (unstaged.length + conflicts.length > 0) {
+    const all = unstaged.length > 0 ? actionButton('Stage all', 'Stage every changed file', (button) => void act({ action: 'stage', files: paths(unstaged) }, 'Staged the changed files', button)) : undefined
+    // The two Stage all buttons of the panel are told apart by what they stage.
+    all?.setAttribute('aria-label', 'Stage all changed files')
+    created.push(title(`Not staged (${unstaged.length + conflicts.length})`, all), ...fileIndex(await patch(current, 'unstaged'), 'unstaged', stage))
+  }
+  if (untracked.length > 0) {
+    const all = actionButton('Stage all', 'Stage every file not tracked', (button) => void act({ action: 'stage', files: paths(untracked) }, 'Staged the new files', button))
+    all.setAttribute('aria-label', 'Stage all new files')
+    created.push(title(`Untracked (${untracked.length})`, all), ...fileIndex(await patch(current, 'untracked'), 'untracked', stage))
+  }
+  return created
+}
+
+async function commitBlocks(current: Loaded, shown: string): Promise<HTMLElement[]> {
+  const created: HTMLElement[] = []
+  const diff = await patch(current, shown)
+  const [subject, ...body] = (diff.commit?.message ?? '').split('\n')
+  created.push(node('h2', subject))
+  if (body.join('\n').trim()) created.push(node('pre', body.join('\n').trim(), 'body'))
+  const facts = node('p', '', 'facts')
+  const hash = copyHash(shown)
+  facts.append(hash, node('span', diff.commit?.author ?? ''), node('span', diff.commit ? new Date(diff.commit.date).toLocaleString() : ''))
+  created.push(facts)
+  const fact = node('p', '', 'check-fact')
+  fact.dataset.hash = shown
+  paintFact(fact, shown)
+  created.push(fact)
+  if (diff.patch === '') created.push(node('p', 'This commit changes no file.', 'empty'))
+  else created.push(node('h3', 'Files'), ...fileIndex(diff, shown))
+  return created
+}
+
 async function renderDetail(current: Loaded): Promise<void> {
   const panel = element('detail')
   for (const [name, line] of rows) line.classList.toggle('selected', name === target)
@@ -406,58 +477,7 @@ async function renderDetail(current: Loaded): Promise<void> {
   }
   const shown = target
   try {
-    const created: HTMLElement[] = []
-    if (shown === WORKING_TREE) {
-      const staged = current.changes.filter((file) => file.staged !== ' ' && file.staged !== 'U')
-      const conflicts = current.changes.filter((file) => file.staged === 'U' || file.unstaged === 'U')
-      const unstaged = current.changes.filter((file) => file.unstaged !== ' ' && file.unstaged !== '?' && file.unstaged !== 'U' && file.staged !== 'U')
-      const untracked = current.changes.filter((file) => file.unstaged === '?')
-      created.push(node('h2', 'Uncommitted changes'))
-      if (current.changes.length === 0) created.push(node('p', 'The working tree is clean.', 'empty'))
-      created.push(...fileList('In conflict', conflicts, 'U'))
-      // A title of a part of the working tree, with the button that stages or unstages all of it.
-      const title = (text: string, button?: HTMLButtonElement): HTMLElement => {
-        const heading = node('h3', text, 'with-action')
-        if (button) heading.append(button)
-        return heading
-      }
-      const paths = (files: FileChange[]): string[] => files.map((file) => file.path)
-      const stage: FileAction = { text: '+', title: 'Stage', action: 'stage' }
-      stagedCount = staged.length
-      last = current.last
-      updateCommit()
-      created.push(commitForm)
-      if (staged.length > 0) {
-        const all = actionButton('Unstage all', 'Take every file out of the index', (button) => void act({ action: 'unstage' }, 'Unstaged every file', button))
-        created.push(title(`Staged (${staged.length})`, all), ...fileIndex(await patch(current, 'staged'), 'staged', { text: '−', title: 'Unstage', action: 'unstage' }))
-      }
-      if (unstaged.length + conflicts.length > 0) {
-        const all = unstaged.length > 0 ? actionButton('Stage all', 'Stage every changed file', (button) => void act({ action: 'stage', files: paths(unstaged) }, 'Staged the changed files', button)) : undefined
-        // The two Stage all buttons of the panel are told apart by what they stage.
-        all?.setAttribute('aria-label', 'Stage all changed files')
-        created.push(title(`Not staged (${unstaged.length + conflicts.length})`, all), ...fileIndex(await patch(current, 'unstaged'), 'unstaged', stage))
-      }
-      if (untracked.length > 0) {
-        const all = actionButton('Stage all', 'Stage every file not tracked', (button) => void act({ action: 'stage', files: paths(untracked) }, 'Staged the new files', button))
-        all.setAttribute('aria-label', 'Stage all new files')
-        created.push(title(`Untracked (${untracked.length})`, all), ...fileIndex(await patch(current, 'untracked'), 'untracked', stage))
-      }
-    } else {
-      const diff = await patch(current, shown)
-      const [subject, ...body] = (diff.commit?.message ?? '').split('\n')
-      created.push(node('h2', subject))
-      if (body.join('\n').trim()) created.push(node('pre', body.join('\n').trim(), 'body'))
-      const facts = node('p', '', 'facts')
-      const hash = copyHash(shown)
-      facts.append(hash, node('span', diff.commit?.author ?? ''), node('span', diff.commit ? new Date(diff.commit.date).toLocaleString() : ''))
-      created.push(facts)
-      const fact = node('p', '', 'check-fact')
-      fact.dataset.hash = shown
-      paintFact(fact, shown)
-      created.push(fact)
-      if (diff.patch === '') created.push(node('p', 'This commit changes no file.', 'empty'))
-      else created.push(node('h3', 'Files'), ...fileIndex(diff, shown))
-    }
+    const created = shown === WORKING_TREE ? await workingTreeBlocks(current) : await commitBlocks(current, shown)
     // The answer of a commit left for another one meanwhile is dropped.
     if (shown !== target) return
     // A message being written keeps its place and its caret, which taking the box out of the page and back would lose.
@@ -546,7 +566,7 @@ document.addEventListener('keydown', (event) => {
 export const repository = {
   section: element('repository'),
   // The last folder names a repository, whichever separator its system uses.
-  title: (params: URLSearchParams): string => (params.get('path') ?? '').split(/[\\/]/).filter(Boolean).pop() ?? 'Repository',
+  title: (params: URLSearchParams): string => (params.get('path') ?? '').split(/[\\/]/).findLast(Boolean) ?? 'Repository',
   loaded: (): boolean => detail !== undefined,
   clear: (): void => {
     detail = undefined

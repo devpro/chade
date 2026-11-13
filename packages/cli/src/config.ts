@@ -63,15 +63,19 @@ export function parseConfig(text: string, home: string): Config {
 
 function parseCleanup(raw: unknown): (string | CustomStep)[] {
   const names = new Set<string>()
-  return list(raw, 'cleanup').map((entry): string | CustomStep => {
-    const name = typeof entry === 'string' ? entry : isObject(entry) ? entry.name : undefined
-    if (typeof name !== 'string') throw new Error('cleanup: a custom step is a mapping with a name and a command')
+  const unique = (name: string): void => {
     if (names.has(name)) throw new Error(`cleanup: ${name} is listed twice`)
     names.add(name)
+  }
+  return list(raw, 'cleanup').map((entry): string | CustomStep => {
     if (typeof entry === 'string') {
+      unique(entry)
       if (!STEP_NAMES.includes(entry)) throw new Error(`cleanup: ${entry} is not one of ${STEP_NAMES.join(', ')}, and a custom one needs a name and a command`)
       return entry
     }
+    const name = isObject(entry) ? entry.name : undefined
+    if (typeof name !== 'string') throw new Error('cleanup: a custom step is a mapping with a name and a command')
+    unique(name)
     const step = entry as Record<string, unknown>
     if (typeof step.command !== 'string' || STEP_NAMES.includes(name)) {
       throw new Error(`cleanup: ${name} must have a command and a name different from the built-in ones`)

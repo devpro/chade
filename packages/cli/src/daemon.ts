@@ -86,5 +86,6 @@ export async function startDaemon(configFile: string, port: number): Promise<Dae
     if (state && state.pid === child.pid) return state
   }
   const output = (await readFile(logPath(configFile), 'utf8').catch(() => '')).trim()
-  throw new Error(`the server did not start${output ? `: ${output.replace(/^chade: /, '')}` : `, ${logPath(configFile)} may say why`}`)
+  const reason = output ? `: ${output.replace(/^chade: /, '')}` : `, ${logPath(configFile)} may say why`
+  throw new Error(`the server did not start${reason}`)
 }
