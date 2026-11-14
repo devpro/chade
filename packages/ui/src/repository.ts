@@ -579,6 +579,12 @@ function closeDelete(): void {
   element('delete-form').hidden = true
 }
 
+function deleteQuestion(name: string, lost: number): string {
+  if (lost === 0) return `Delete ${name}? Its commits stay, in another branch or under a tag.`
+  if (lost === 1) return `Delete ${name}? 1 commit is in no other branch or tag, and is lost with it.`
+  return `Delete ${name}? ${lost} commits are in no other branch or tag, and are lost with it.`
+}
+
 // A deletion is asked twice: the button of the branch opens a line that says what is lost, and that line deletes.
 async function askDelete(name: string, button: HTMLElement): Promise<void> {
   if (!detail || acting) return
@@ -591,10 +597,7 @@ async function askDelete(name: string, button: HTMLElement): Promise<void> {
     doomed = { name, lost }
     const form = element('delete-form')
     form.classList.toggle('loss', lost > 0)
-    element('delete-text').textContent =
-      lost > 0
-        ? `Delete ${name}? ${lost} commit${lost === 1 ? ' is' : 's are'} in no other branch or tag, and ${lost === 1 ? 'is' : 'are'} lost with it.`
-        : `Delete ${name}? Its commits stay, in another branch or under a tag.`
+    element('delete-text').textContent = deleteQuestion(name, lost)
     form.hidden = false
     // Enter on a question that loses commits cancels it.
     element(lost > 0 ? 'delete-cancel' : 'delete-submit').focus()
