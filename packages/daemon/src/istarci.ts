@@ -1,3 +1,5 @@
+import { trimTrailing } from './text.js'
+
 // IstarCI, a CI that runs on this machine, answers on its local HTTP API what it ran of each commit.
 // chade reads it when it runs and shows nothing of it otherwise, so the two tools stay separate.
 
@@ -27,7 +29,7 @@ export interface RepositoryCheck extends Check {
 
 // A folder of Windows is /mnt/c/... on WSL and C:\... on Windows, and its case and the way of its slashes do not matter, so one key names it on either side.
 export function pathKey(path: string): string {
-  const unix = path.replace(/\\/g, '/').replace(/\/+$/, '')
+  const unix = trimTrailing(path.replaceAll('\\', '/'), '/')
   const mounted = /^\/mnt\/([a-zA-Z])(\/.*)?$/.exec(unix)
   const drive = mounted ? `${mounted[1]}:${mounted[2] ?? ''}` : unix
   return /^[a-zA-Z]:(\/|$)/.test(drive) ? drive.toLowerCase() : drive
@@ -42,7 +44,8 @@ const SHA = /^[0-9a-f]{40}$/
 type Fetch = typeof fetch
 
 async function read(server: IstarciServer, route: string, query: URLSearchParams, fetcher: Fetch): Promise<unknown[]> {
-  const response = await fetcher(`${server.url}/api/v1/${route}${query.size > 0 ? `?${query}` : ''}`, {
+  const search = query.size > 0 ? `?${query}` : ''
+  const response = await fetcher(`${server.url}/api/v1/${route}${search}`, {
     headers: { Authorization: `Bearer ${server.token}` },
     signal: AbortSignal.timeout(TIMEOUT_MS),
   })

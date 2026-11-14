@@ -71,21 +71,26 @@ Changes  | Message, author and date of the commit chosen, and the list of the fi
 
 The page of a repository changes it through these actions, and no other.
 
-Action       | Where                                    | What git runs
--------------|------------------------------------------|-----------------------------------------------------------------------------------
-Fetch        | Top of the page                          | `git fetch --all --prune`
-Pull         | Top of the page                          | `git pull --no-rebase --ff --no-edit`, and `git merge --abort` on a conflict
-Push         | Top of the page                          | `git push`, or `git push --set-upstream origin <branch>` for a branch never pushed
-New branch   | Top of the page, then a name             | `git switch --create <name>`, from the commit checked out
-Check out    | Beside a branch, when it is pointed at   | `git switch <branch>`, or `git switch --track <remote>/<branch>` for a remote one
-Stage, `+`   | Beside a file of the uncommitted changes | `git add --all -- <file>`
-Unstage, `−` | Beside a staged file                     | `git reset -- <file>`
-Stage all    | Beside Not staged, or Untracked          | `git add --all -- <files>`
-Unstage all  | Beside Staged                            | `git reset`
-Commit       | Under the message, above the files       | `git commit --message <message>`, of what is staged
-Amend        | Under the message, Amend checked         | `git commit --amend --message <message>`, of a commit no remote holds
+Action      | Where                                      | What git runs                                                                      | Icon
+------------|--------------------------------------------|------------------------------------------------------------------------------------|-----
+Fetch       | Top of the page                            | `git fetch --all --prune`                                                          | -
+Pull        | Top of the page                            | `git pull --no-rebase --ff --no-edit`, and `git merge --abort` on a conflict       | -
+Push        | Top of the page                            | `git push`, or `git push --set-upstream origin <branch>` for a branch never pushed | -
+New branch  | Top of the page, then a name               | `git switch --create <name>`, from the commit checked out                          | -
+Check out   | Beside a branch, when it is pointed at     | `git switch <branch>`, or `git switch --track <remote>/<branch>` for a remote one  | `⇄`
+Pull        | Beside a local branch that tracks another  | `git fetch <remote> <branch>:<branch>`, a fast forward of a branch not checked out | `↓`
+Delete      | Beside a local branch, then a confirmation | `git branch --delete --force <branch>`, of a branch not checked out                | `✕`
+Stage       | Beside a file of the uncommitted changes   | `git add --all -- <file>`                                                          | `+`
+Unstage     | Beside a staged file                       | `git reset -- <file>`                                                              | `−`
+Stage all   | Beside Not staged, or Untracked            | `git add --all -- <files>`                                                         | -
+Unstage all | Beside Staged                              | `git reset`                                                                        | -
+Commit      | Under the message, above the files         | `git commit --message <message>`, of what is staged                                | -
+Amend       | Under the message, Amend checked           | `git commit --amend --message <message>`, of a commit no remote holds              | -
 
 A pull fast forwards when it can, and otherwise merges with a merge commit, whatever `pull.rebase` and `pull.ff` say.
+The pull of a branch that is not checked out touches neither the index nor the working tree, and is refused when the branch has commits its upstream does not.
+Before a branch is deleted, a line asks to confirm, and says how many of its commits are in no other branch, remote branch or tag, and are lost with it.
+A branch that was squash merged on the remote has such commits, as the squash made one commit of them, and its remote branch is gone.
 Checking Amend fills an empty message with the one of the commit checked out, and with nothing staged only the message changes.
 A notice in a corner of the page says what runs, then what was done or what git answered, and a refusal stays until dismissed.
 One action runs at a time in a repository, and the page reads the repository again after each.
@@ -96,7 +101,7 @@ chade holds no credential, and a command that would ask for a password fails ins
 Left to the terminal, on purpose:
 
 - A pull that meets a conflict is aborted, and the branch stays as it was.
-- Nothing is forced, discarded or deleted: no force push, no reset of the working tree, no branch deletion.
+- No force push, no reset of the working tree, and no deletion of a remote branch.
 - A pushed commit is never rewritten, so Amend is off once the last commit is pushed.
 - A conflict is resolved in an editor.
 
@@ -108,14 +113,14 @@ When [IstarCI](https://github.com/devpro/istarci) runs on the machine, the inter
   The mark is grey when the run is of another commit than the one checked out.
 - The history marks each commit IstarCI ran, and the changes of the commit link to its run.
 
-Mark | Meaning
------|-------------------------------------
-✓    | Passed
-✕    | Failed
-●    | Running
-○    | Waiting to run
-⊘    | Stopped
-◌    | Skipped, or not run, with the reason
+Meaning                              | Mark
+-------------------------------------|-----
+Passed                               | ✓
+Failed                               | ✕
+Running                              | ●
+Waiting to run                       | ○
+Stopped                              | ⊘
+Skipped, or not run, with the reason | ◌
 
 chade reads the port and the token of IstarCI from `~/.istarci/config.yml` at each read, and keeps neither.
 A browser never signed in to IstarCI asks for its token there, which `istarci ui` gives.

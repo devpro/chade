@@ -203,7 +203,8 @@ The unit tests of a Linux host are skipped on Windows, and the smoke test config
 ### Sonar
 
 The Build & Test job analyzes the code on [SonarCloud](https://sonarcloud.io/dashboard?id=devpro_chade).
-`sonar-project.properties` gives the sources, the tests and the coverage report, and the pipeline gives the rest from the repository settings.
+`sonar-project.properties` gives the sources, the tests, the coverage report and the findings accepted by design, and the pipeline gives the rest from the repository settings.
+A finding is accepted there with its reason, never in the interface of Sonar, so it is reviewed with the code.
 
 Setting             | Kind     | Value
 --------------------|----------|----------------------------------------------
@@ -213,10 +214,12 @@ Setting             | Kind     | Value
 `SONAR_TOKEN`       | Secret   | Token of the SonarCloud organization
 
 The coverage report comes from `npm run test:coverage` at the root, so its paths start at the root, as the scan expects.
+The modules that run only in Chromium, and the entry point of the CLI, are left out of the coverage, as the tests that run them are not measured.
 
 ### Local run
 
 [IstarCI](https://github.com/devpro/istarci) runs the same pipeline in Docker before a push, with the settings of `.istarci.yml`.
+Its Sonar analysis runs against a SonarQube on the machine, and fails the run when the quality gate fails, where SonarCloud only reports it on the pull request.
 It skips the Windows job, which `scripts/run_on_windows.sh --check` runs on the Windows of a WSL machine.
 `istarci add` and `istarci install-hook` set it up for this repository.
 

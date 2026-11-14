@@ -120,6 +120,26 @@ const snapshotQuery = (machine: string, commit: string): Record<string, string> 
 // What stays the same between two renders tells whether an answer still has its place on the page.
 const place = (): string => JSON.stringify(asked)
 
+// A file as the snapshot holds it, in the Files view.
+async function fileContent(machine: string, commit: string, path: string, close: () => void, name: HTMLElement): Promise<HTMLElement[]> {
+  const file = await cached(contents, `${commit}\n${path}`, () => get<StoredFile>('snapshot-file', { ...snapshotQuery(machine, commit), path }))
+  const created = [fileHead(close, name), ...(file.binary ? [node('p', 'Binary file, not shown.', 'empty')] : contentLines(file.content))]
+  if (file.truncated) created.push(node('p', 'The file is too large to show in full, and stops here.', 'empty'))
+  return created
+}
+
+// What the snapshot changed of a file, in the Changes view.
+async function fileChanges(machine: string, commit: string, path: string, close: () => void, name: HTMLElement): Promise<HTMLElement[]> {
+  const detail = await cached(details, commit, () => get<SnapshotDetail>('snapshot', snapshotQuery(machine, commit)))
+  const file = parseDiff(detail.patch).find((candidate) => candidate.path === path)
+  if (file) {
+    name.textContent = label({ path: file.path.slice(machine.length + 1), from: file.from?.slice(machine.length + 1) })
+    return [fileHead(close, statusOf(file.status), name, ...counts(file)), ...diffLines(file)]
+  }
+  const known = detail.changes.some((change) => change.path === path)
+  return [fileHead(close, name), node('p', known ? 'The changes of this snapshot are too large to show those of this file. Files shows its content.' : 'This snapshot did not change this file.', 'empty')]
+}
+
 async function renderFile(machine: string, commit: string): Promise<void> {
   const view = element('store-file')
   const path = asked.file
@@ -130,28 +150,45 @@ async function renderFile(machine: string, commit: string): Promise<void> {
   const close = (): void => go({ machine, commit, files: asked.files })
   const name = node('span', path.slice(machine.length + 1), 'file-path')
   try {
-    let created: HTMLElement[]
-    if (asked.files) {
-      const file = await cached(contents, `${commit}\n${path}`, () => get<StoredFile>('snapshot-file', { ...snapshotQuery(machine, commit), path }))
-      created = [fileHead(close, name), ...(file.binary ? [node('p', 'Binary file, not shown.', 'empty')] : contentLines(file.content))]
-      if (file.truncated) created.push(node('p', 'The file is too large to show in full, and stops here.', 'empty'))
-    } else {
-      const detail = await cached(details, commit, () => get<SnapshotDetail>('snapshot', snapshotQuery(machine, commit)))
-      const file = parseDiff(detail.patch).find((candidate) => candidate.path === path)
-      if (file) {
-        name.textContent = label({ path: file.path.slice(machine.length + 1), from: file.from?.slice(machine.length + 1) })
-        created = [fileHead(close, statusOf(file.status), name, ...counts(file)), ...diffLines(file)]
-      } else {
-        const known = detail.changes.some((change) => change.path === path)
-        created = [fileHead(close, name), node('p', known ? 'The changes of this snapshot are too large to show those of this file. Files shows its content.' : 'This snapshot did not change this file.', 'empty')]
-      }
-    }
+    const created = asked.files ? await fileContent(machine, commit, path, close, name) : await fileChanges(machine, commit, path, close, name)
     if (at !== place()) return
     view.replaceChildren(...created)
     view.scrollTop = 0
   } catch (error) {
     if (at === place()) view.replaceChildren(fileHead(close, name), node('p', error instanceof Error ? error.message : String(error), 'error'))
   }
+}
+
+// The files of the snapshot in the Files view, or what it changed of them in the Changes view.
+function snapshotFiles(machine: string, commit: string, detail: SnapshotDetail, tree: string[] | undefined): HTMLElement[] {
+  const created: HTMLElement[] = []
+  if (tree) {
+    created.push(
+      ...fileLists(
+        machine,
+        tree.map((path) => ({ path })),
+        (_file, name) => [node('span', name, 'file-path')],
+        (path) => go({ machine, commit, files: true, file: path }),
+      ),
+    )
+  } else if (detail.changes.length === 0) created.push(node('p', 'This snapshot changed no file of the machine.', 'empty'))
+  else {
+    const patched = new Map(parseDiff(detail.patch).map((file) => [file.path, file]))
+    created.push(
+      ...fileLists(
+        machine,
+        detail.changes,
+        (change, name) => {
+          const file = patched.get(change.path)
+          const from = change.from?.split('/').slice(2).join('/')
+          return [statusOf(STATUSES[change.status] ?? 'modified'), node('span', label({ path: name, from }), 'file-path'), ...(file ? counts(file) : [])]
+        },
+        (path) => go({ machine, commit, file: path }),
+      ),
+    )
+    if (detail.truncated) created.push(node('p', 'The changes are too large to show in full: the last files open without their lines.', 'empty'))
+  }
+  return created
 }
 
 async function renderDetail(current: Loaded, machine: Machine | undefined, commit: string | undefined): Promise<void> {
@@ -173,7 +210,8 @@ async function renderDetail(current: Loaded, machine: Machine | undefined, commi
     const facts = node('p', '', 'facts')
     const hash = copyHash(commit)
     const before = machine.snapshots.find((snapshot) => snapshot.hash === detail.previous)
-    const compared = detail.previous ? `Compared with the snapshot of ${before ? new Date(before.date).toLocaleString() : detail.previous.slice(0, 10)}` : `First snapshot of ${machine.name}`
+    const previous = before ? new Date(before.date).toLocaleString() : detail.previous?.slice(0, 10)
+    const compared = detail.previous ? `Compared with the snapshot of ${previous}` : `First snapshot of ${machine.name}`
     facts.append(hash, node('span', detail.commit?.author ?? ''), node('span', detail.commit ? new Date(detail.commit.date).toLocaleString() : ''), node('span', compared))
     created.push(facts)
     const views = node('div', '', 'views')
@@ -190,33 +228,7 @@ async function renderDetail(current: Loaded, machine: Machine | undefined, commi
       return tab
     }
     views.append(view('Changes', 'What the snapshot changed since the one before', false, detail.changes.length), view('Files', 'Every file the machine had at the snapshot', true, tree?.length))
-    created.push(views)
-    if (tree) {
-      created.push(
-        ...fileLists(
-          machine.name,
-          tree.map((path) => ({ path })),
-          (_file, name) => [node('span', name, 'file-path')],
-          (path) => go({ machine: machine.name, commit, files: true, file: path }),
-        ),
-      )
-    } else if (detail.changes.length === 0) created.push(node('p', 'This snapshot changed no file of the machine.', 'empty'))
-    else {
-      const patched = new Map(parseDiff(detail.patch).map((file) => [file.path, file]))
-      created.push(
-        ...fileLists(
-          machine.name,
-          detail.changes,
-          (change, name) => {
-            const file = patched.get(change.path)
-            const from = change.from?.split('/').slice(2).join('/')
-            return [statusOf(STATUSES[change.status] ?? 'modified'), node('span', label({ path: name, from }), 'file-path'), ...(file ? counts(file) : [])]
-          },
-          (path) => go({ machine: machine.name, commit, file: path }),
-        ),
-      )
-      if (detail.truncated) created.push(node('p', 'The changes are too large to show in full: the last files open without their lines.', 'empty'))
-    }
+    created.push(views, ...snapshotFiles(machine.name, commit, detail, tree))
     panel.replaceChildren(...created)
   } catch (error) {
     if (at === place()) panel.replaceChildren(node('p', error instanceof Error ? error.message : String(error), 'error'))

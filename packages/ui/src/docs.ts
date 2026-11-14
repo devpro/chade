@@ -60,7 +60,7 @@ function render(page: Page): void {
   // The headings of a fenced block are no headings of the page.
   const headings = [...page.source.replace(/^```[\s\S]*?^```/gm, '').matchAll(/^## (.*)$/gm)].map((match) => match[1])
   const toc = headings.map((heading) => {
-    const link = node('a', heading.replace(/`/g, '')) as HTMLAnchorElement
+    const link = node('a', heading.replaceAll('`', '')) as HTMLAnchorElement
     link.href = docsAddress(page.slug, slugify(heading))
     return link
   })
@@ -83,9 +83,10 @@ export const docs = {
     if (page !== shown) render(page)
     shown = page
     const heading = params.get('at') ?? undefined
-    // Once the page is shown, as a hidden one has no place to scroll to.
+    const read = await this.reload()
+    // The section is shown once the read answers, before the next frame, and a hidden one has no place to scroll to.
     requestAnimationFrame(() => scrollTo(heading))
-    return this.reload()
+    return read
   },
   // The pages need no server, and asking it keeps the top of the page true about the session.
   async reload(): Promise<{ machine: string; version: string }> {

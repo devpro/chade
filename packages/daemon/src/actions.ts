@@ -1,15 +1,19 @@
-import { parseBranches, parseChanges, UNPUSHED } from './history.js'
+import { aloneIn, BRANCHES, parseBranches, parseChanges, UNPUSHED, type Branch } from './history.js'
 import { GIT_TIMEOUT_MS, parseStatus, repositoryPath, type Root, type Run } from './repositories.js'
 import { RequestError } from './server.js'
 
 // What the interface asks to change in a repository, the only changes chade makes to it.
-export const ACTIONS = ['fetch', 'pull', 'push', 'checkout', 'branch', 'stage', 'unstage', 'commit', 'amend'] as const
+export const ACTIONS = ['fetch', 'pull', 'push', 'checkout', 'branch', 'stage', 'unstage', 'commit', 'amend', 'delete'] as const
 
 export interface ActionRequest {
   action: string
   // checkout: a branch of the repository, local or remote.
   // branch: the name of the branch to create and check out.
+  // pull: a local branch to move to its upstream without checking it out, the one checked out when absent.
+  // delete: a local branch, other than the one checked out.
   branch?: string
+  // delete: commits that no other branch or tag holds are lost with the branch.
+  force?: boolean
   // branch: the commit to start from, HEAD when absent.
   from?: string
   // stage, unstage: files among the changes, all of them when absent.
@@ -43,87 +47,152 @@ function invalid(message: string): never {
   throw new RequestError(400, message)
 }
 
+type Action = (typeof ACTIONS)[number]
+
+interface Context {
+  git: Git
+  // What a command printed, untrimmed, for a parser.
+  read: (args: string[]) => Promise<string>
+  request: ActionRequest
+}
+
+// A local branch named by a request, among those git lists.
+async function localBranch(read: Context['read'], name: string | undefined): Promise<Branch> {
+  const target = parseBranches(await read(BRANCHES)).find((branch) => !branch.remote && branch.name === name)
+  if (!target) invalid(`${name} is not a local branch of the repository`)
+  return target
+}
+
+// Moves a branch that is not checked out to its upstream, which touches neither the index nor the working tree.
+async function pullOther({ git, read }: Context, target: Branch): Promise<string> {
+  const [remote, ref] = (await read(['for-each-ref', '--format=%(upstream:remotename)%00%(upstream:remoteref)', `refs/heads/${target.name}`])).trim().split('\0')
+  if (!remote || !ref) invalid(`${target.name} tracks no branch, so there is nothing to pull`)
+  try {
+    // A fetch into a branch only fast forwards it, and refuses when the branch has commits of its own.
+    return await git(['fetch', remote, `${ref}:refs/heads/${target.name}`], NETWORK_TIMEOUT_MS)
+  } catch (error) {
+    if (!(error instanceof RequestError) || !error.message.includes('non-fast-forward')) throw error
+    throw new RequestError(409, `${error.message}\n${target.name} has commits its upstream does not, so it is pulled once checked out, where the two are merged.`)
+  }
+}
+
+async function pull(context: Context): Promise<string> {
+  const { git, read, request } = context
+  if (request.branch !== undefined) {
+    const target = await localBranch(read, request.branch)
+    if (!target.head) return pullOther(context, target)
+  }
+  // Fast forward when it can, merge otherwise, whatever pull.rebase and pull.ff say, and never an editor for the message of the merge.
+  try {
+    return await git(['pull', '--no-rebase', '--ff', '--no-edit'], NETWORK_TIMEOUT_MS)
+  } catch (error) {
+    // A merge that stopped on a conflict is undone, so the repository is never left half merged.
+    if (!(error instanceof RequestError) || (await read(['rev-parse', '--quiet', '--verify', 'MERGE_HEAD']).catch(() => '')) === '') throw error
+    await git(['merge', '--abort'])
+    throw new RequestError(409, `${error.message}\nThe merge was aborted, and the branch is as it was before the pull.`)
+  }
+}
+
+async function push({ git, read }: Context): Promise<string> {
+  const status = parseStatus(await read(['status', '--porcelain=v2', '--branch']))
+  if (!status.branch) invalid('no branch is checked out, so there is nothing to push')
+  if (status.upstream) return git(['push'], NETWORK_TIMEOUT_MS)
+  // A branch never pushed goes to origin, or to the only remote, under its own name, and tracks it from then on.
+  const remotes = (await git(['remote'])).split('\n').filter(Boolean)
+  const remote = remotes.includes('origin') ? 'origin' : remotes[0]
+  if (!remote) invalid('the repository has no remote to push to')
+  return git(['push', '--set-upstream', remote, status.branch], NETWORK_TIMEOUT_MS)
+}
+
+async function checkout({ git, read, request }: Context): Promise<string> {
+  const branches = parseBranches(await read(BRANCHES))
+  const target = branches.find((branch) => branch.name === request.branch)
+  if (!target) invalid(`${request.branch} is not a branch of the repository`)
+  if (!target.remote) return git(['switch', target.name])
+  // A remote branch is checked out as the local branch of the same name, created to track it when it does not exist.
+  const local = target.name.slice(target.name.indexOf('/') + 1)
+  const exists = branches.some((branch) => !branch.remote && branch.name === local)
+  return git(exists ? ['switch', local] : ['switch', '--track', target.name])
+}
+
+async function branch({ git, request }: Context): Promise<string> {
+  const name = request.branch ?? ''
+  if (name === '' || name.startsWith('-')) invalid('a branch needs a name, which does not start with a dash')
+  if (request.from !== undefined && !/^[0-9a-f]{40}$/.test(request.from)) invalid('a branch starts from HEAD or from the full hash of a commit')
+  try {
+    await git(['check-ref-format', '--branch', name])
+  } catch {
+    invalid(`${name} is not a valid branch name`)
+  }
+  return git(['switch', '--create', name, ...(request.from ? [request.from] : [])])
+}
+
+async function stage({ git, read, request }: Context): Promise<string> {
+  const command = request.action === 'stage' ? ['add', '--all'] : ['reset', '--quiet']
+  if (request.files === undefined) return git(command)
+  if (!Array.isArray(request.files) || request.files.length === 0 || request.files.some((file) => typeof file !== 'string')) invalid('files is a list of paths')
+  const changes = parseChanges(await read(['status', '--porcelain=v1', '-z', '--untracked-files=all']))
+  const paths: string[] = []
+  for (const file of request.files) {
+    const change = changes.find((candidate) => candidate.path === file)
+    if (!change) invalid(`${file} is not among the changes of the repository`)
+    // A renamed file is two paths in the index, the one it left and the one it took.
+    paths.push(change.path, ...(change.from ? [change.from] : []))
+  }
+  return git([...command, '--', ...paths])
+}
+
+function messageOf(request: ActionRequest): string {
+  const message = typeof request.message === 'string' ? request.message.trim() : ''
+  if (message === '') invalid('a commit needs a message')
+  return message
+}
+
+async function commit({ git, read, request }: Context): Promise<string> {
+  const message = messageOf(request)
+  const changes = parseChanges(await read(['status', '--porcelain=v1', '-z']))
+  if (!changes.some((change) => change.staged !== ' ' && change.staged !== 'U')) invalid('nothing is staged, so there is nothing to commit')
+  return git(['commit', '--message', message])
+}
+
+async function amend({ git, read, request }: Context): Promise<string> {
+  const message = messageOf(request)
+  if (!parseStatus(await read(['status', '--porcelain=v2', '--branch'])).head) invalid('there is no commit to amend yet')
+  // A commit a remote holds is never rewritten, as the next push would have to force.
+  if ((await read(UNPUSHED)).trim() === '') invalid('the last commit is already pushed, so it is not amended')
+  return git(['commit', '--amend', '--message', message])
+}
+
+async function remove({ git, read, request }: Context): Promise<string> {
+  const target = await localBranch(read, request.branch)
+  if (target.head) invalid(`${target.name} is checked out, and is deleted once another branch is`)
+  const lost = Number((await read(aloneIn(target.name))).trim())
+  // Commits are lost only when the request says so, having shown how many to the person.
+  if (lost > 0 && request.force !== true) {
+    throw new RequestError(409, `${lost} commit${lost === 1 ? '' : 's'} of ${target.name} ${lost === 1 ? 'is' : 'are'} in no other branch or tag, and would be lost with it`)
+  }
+  // Forced for git, whose own check knows the upstream and HEAD alone, and refuses a branch merged anywhere else.
+  return git(['branch', '--delete', '--force', target.name])
+}
+
+const HANDLERS: Record<Action, (context: Context) => Promise<string>> = {
+  fetch: ({ git }) => git(['fetch', '--all', '--prune'], NETWORK_TIMEOUT_MS),
+  pull,
+  push,
+  checkout,
+  branch,
+  stage,
+  unstage: stage,
+  commit,
+  amend,
+  delete: remove,
+}
+
 // Every value that reaches a git command is checked against what git itself lists, or against a strict form,
 // so a request never names an option, a path outside of the changes, or a ref that does not exist.
 export async function runAction(root: Root, relative: string[], run: Run, request: ActionRequest): Promise<{ output: string }> {
+  if (!(ACTIONS as readonly string[]).includes(request.action)) invalid(`${request.action} is not one of ${ACTIONS.join(', ')}`)
   const git = gitOf(root, relative, run)
   const read = (args: string[]): Promise<string> => git(args, GIT_TIMEOUT_MS, true)
-  switch (request.action) {
-    case 'fetch':
-      return { output: await git(['fetch', '--all', '--prune'], NETWORK_TIMEOUT_MS) }
-    case 'pull':
-      // Fast forward when it can, merge otherwise, whatever pull.rebase and pull.ff say, and never an editor for the message of the merge.
-      try {
-        return { output: await git(['pull', '--no-rebase', '--ff', '--no-edit'], NETWORK_TIMEOUT_MS) }
-      } catch (error) {
-        // A merge that stopped on a conflict is undone, so the repository is never left half merged.
-        if (!(error instanceof RequestError) || (await read(['rev-parse', '--quiet', '--verify', 'MERGE_HEAD']).catch(() => '')) === '') throw error
-        await git(['merge', '--abort'])
-        throw new RequestError(409, `${error.message}\nThe merge was aborted, and the branch is as it was before the pull.`)
-      }
-    case 'push': {
-      const status = parseStatus(await read(['status', '--porcelain=v2', '--branch']))
-      if (!status.branch) invalid('no branch is checked out, so there is nothing to push')
-      if (status.upstream) return { output: await git(['push'], NETWORK_TIMEOUT_MS) }
-      // A branch never pushed goes to origin, or to the only remote, under its own name, and tracks it from then on.
-      const remotes = (await git(['remote'])).split('\n').filter(Boolean)
-      const remote = remotes.includes('origin') ? 'origin' : remotes[0]
-      if (!remote) invalid('the repository has no remote to push to')
-      return { output: await git(['push', '--set-upstream', remote, status.branch], NETWORK_TIMEOUT_MS) }
-    }
-    case 'checkout': {
-      const refs = await read(['for-each-ref', '--format=%(refname)%00%(objectname)%00%(upstream:short)%00%(upstream:track,nobracket)%00%(HEAD)', 'refs/heads', 'refs/remotes'])
-      const branches = parseBranches(refs)
-      const target = branches.find((branch) => branch.name === request.branch)
-      if (!target) invalid(`${request.branch} is not a branch of the repository`)
-      if (!target.remote) return { output: await git(['switch', target.name]) }
-      // A remote branch is checked out as the local branch of the same name, created to track it when it does not exist.
-      const local = target.name.slice(target.name.indexOf('/') + 1)
-      const exists = branches.some((branch) => !branch.remote && branch.name === local)
-      return { output: await git(exists ? ['switch', local] : ['switch', '--track', target.name]) }
-    }
-    case 'branch': {
-      const name = request.branch ?? ''
-      if (name === '' || name.startsWith('-')) invalid('a branch needs a name, which does not start with a dash')
-      if (request.from !== undefined && !/^[0-9a-f]{40}$/.test(request.from)) invalid('a branch starts from HEAD or from the full hash of a commit')
-      try {
-        await git(['check-ref-format', '--branch', name])
-      } catch {
-        invalid(`${name} is not a valid branch name`)
-      }
-      return { output: await git(['switch', '--create', name, ...(request.from ? [request.from] : [])]) }
-    }
-    case 'stage':
-    case 'unstage': {
-      const command = request.action === 'stage' ? ['add', '--all'] : ['reset', '--quiet']
-      if (request.files === undefined) return { output: await git(command) }
-      if (!Array.isArray(request.files) || request.files.length === 0 || request.files.some((file) => typeof file !== 'string')) invalid('files is a list of paths')
-      const changes = parseChanges(await read(['status', '--porcelain=v1', '-z', '--untracked-files=all']))
-      const paths: string[] = []
-      for (const file of request.files) {
-        const change = changes.find((candidate) => candidate.path === file)
-        if (!change) invalid(`${file} is not among the changes of the repository`)
-        // A renamed file is two paths in the index, the one it left and the one it took.
-        paths.push(change.path, ...(change.from ? [change.from] : []))
-      }
-      return { output: await git([...command, '--', ...paths]) }
-    }
-    case 'commit': {
-      const message = typeof request.message === 'string' ? request.message.trim() : ''
-      if (message === '') invalid('a commit needs a message')
-      const changes = parseChanges(await read(['status', '--porcelain=v1', '-z']))
-      if (!changes.some((change) => change.staged !== ' ' && change.staged !== 'U')) invalid('nothing is staged, so there is nothing to commit')
-      return { output: await git(['commit', '--message', message]) }
-    }
-    case 'amend': {
-      const message = typeof request.message === 'string' ? request.message.trim() : ''
-      if (message === '') invalid('a commit needs a message')
-      if (!parseStatus(await read(['status', '--porcelain=v2', '--branch'])).head) invalid('there is no commit to amend yet')
-      // A commit a remote holds is never rewritten, as the next push would have to force.
-      if ((await read(UNPUSHED)).trim() === '') invalid('the last commit is already pushed, so it is not amended')
-      return { output: await git(['commit', '--amend', '--message', message]) }
-    }
-    default:
-      return invalid(`${request.action} is not one of ${ACTIONS.join(', ')}`)
-  }
+  return { output: await HANDLERS[request.action as Action]({ git, read, request }) }
 }

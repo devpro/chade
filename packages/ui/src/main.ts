@@ -49,10 +49,18 @@ function current(): View {
   return route().has('path') ? repository : list
 }
 
+// A page that tells its own age says it, the others the age of the last read.
+function age(): string {
+  const own = current().age?.()
+  if (own !== undefined) return own
+  if (!scannedAt) return ''
+  const read = ago(scannedAt, Date.now())
+  return failed ? `No answer, last read ${read}` : `Read ${read}`
+}
+
 function renderAge(): void {
   const scanned = element('scanned')
-  const own = current().age?.()
-  scanned.textContent = own !== undefined ? own : scannedAt ? (failed ? `No answer, last read ${ago(scannedAt, Date.now())}` : `Read ${ago(scannedAt, Date.now())}`) : ''
+  scanned.textContent = age()
   scanned.className = failed ? 'stale' : ''
 }
 
@@ -101,7 +109,9 @@ function mark(): void {
 async function run(action: () => Promise<Read>): Promise<boolean> {
   mark()
   if (loading) {
-    queued = async () => void (await run(action))
+    queued = async () => {
+      await run(action)
+    }
     return true
   }
   let read = false
@@ -130,7 +140,9 @@ async function run(action: () => Promise<Read>): Promise<boolean> {
   return read
 }
 
-const reload = async (asked = false): Promise<void> => void (await run(() => current().reload(asked)))
+const reload = async (asked = false): Promise<void> => {
+  await run(() => current().reload(asked))
+}
 // A list shown from what was read before is read again behind it, so a repository just left shows as it is now.
 const show = async (): Promise<void> => {
   const read = await run(() => current().show(route()))
@@ -154,4 +166,4 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') void reload()
 })
 setInterval(renderAge, 5000)
-void show()
+await show()

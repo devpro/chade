@@ -26,7 +26,8 @@ export function address(values: Record<string, string | undefined>): string {
   const params = new URLSearchParams()
   for (const [name, value] of Object.entries(values)) if (value !== undefined && name !== 'page') params.set(name, value)
   if (values.page === undefined) return `#${params}`
-  return `#${values.page}${params.size > 0 ? `?${params}` : ''}`
+  const query = params.size > 0 ? `?${params}` : ''
+  return `#${values.page}${query}`
 }
 
 // The token arrives in the fragment of the address chade ui opens, and leaves the address bar and the history at once.
@@ -43,7 +44,8 @@ function takeToken(): string | null {
 
 export function get<T>(name: string, query: Record<string, string> = {}): Promise<T> {
   const search = new URLSearchParams(query)
-  return call<T>(`api/${name}${search.size > 0 ? `?${search}` : ''}`, {})
+  const suffix = search.size > 0 ? `?${search}` : ''
+  return call<T>(`api/${name}${suffix}`, {})
 }
 
 // Asks the server to change something, where get only reads.

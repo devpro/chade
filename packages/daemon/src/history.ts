@@ -1,5 +1,6 @@
 import { mainRemote, webAddress } from './remote.js'
 import { GIT_TIMEOUT_MS, readRepository, repositoryPath, type Repository, type Root, type Run } from './repositories.js'
+import { RequestError } from './server.js'
 
 export interface Commit {
   hash: string
@@ -72,6 +73,13 @@ function gitOf(root: Root, relative: string[], run: Run): Git {
   return (args) => run(root.git, ['-C', repositoryPath(root, relative), '--no-optional-locks', '-c', 'core.quotePath=false', ...args], { cwd: root.cwd, timeoutMs: GIT_TIMEOUT_MS })
 }
 
+// Lists the local and the remote branches, in the form parseBranches reads.
+export const BRANCHES = ['for-each-ref', '--format=%(refname)%00%(objectname)%00%(upstream:short)%00%(upstream:track,nobracket)%00%(HEAD)', 'refs/heads', 'refs/remotes']
+
+// Counts the commits a local branch is alone to hold, which no other branch, remote branch or tag reaches.
+// A branch name holds no character --exclude reads as a wildcard.
+export const aloneIn = (name: string): string[] => ['rev-list', '--count', `refs/heads/${name}`, '--not', `--exclude=${name}`, '--branches', '--remotes', '--tags']
+
 export function parseBranches(text: string): Branch[] {
   const branches: Branch[] = []
   for (const line of text.split('\n')) {
@@ -135,7 +143,7 @@ export async function repositoryDetail(root: Root, relative: string[], run: Run,
   const count = Math.min(Math.max(1, Math.floor(limit) || DEFAULT_COMMITS), MAX_COMMITS)
   const none = Promise.resolve({ code: 0, stdout: '', stderr: '' })
   const [refs, log, status, message, unpushed] = await Promise.all([
-    git(['for-each-ref', '--format=%(refname)%00%(objectname)%00%(upstream:short)%00%(upstream:track,nobracket)%00%(HEAD)', 'refs/heads', 'refs/remotes']),
+    git(BRANCHES),
     // Every branch and tag, and HEAD for a detached one, but not the stash, whose commits are no history.
     repository.head
       ? git(['log', '--branches', '--remotes', '--tags', 'HEAD', '--date-order', `--max-count=${count + 1}`, '--format=%H%x00%P%x00%an%x00%cI%x00%D%x00%s'])
@@ -172,6 +180,19 @@ async function readWeb(git: Git, branch: string | undefined): Promise<string | u
   // A branch that was never pushed, or whose upstream is gone, has no page on the remote yet.
   const pushed = name === remote && ref?.startsWith('refs/heads/') && track !== '[gone]'
   return webAddress(url.stdout.trim(), pushed ? ref.slice('refs/heads/'.length) : undefined)
+}
+
+// What deleting a local branch would lose, asked before the deletion so the person knows.
+export async function branchLoss(root: Root, relative: string[], run: Run, name: string): Promise<{ lost: number }> {
+  const git = gitOf(root, relative, run)
+  const refs = await git(BRANCHES)
+  // The name is one git lists, so it never reads as an option or as another ref.
+  if (refs.code !== 0 || !parseBranches(refs.stdout).some((branch) => !branch.remote && branch.name === name)) {
+    throw new RequestError(400, `${name} is not a local branch of the repository`)
+  }
+  const count = await git(aloneIn(name))
+  if (count.code !== 0) throw new Error((count.stderr || count.stdout).trim().split('\n')[0])
+  return { lost: Number(count.stdout.trim()) }
 }
 
 // Prints HEAD when no remote branch holds it yet, and nothing once it is pushed.

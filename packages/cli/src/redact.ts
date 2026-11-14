@@ -4,8 +4,10 @@ export const DEFAULT_KEYS = ['token', 'password', 'passwd', 'secret', 'api[_-]?k
 // Letters, as asterisks are an alias in YAML and emphasis in Markdown, which a linter of the repository holding the store would refuse.
 export const MASK = 'xxx'
 
-const KEY = /([\w.-]+)(["']?\s*[:=]\s*)/g
-const URL_CREDENTIALS = /([a-z][\w+.-]*:\/\/)([^\s/@:]+):([^\s/@]+)@/gi
+// A key is read from the start of its word only, so a long word is scanned once rather than again from each of its letters.
+const KEY = /(?<![\w.-])([\w.-]+)(["']?\s*[:=]\s*)/g
+// A scheme is a few letters long, and the bound keeps a long word from being read again from each of its letters.
+const URL_CREDENTIALS = /([a-z][\w+.-]{0,30}:\/\/)([^\s/@:]+):([^\s/@]+)@/gi
 // A boolean, a number or an empty value says whether a secret is set, never what it is, and it is worth keeping in the snapshot.
 const HARMLESS = /^(true|false|null|yes|no|~|-?\d+)?$/i
 
@@ -42,6 +44,9 @@ function redactValue(value: string): string {
     if (end < 0) return value
     return HARMLESS.test(value.slice(1, end)) ? value : quote + MASK + value.slice(end)
   }
-  const [, content, trailer] = /^(.*?)(,?\s*)$/.exec(value) ?? ['', value, '']
+  // The comma and the spaces that end the value are kept, a comma ending a line of JSON for instance.
+  const trimmed = value.trimEnd()
+  const content = trimmed.endsWith(',') ? trimmed.slice(0, -1) : trimmed
+  const trailer = value.slice(content.length)
   return HARMLESS.test(content) ? value : MASK + trailer
 }

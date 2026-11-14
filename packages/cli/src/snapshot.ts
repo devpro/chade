@@ -86,8 +86,12 @@ async function scanSecrets(repository: string, config: Config, host: Host, log: 
 
 async function collectSystem(system: System, systemConfig: SystemConfig, config: Config, host: Host, log: Logger): Promise<Entry[]> {
   const warn = (message: string) => log.warn(`${system.id}: ${message}`)
-  const entries: Entry[] = []
+  const files = await collectFiles(system, systemConfig, config, host, log, warn)
+  return [...files, ...(await collectInventories(system, systemConfig, config, host, log, warn))]
+}
 
+async function collectFiles(system: System, systemConfig: SystemConfig, config: Config, host: Host, log: Logger, warn: (message: string) => void): Promise<Entry[]> {
+  const entries: Entry[] = []
   for (const file of systemConfig.files) {
     try {
       for (const found of await resolveFile(system, file, host)) {
@@ -104,7 +108,10 @@ async function collectSystem(system: System, systemConfig: SystemConfig, config:
       warn(`${file}: ${describe(error)}`)
     }
   }
+  return entries
+}
 
+async function collectInventories(system: System, systemConfig: SystemConfig, config: Config, host: Host, log: Logger, warn: (message: string) => void): Promise<Entry[]> {
   const inventories: Inventory[] = systemConfig.inventories.map((entry) =>
     typeof entry === 'string'
       ? (INVENTORIES[system.kind].find((inventory) => inventory.name === entry) as Inventory)
@@ -112,6 +119,7 @@ async function collectSystem(system: System, systemConfig: SystemConfig, config:
   )
   if (systemConfig.repos.length > 0) inventories.push(gitReposInventory(system.kind))
   const context: Context = { run: host.run, home: host.home, windows: host.windows, repos: systemConfig.repos, warn }
+  const entries: Entry[] = []
   for (const inventory of inventories) {
     try {
       const content = redact((await inventory.collect(context)).replaceAll('\r', ''), config.redact).text
@@ -144,10 +152,12 @@ async function resolveFile(system: System, file: string, host: Host): Promise<Fo
   })
 }
 
+const UNREADABLE: Record<string, string> = { ENOENT: 'does not exist', EACCES: 'is not readable by this user' }
+
 // A folder in the configuration stands for every file under it.
 async function walk(path: string): Promise<string[]> {
   const info = await stat(path).catch((error: NodeJS.ErrnoException) => {
-    throw new Error(error.code === 'ENOENT' ? 'does not exist' : error.code === 'EACCES' ? 'is not readable by this user' : error.message)
+    throw new Error(UNREADABLE[error.code ?? ''] ?? error.message)
   })
   if (!info.isDirectory()) return [path]
   const files: string[] = []

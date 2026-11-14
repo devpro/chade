@@ -17,14 +17,38 @@ export interface DiffFile {
   lines: DiffLine[]
 }
 
+// The header of a file, up to its first hunk, says what became of it.
+function readHeader(file: DiffFile, line: string): void {
+  if (line.startsWith('new file mode')) file.status = 'added'
+  else if (line.startsWith('deleted file mode')) file.status = 'deleted'
+  else if (line.startsWith('rename from ')) {
+    file.status = 'renamed'
+    file.from = line.slice('rename from '.length)
+  } else if (line.startsWith('rename to ')) file.path = line.slice('rename to '.length)
+  else if (line.startsWith('+++ b/')) file.path = line.slice('+++ b/'.length)
+  else if (line.startsWith('--- a/') && file.status === 'deleted') file.path = line.slice('--- a/'.length)
+  else if (line.startsWith('Binary files ') || line === 'GIT binary patch') file.binary = true
+}
+
+// A line of a hunk, numbered on the side or the sides it is on.
+function readHunkLine(file: DiffFile, line: string, at: { before: number; after: number }): void {
+  if (line.startsWith('+')) {
+    file.additions++
+    file.lines.push({ kind: 'add', text: line.slice(1), after: at.after++ })
+  } else if (line.startsWith('-')) {
+    file.deletions++
+    file.lines.push({ kind: 'del', text: line.slice(1), before: at.before++ })
+  } else if (line.startsWith(' ')) file.lines.push({ kind: 'context', text: line.slice(1), before: at.before++, after: at.after++ })
+  else if (line.startsWith('\\')) file.lines.push({ kind: 'note', text: line.slice(2) })
+}
+
 // Reads a patch as git diff and git show write it, into its files and their lines.
 export function parseDiff(patch: string): DiffFile[] {
   const files: DiffFile[] = []
   let file: DiffFile | undefined
   // The header of a file ends at its first hunk, and a line of content can start with --- or +++ as well.
   let inHunk = false
-  let before = 0
-  let after = 0
+  const at = { before: 0, after: 0 }
   for (const line of patch.split('\n')) {
     if (line.startsWith('diff --git ')) {
       const names = /^diff --git a\/(.*) b\/(.*)$/.exec(line)
@@ -34,33 +58,14 @@ export function parseDiff(patch: string): DiffFile[] {
       continue
     }
     if (!file) continue
-    if (!inHunk) {
-      if (line.startsWith('new file mode')) file.status = 'added'
-      else if (line.startsWith('deleted file mode')) file.status = 'deleted'
-      else if (line.startsWith('rename from ')) {
-        file.status = 'renamed'
-        file.from = line.slice('rename from '.length)
-      } else if (line.startsWith('rename to ')) file.path = line.slice('rename to '.length)
-      else if (line.startsWith('+++ b/')) file.path = line.slice('+++ b/'.length)
-      else if (line.startsWith('--- a/') && file.status === 'deleted') file.path = line.slice('--- a/'.length)
-      else if (line.startsWith('Binary files ') || line === 'GIT binary patch') file.binary = true
-    }
+    if (!inHunk) readHeader(file, line)
     const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line)
     if (hunk) {
       inHunk = true
-      before = Number(hunk[1])
-      after = Number(hunk[2])
+      at.before = Number(hunk[1])
+      at.after = Number(hunk[2])
       file.lines.push({ kind: 'hunk', text: line })
-    } else if (inHunk) {
-      if (line.startsWith('+')) {
-        file.additions++
-        file.lines.push({ kind: 'add', text: line.slice(1), after: after++ })
-      } else if (line.startsWith('-')) {
-        file.deletions++
-        file.lines.push({ kind: 'del', text: line.slice(1), before: before++ })
-      } else if (line.startsWith(' ')) file.lines.push({ kind: 'context', text: line.slice(1), before: before++, after: after++ })
-      else if (line.startsWith('\\')) file.lines.push({ kind: 'note', text: line.slice(2) })
-    }
+    } else if (inHunk) readHunkLine(file, line, at)
   }
   return files
 }

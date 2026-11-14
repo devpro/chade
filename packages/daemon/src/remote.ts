@@ -1,3 +1,5 @@
+import { trimTrailing } from './text.js'
+
 // The host a repository is pushed to, told by the address of its remote.
 export type Forge = 'github' | 'gitlab' | 'azure' | 'git'
 
@@ -27,7 +29,7 @@ function webBase(remote: string): URL | undefined {
     // The port of ssh is no port of the web, and the name and password of a remote stay out of a link.
     base = url.protocol === 'http:' || url.protocol === 'https:' ? `${url.protocol}//${url.host}${url.pathname}` : `https://${url.hostname}${url.pathname}`
   }
-  const web = new URL(base.replace(/\/+$/, '').replace(/\.git$/, ''))
+  const web = new URL(trimTrailing(base, '/').replace(/\.git$/, ''))
   // A host without a dot is a folder read as scp, C:/repos/name, or a name of the local network.
   if (!web.hostname.includes('.') || web.pathname.split('/').filter(Boolean).length < 2) return undefined
   return web
@@ -47,8 +49,10 @@ export function forgeOf(remote: string): { forge: Forge; host?: string } {
   const host = webBase(remote)?.hostname
   if (!host) return { forge: 'git' }
   const azure = host === 'dev.azure.com' || host.endsWith('.dev.azure.com') || host.endsWith('.visualstudio.com')
-  const forge: Forge = azure ? 'azure' : /(^|[.-])github([.-]|$)/.test(host) ? 'github' : /(^|[.-])gitlab([.-]|$)/.test(host) ? 'gitlab' : 'git'
-  return { forge, host }
+  if (azure) return { forge: 'azure', host }
+  const named = (name: string) => host.split(/[.-]/).includes(name)
+  if (named('github')) return { forge: 'github', host }
+  return { forge: named('gitlab') ? 'gitlab' : 'git', host }
 }
 
 // The remote a repository is known by: the one the branch tracks, or origin, or the only one.

@@ -30,7 +30,8 @@ function checkCell(repository: Repository): HTMLElement {
   link.href = check.url
   link.target = '_blank'
   link.rel = 'noopener'
-  link.title = `${text}, for ${check.sha.slice(0, 7)}${check.branch ? ` on ${check.branch}` : ''}${current ? '' : ', not the commit checked out'}`
+  const branch = check.branch ? ` on ${check.branch}` : ''
+  link.title = `${text}, for ${check.sha.slice(0, 7)}${branch}${current ? '' : ', not the commit checked out'}`
   link.setAttribute('aria-label', link.title)
   link.append(node('span', mark, 'check'))
   cell.append(link)

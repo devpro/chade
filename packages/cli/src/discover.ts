@@ -27,13 +27,13 @@ export const LINUX_CANDIDATES = [
 ]
 
 export const WINDOWS_CANDIDATES = [
-  '%USERPROFILE%\\.wslconfig',
-  '%USERPROFILE%\\.gitconfig',
-  '%USERPROFILE%\\.ssh\\config',
-  '%APPDATA%\\Code\\User\\settings.json',
-  '%APPDATA%\\Code\\User\\keybindings.json',
-  '%LOCALAPPDATA%\\Packages\\Microsoft.WindowsTerminal_8wekyb3d8bbwe\\LocalState\\settings.json',
-  '%USERPROFILE%\\Documents\\PowerShell\\Microsoft.PowerShell_profile.ps1',
+  String.raw`%USERPROFILE%\.wslconfig`,
+  String.raw`%USERPROFILE%\.gitconfig`,
+  String.raw`%USERPROFILE%\.ssh\config`,
+  String.raw`%APPDATA%\Code\User\settings.json`,
+  String.raw`%APPDATA%\Code\User\keybindings.json`,
+  String.raw`%LOCALAPPDATA%\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json`,
+  String.raw`%USERPROFILE%\Documents\PowerShell\Microsoft.PowerShell_profile.ps1`,
 ]
 
 export interface Discovery {

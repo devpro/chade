@@ -85,6 +85,16 @@ function sameToken(given: string, token: string): boolean {
   return timingSafeEqual(digest(given), digest(token))
 }
 
+// Only a route of its own, so a name such as constructor reaches nothing an object inherits.
+function own<T>(routes: Record<string, T> | undefined, name: string): T | undefined {
+  return routes && Object.hasOwn(routes, name) ? routes[name] : undefined
+}
+
+// A name that is a route of the other method is there, only not for this method.
+function missing(other: unknown, why: string): [number, string] {
+  return other === undefined ? [404, 'no such route'] : [405, why]
+}
+
 export async function startServer(options: ServerOptions): Promise<Server> {
   // The files are read once, by name, so no request can name a path outside of the folder.
   const files = new Map<string, Buffer>()
@@ -103,27 +113,27 @@ export async function startServer(options: ServerOptions): Promise<Server> {
     const origin = request.headers.origin
     if (origin !== undefined && !hosts.has(origin.replace(/^http:\/\//, ''))) return refuse(response, 403, 'this request comes from another site')
     const url = new URL(request.url ?? '/', `http://${HOST}`)
-    const path = url.pathname
-    const head = request.method === 'HEAD'
-    if (path.startsWith('/api/')) {
-      const given = /^Bearer (.+)$/.exec(request.headers.authorization ?? '')?.[1]
-      if (given === undefined || !sameToken(given, token)) return refuse(response, 401, 'chade ui gives the address that signs in')
-      const name = path.slice('/api/'.length)
-      const action = options.actions?.[name]
-      if (request.method === 'POST') {
-        if (!action) return refuse(response, options.api[name] ? 405 : 404, options.api[name] ? 'this route only reads' : 'no such route')
-        return send(response, 200, 'application/json; charset=utf-8', JSON.stringify(await action(await readJson(request))))
-      }
-      if (request.method !== 'GET' && request.method !== 'HEAD') return refuse(response, 405, 'a route is read with GET, or changed with POST')
-      const route = options.api[name]
-      if (!route) return refuse(response, action ? 405 : 404, action ? 'this route is called with POST' : 'no such route')
-      return send(response, 200, 'application/json; charset=utf-8', JSON.stringify(await route(url.searchParams)), head)
-    }
+    if (url.pathname.startsWith('/api/')) return api(request, response, url)
     if (request.method !== 'GET' && request.method !== 'HEAD') return refuse(response, 405, 'a page is read with GET')
-    const name = path === '/' ? '/index.html' : path
+    const name = url.pathname === '/' ? '/index.html' : url.pathname
     const file = files.get(name)
     if (!file) return refuse(response, 404, 'no such page')
-    send(response, 200, CONTENT_TYPES[extname(name)], file, head)
+    send(response, 200, CONTENT_TYPES[extname(name)], file, request.method === 'HEAD')
+  }
+
+  const api = async (request: IncomingMessage, response: ServerResponse, url: URL): Promise<void> => {
+    const given = /^Bearer (.+)$/.exec(request.headers.authorization ?? '')?.[1]
+    if (given === undefined || !sameToken(given, token)) return refuse(response, 401, 'chade ui gives the address that signs in')
+    const name = url.pathname.slice('/api/'.length)
+    const action = own(options.actions, name)
+    const route = own(options.api, name)
+    if (request.method === 'POST') {
+      if (!action) return refuse(response, ...missing(route, 'this route only reads'))
+      return send(response, 200, 'application/json; charset=utf-8', JSON.stringify(await action(await readJson(request))))
+    }
+    if (request.method !== 'GET' && request.method !== 'HEAD') return refuse(response, 405, 'a route is read with GET, or changed with POST')
+    if (!route) return refuse(response, ...missing(action, 'this route is called with POST'))
+    send(response, 200, 'application/json; charset=utf-8', JSON.stringify(await route(url.searchParams)), request.method === 'HEAD')
   }
 
   const server = createServer((request, response) => {

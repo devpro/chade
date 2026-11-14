@@ -39,6 +39,11 @@ test('a link to another page of the documentation opens it in the interface, at 
 })
 
 test('what the report advises links to its step in the documentation', async ({ page, report }) => {
+  // A slow server shows the page late, and the heading is reached once it is shown.
+  await page.route('**/api/ping', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    await route.continue()
+  })
   await report.card('Windows disk').guide.click()
   const docs = new DocsPage(page)
   await expect(docs.title).toHaveText('System clean-up')

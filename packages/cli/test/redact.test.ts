@@ -40,3 +40,19 @@ test('credentials in a URL are masked, the user kept', () => {
 test('a key from the configuration is masked as well', () => {
   assert.equal(redact('license: ABCD-1234', ['^license$']).text, 'license: xxx')
 })
+
+test('a line of one long word, such as a key in base64, is read in a time that grows with its length only', () => {
+  const word = 'a'.repeat(200_000)
+  const started = performance.now()
+  assert.equal(redact(`${word}\n${word}:// ${word} =`).count, 0)
+  assert.ok(performance.now() - started < 1000)
+})
+
+test('a scheme longer than any real one still has its credentials masked', () => {
+  assert.equal(redactUrl(`${'x'.repeat(40)}://me:secret@host`), `${'x'.repeat(40)}://me:xxx@host`)
+})
+
+test('the comma and the spaces after an unquoted value are kept', () => {
+  assert.equal(redact('password: hunter2,  ').text, 'password: xxx,  ')
+  assert.equal(redact('token=abc,').text, 'token=xxx,')
+})
