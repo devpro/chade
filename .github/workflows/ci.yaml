@@ -21,21 +21,21 @@ permissions:
 jobs:
   markup-lint:
     name: Markup
-    uses: devpro/github-workflow-parts/.github/workflows/reusable-markup-lint.yml@5379b9d0052e3b233ec2e56ba8678e827361b89e
+    uses: devpro/github-workflow-parts/.github/workflows/reusable-markup-lint.yml@2e051e8eeb82eb973195d837024af7c9acb3dcf0
 
   # A change to the documentation alone needs the markup checked, not the build and the tests.
   git-check:
     name: Git
-    uses: devpro/github-workflow-parts/.github/workflows/reusable-git-check.yml@5379b9d0052e3b233ec2e56ba8678e827361b89e
+    uses: devpro/github-workflow-parts/.github/workflows/reusable-git-check.yml@2e051e8eeb82eb973195d837024af7c9acb3dcf0
     with:
       paths: ". :(exclude)*.md :(exclude)docs"
-      workflow-parts-version: 5379b9d0052e3b233ec2e56ba8678e827361b89e
+      workflow-parts-version: 2e051e8eeb82eb973195d837024af7c9acb3dcf0
 
   build-test:
     name: Build & Test
     needs: git-check
     if: needs.git-check.outputs.changed == 'true'
-    uses: devpro/github-workflow-parts/.github/workflows/reusable-node-quality.yml@5379b9d0052e3b233ec2e56ba8678e827361b89e
+    uses: devpro/github-workflow-parts/.github/workflows/reusable-node-quality.yml@2e051e8eeb82eb973195d837024af7c9acb3dcf0
     with:
       # The end to end tests run with their screenshots, copied where the job keeps its test results.
       custom-tests: npm run test:pkg && npm run ui:screenshots && mkdir -p report && cp -r packages/ui/e2e/screenshots report/
@@ -47,7 +47,7 @@ jobs:
       sonar-project-name: Chade
       # The unit tests, with the lcov report the Sonar analysis reads.
       test-script: test:coverage
-      workflow-parts-version: 5379b9d0052e3b233ec2e56ba8678e827361b89e
+      workflow-parts-version: 2e051e8eeb82eb973195d837024af7c9acb3dcf0
     secrets:
       sonar-token: ${{ secrets.SONAR_TOKEN }}
 
@@ -56,7 +56,7 @@ jobs:
     name: Build & Test (Windows)
     needs: git-check
     if: needs.git-check.outputs.changed == 'true'
-    uses: devpro/github-workflow-parts/.github/workflows/reusable-node-quality.yml@5379b9d0052e3b233ec2e56ba8678e827361b89e
+    uses: devpro/github-workflow-parts/.github/workflows/reusable-node-quality.yml@2e051e8eeb82eb973195d837024af7c9acb3dcf0
     with:
       custom-tests: npm run test:pkg
       # npm runs the scripts with cmd.exe on Windows, and they are bash scripts.
@@ -69,4 +69,4 @@ jobs:
       job-name: Build & Test (Windows)
       operating-system: windows-latest
       test-script: test:unit
-      workflow-parts-version: 5379b9d0052e3b233ec2e56ba8678e827361b89e
+      workflow-parts-version: 2e051e8eeb82eb973195d837024af7c9acb3dcf0
