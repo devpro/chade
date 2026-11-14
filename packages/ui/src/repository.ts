@@ -62,6 +62,7 @@ const RUNNING: Record<string, string> = {
   unstage: 'Unstaging…',
   commit: 'Committing…',
   amend: 'Amending…',
+  delete: 'Deleting the branch…',
 }
 
 // Asks the server for one change in the repository shown, then reads the repository again.
@@ -311,11 +312,23 @@ function renderBranches(current: Loaded): void {
       item.title = branch.upstream ? `${branch.name}, tracking ${branch.upstream}` : branch.name
       item.addEventListener('click', () => choose(branch.commit))
       if (branch.head) return item
-      // The name shows the commit of the branch, and the button beside it checks the branch out.
+      // The name shows the commit of the branch, and the buttons beside it change the branch.
       const line = node('div', '', 'branch-line')
-      const checkout = actionButton('Check out', `Check out ${branch.name}`, (button) => void act({ action: 'checkout', branch: branch.name }, `Checked out ${branch.name}`, button), 'action small checkout')
-      checkout.setAttribute('aria-label', `Check out ${branch.name}`)
-      line.append(item, checkout)
+      const { name } = branch
+      // Signs, as the + and − of a file are, so the name keeps its room in a narrow list, and each says what it does when pointed at.
+      const add = (text: string, label: string, title: string, run: (button: HTMLButtonElement) => void): void => {
+        const button = actionButton(text, title, run)
+        button.setAttribute('aria-label', label)
+        line.append(button)
+      }
+      line.append(item)
+      add('⇄', `Check out ${name}`, `Check out ${name}`, (button) => void act({ action: 'checkout', branch: name }, `Checked out ${name}`, button))
+      if (branch.remote) return line
+      if (branch.upstream && !branch.gone) {
+        const title = `Pull ${name}: move it to ${branch.upstream}, when that is a fast forward, without checking it out`
+        add('↓', `Pull ${name}`, title, (button) => void act({ action: 'pull', branch: name }, `Pulled ${name}`, button))
+      }
+      add('✕', `Delete ${name}`, `Delete ${name}, after a question that says what is lost`, (button) => void askDelete(name, button))
       return line
     })
     return [node('h3', title), ...items]
@@ -558,6 +571,58 @@ function actionButtons(): HTMLButtonElement[] {
   })
 }
 
+// The branch a deletion is asked for, and whether commits go with it.
+let doomed: { name: string; lost: number } | undefined
+
+function closeDelete(): void {
+  doomed = undefined
+  element('delete-form').hidden = true
+}
+
+// A deletion is asked twice: the button of the branch opens a line that says what is lost, and that line deletes.
+async function askDelete(name: string, button: HTMLElement): Promise<void> {
+  if (!detail || acting) return
+  const { system, path } = detail.repository
+  button.classList.add('running')
+  try {
+    const { lost } = await get<{ lost: number }>('branch', { system, path, name })
+    // The answer for a repository left meanwhile is dropped.
+    if (`${system}\n${path}` !== key) return
+    doomed = { name, lost }
+    const form = element('delete-form')
+    form.classList.toggle('loss', lost > 0)
+    element('delete-text').textContent =
+      lost > 0
+        ? `Delete ${name}? ${lost} commit${lost === 1 ? ' is' : 's are'} in no other branch or tag, and ${lost === 1 ? 'is' : 'are'} lost with it.`
+        : `Delete ${name}? Its commits stay, in another branch or under a tag.`
+    form.hidden = false
+    // Enter on a question that loses commits cancels it.
+    element(lost > 0 ? 'delete-cancel' : 'delete-submit').focus()
+  } catch (error) {
+    notify('Delete did not go through', error instanceof Error ? error.message : String(error), 'failed')
+  } finally {
+    button.classList.remove('running')
+  }
+}
+
+{
+  const form = element<HTMLFormElement>('delete-form')
+  element('delete-cancel').addEventListener('click', closeDelete)
+  form.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      closeDelete()
+      event.stopPropagation()
+    }
+  })
+  form.addEventListener('submit', (event) => {
+    event.preventDefault()
+    if (!doomed) return
+    const { name, lost } = doomed
+    // A refusal is said by the notice, and the question is asked again from the branch, with the count of that moment.
+    void act({ action: 'delete', branch: name, force: lost > 0 }, `Deleted ${name}`, element('delete-submit')).then(closeDelete)
+  })
+}
+
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && shownFile && !repository.section.hidden) open(shownFile.from, undefined)
 })
@@ -586,6 +651,7 @@ export const repository = {
     checks = {}
     message.value = ''
     element('branch-form').hidden = true
+    closeDelete()
     for (const id of ['branches', 'history', 'diff', 'detail', 'repository-state']) element(id).replaceChildren()
     element('repository-name').textContent = ''
     element('repository-path').textContent = params.get('path') ?? ''

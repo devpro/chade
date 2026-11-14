@@ -1,15 +1,19 @@
-import { parseBranches, parseChanges, UNPUSHED } from './history.js'
+import { aloneIn, BRANCHES, parseBranches, parseChanges, UNPUSHED, type Branch } from './history.js'
 import { GIT_TIMEOUT_MS, parseStatus, repositoryPath, type Root, type Run } from './repositories.js'
 import { RequestError } from './server.js'
 
 // What the interface asks to change in a repository, the only changes chade makes to it.
-export const ACTIONS = ['fetch', 'pull', 'push', 'checkout', 'branch', 'stage', 'unstage', 'commit', 'amend'] as const
+export const ACTIONS = ['fetch', 'pull', 'push', 'checkout', 'branch', 'stage', 'unstage', 'commit', 'amend', 'delete'] as const
 
 export interface ActionRequest {
   action: string
   // checkout: a branch of the repository, local or remote.
   // branch: the name of the branch to create and check out.
+  // pull: a local branch to move to its upstream without checking it out, the one checked out when absent.
+  // delete: a local branch, other than the one checked out.
   branch?: string
+  // delete: commits that no other branch or tag holds are lost with the branch.
+  force?: boolean
   // branch: the commit to start from, HEAD when absent.
   from?: string
   // stage, unstage: files among the changes, all of them when absent.
@@ -52,7 +56,32 @@ interface Context {
   request: ActionRequest
 }
 
-async function pull({ git, read }: Context): Promise<string> {
+// A local branch named by a request, among those git lists.
+async function localBranch(read: Context['read'], name: string | undefined): Promise<Branch> {
+  const target = parseBranches(await read(BRANCHES)).find((branch) => !branch.remote && branch.name === name)
+  if (!target) invalid(`${name} is not a local branch of the repository`)
+  return target
+}
+
+// Moves a branch that is not checked out to its upstream, which touches neither the index nor the working tree.
+async function pullOther({ git, read }: Context, target: Branch): Promise<string> {
+  const [remote, ref] = (await read(['for-each-ref', '--format=%(upstream:remotename)%00%(upstream:remoteref)', `refs/heads/${target.name}`])).trim().split('\0')
+  if (!remote || !ref) invalid(`${target.name} tracks no branch, so there is nothing to pull`)
+  try {
+    // A fetch into a branch only fast forwards it, and refuses when the branch has commits of its own.
+    return await git(['fetch', remote, `${ref}:refs/heads/${target.name}`], NETWORK_TIMEOUT_MS)
+  } catch (error) {
+    if (!(error instanceof RequestError) || !error.message.includes('non-fast-forward')) throw error
+    throw new RequestError(409, `${error.message}\n${target.name} has commits its upstream does not, so it is pulled once checked out, where the two are merged.`)
+  }
+}
+
+async function pull(context: Context): Promise<string> {
+  const { git, read, request } = context
+  if (request.branch !== undefined) {
+    const target = await localBranch(read, request.branch)
+    if (!target.head) return pullOther(context, target)
+  }
   // Fast forward when it can, merge otherwise, whatever pull.rebase and pull.ff say, and never an editor for the message of the merge.
   try {
     return await git(['pull', '--no-rebase', '--ff', '--no-edit'], NETWORK_TIMEOUT_MS)
@@ -76,8 +105,7 @@ async function push({ git, read }: Context): Promise<string> {
 }
 
 async function checkout({ git, read, request }: Context): Promise<string> {
-  const refs = await read(['for-each-ref', '--format=%(refname)%00%(objectname)%00%(upstream:short)%00%(upstream:track,nobracket)%00%(HEAD)', 'refs/heads', 'refs/remotes'])
-  const branches = parseBranches(refs)
+  const branches = parseBranches(await read(BRANCHES))
   const target = branches.find((branch) => branch.name === request.branch)
   if (!target) invalid(`${request.branch} is not a branch of the repository`)
   if (!target.remote) return git(['switch', target.name])
@@ -135,6 +163,18 @@ async function amend({ git, read, request }: Context): Promise<string> {
   return git(['commit', '--amend', '--message', message])
 }
 
+async function remove({ git, read, request }: Context): Promise<string> {
+  const target = await localBranch(read, request.branch)
+  if (target.head) invalid(`${target.name} is checked out, and is deleted once another branch is`)
+  const lost = Number((await read(aloneIn(target.name))).trim())
+  // Commits are lost only when the request says so, having shown how many to the person.
+  if (lost > 0 && request.force !== true) {
+    throw new RequestError(409, `${lost} commit${lost === 1 ? '' : 's'} of ${target.name} ${lost === 1 ? 'is' : 'are'} in no other branch or tag, and would be lost with it`)
+  }
+  // Forced for git, whose own check knows the upstream and HEAD alone, and refuses a branch merged anywhere else.
+  return git(['branch', '--delete', '--force', target.name])
+}
+
 const HANDLERS: Record<Action, (context: Context) => Promise<string>> = {
   fetch: ({ git }) => git(['fetch', '--all', '--prune'], NETWORK_TIMEOUT_MS),
   pull,
@@ -145,6 +185,7 @@ const HANDLERS: Record<Action, (context: Context) => Promise<string>> = {
   unstage: stage,
   commit,
   amend,
+  delete: remove,
 }
 
 // Every value that reaches a git command is checked against what git itself lists, or against a strict form,

@@ -991,6 +991,7 @@ td.ci {
 
 .action,
 #branch-cancel,
+#delete-cancel,
 #notice-close {
   padding: 5px 12px;
   border: 1px solid var(--border);
@@ -1003,6 +1004,7 @@ td.ci {
 
 .action:hover:not(:disabled),
 #branch-cancel:hover,
+#delete-cancel:hover,
 #notice-close:hover {
   border-color: var(--accent);
 }
@@ -1036,7 +1038,7 @@ td.ci {
 .branch-line {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   border-radius: 6px;
 }
 
@@ -1045,14 +1047,34 @@ td.ci {
   min-width: 0;
 }
 
-/* The button shows when its branch is pointed at or reached with the keyboard, so the list stays a list of names. */
-.checkout {
+/* The buttons show when their branch is pointed at or reached with the keyboard, so the list stays a list of names. */
+.branch-line .action {
   display: none;
+  width: 22px;
+  padding: 0;
 }
 
-.branch-line:hover .checkout,
-.branch-line:focus-within .checkout {
+.branch-line:hover .action,
+.branch-line:focus-within .action {
   display: block;
+}
+
+/* The question asked before a branch is deleted, in the colour of a warning when commits go with it. */
+#delete-form {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+#delete-form.loss {
+  border-color: var(--warn);
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+#delete-text {
+  margin-right: auto;
 }
 
 .commit-form {

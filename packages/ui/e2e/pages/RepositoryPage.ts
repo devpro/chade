@@ -130,6 +130,30 @@ export class RepositoryPage {
     await expect(this.notice).toHaveText(`Checked out ${branch}`)
   }
 
+  // Moves a branch that is not checked out to its upstream.
+  async pullBranch(branch: string): Promise<void> {
+    await this.branch(branch).hover()
+    await this.page.getByRole('button', { name: `Pull ${branch}`, exact: true }).click()
+    await expect(this.notice).toHaveText(`Pulled ${branch}`)
+  }
+
+  // The question a deletion asks before it deletes, with what would be lost.
+  get deleteQuestion(): Locator {
+    return this.page.locator('#delete-text')
+  }
+
+  async askDelete(branch: string): Promise<void> {
+    await this.branch(branch).hover()
+    await this.page.getByRole('button', { name: `Delete ${branch}`, exact: true }).click()
+    await expect(this.deleteQuestion).toBeVisible()
+  }
+
+  async confirmDelete(branch: string): Promise<void> {
+    await this.page.getByRole('button', { name: 'Delete branch', exact: true }).click()
+    await expect(this.notice).toHaveText(`Deleted ${branch}`)
+    await expect(this.deleteQuestion).toBeHidden()
+  }
+
   async createBranch(name: string): Promise<void> {
     await this.page.getByRole('button', { name: 'New branch' }).click()
     await this.page.getByRole('textbox', { name: 'Name of the new branch' }).fill(name)

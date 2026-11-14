@@ -131,6 +131,48 @@ test('a branch is checked out from the list, a remote one as the local branch th
   await work.checkOut('main')
 })
 
+test('a branch that is not checked out is pulled where it is, the working tree untouched', async ({ page, server }, testInfo) => {
+  // The remote gets a commit on review, from the clone that made the branch.
+  const elsewhere = join(server.root, 'elsewhere')
+  execFileSync('git', ['-C', elsewhere, '-c', 'user.name=e2e', '-c', 'user.email=e2e@example.test', 'commit', '--quiet', '--allow-empty', '--message', 'Answer the review'])
+  execFileSync('git', ['-C', elsewhere, 'push', '--quiet'])
+  await work.run('Fetch', 'Fetched')
+  await expect(work.branch('review')).toHaveText('review↓1')
+  await work.branch('review').hover()
+  await shot(page, testInfo, 'branch-actions')
+  await work.pullBranch('review')
+  await expect(work.branch('review')).toHaveText('review')
+  await expect(work.refs('Answer the review')).toHaveText(['origin/review', 'review'])
+  expect(git('branch', '--show-current')).toBe('main')
+  expect(git('status', '--porcelain')).toBe('?? later.txt')
+})
+
+test('a branch is deleted after a question, which says the commits that would be lost with it', async ({ page }, testInfo) => {
+  // Pushed: the remote branch holds its commits.
+  await work.askDelete('feature/new')
+  await expect(work.deleteQuestion).toHaveText('Delete feature/new? Its commits stay, in another branch or under a tag.')
+  await work.confirmDelete('feature/new')
+  await expect(work.branches).toHaveText(['main', 'review', 'origin/feature/new', 'origin/main', 'origin/review'])
+  // Squash merged on the remote, as a branch whose commits no other branch holds.
+  git('branch', 'squashed')
+  git('switch', '--quiet', 'squashed')
+  git('-c', 'user.name=e2e', '-c', 'user.email=e2e@example.test', 'commit', '--quiet', '--allow-empty', '--message', 'Work that was squashed')
+  git('switch', '--quiet', 'main')
+  await page.getByRole('button', { name: 'Refresh' }).click()
+  await work.askDelete('squashed')
+  await expect(work.deleteQuestion).toHaveText('Delete squashed? 1 commit is in no other branch or tag, and is lost with it.')
+  await shot(page, testInfo, 'delete-branch')
+  await page.getByRole('button', { name: 'Cancel' }).click()
+  await expect(work.deleteQuestion).toBeHidden()
+  expect(git('branch', '--list', 'squashed')).toContain('squashed')
+  await work.askDelete('squashed')
+  await work.confirmDelete('squashed')
+  await expect(work.branch('squashed')).toHaveCount(0)
+  expect(git('branch', '--list', 'squashed')).toBe('')
+  // The branch checked out has no button to delete it.
+  await expect(page.getByRole('button', { name: 'Delete main', exact: true })).toHaveCount(0)
+})
+
 test('what git refuses is said in its own words, and stays until dismissed', async ({ page }, testInfo) => {
   await work.createBranch('two words')
   await expect(work.notice).toHaveText('Branch did not go through')

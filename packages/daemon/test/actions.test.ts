@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rename, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, test } from 'node:test'
-import { createActions, RequestError, type Root, type Run } from '../src/index.js'
+import { createActions, createApi, RequestError, type Root, type Run } from '../src/index.js'
 
 const env = {
   ...process.env,
@@ -33,6 +33,8 @@ let folder: string
 let work: string
 let other: string
 let action: (request: Record<string, unknown>) => Promise<{ output: string }>
+// The commits deleting a branch would lose, as the interface asks before it deletes.
+let lost: (name: string) => Promise<number>
 
 // The status a request is refused with, 200 when it is not.
 async function status(request: Record<string, unknown>): Promise<number> {
@@ -60,7 +62,10 @@ beforeEach(async () => {
   await git(work, 'push', '--quiet', '--set-upstream', 'origin', 'main')
   await git(folder, 'clone', '--quiet', origin, other)
   const root: Root = { system: 'linux', folder: join(folder, 'repos'), path: join(folder, 'repos'), separator: process.platform === 'win32' ? '\\' : '/', git: 'git' }
-  const actions = createActions({ version: '1.2.3', machine: 'TEST-PC', roots: async () => [root], store: async () => '', report: async () => ({ machine: 'TEST-PC', date: '', sections: [] }), run })
+  const options = { version: '1.2.3', machine: 'TEST-PC', roots: async () => [root], store: async () => '', report: async () => ({ machine: 'TEST-PC', date: '', sections: [] }), run }
+  const actions = createActions(options)
+  const api = createApi(options)
+  lost = async (name) => ((await api.branch(new URLSearchParams({ system: 'linux', path: work, name }))) as { lost: number }).lost
   action = (request) => actions.action({ system: 'linux', path: work, ...request }) as Promise<{ output: string }>
 })
 
@@ -177,6 +182,74 @@ test('a branch is checked out by its name, a remote one as the local branch that
   // The local branch exists now, and is the one checked out again.
   await action({ action: 'checkout', branch: 'origin/remote-only' })
   assert.equal(await git(work, 'branch', '--show-current'), 'remote-only')
+})
+
+test('a branch that is not checked out is pulled by a fast forward, and refused once it diverged', async () => {
+  await action({ action: 'branch', branch: 'feature' })
+  await writeFile(join(work, 'local.txt'), 'not committed\n')
+  await writeFile(join(other, 'b.txt'), 'from elsewhere\n')
+  await git(other, 'add', '.')
+  await git(other, 'commit', '--quiet', '-m', 'Add b')
+  await git(other, 'push', '--quiet')
+  await action({ action: 'pull', branch: 'main' })
+  assert.equal(await git(work, 'log', '-1', '--format=%s', 'main'), 'Add b')
+  assert.equal(await git(work, 'rev-parse', 'origin/main'), await git(work, 'rev-parse', 'main'))
+  // The branch checked out and its working tree are as they were.
+  assert.equal(await git(work, 'branch', '--show-current'), 'feature')
+  assert.equal(await git(work, 'log', '-1', '--format=%s'), 'Start')
+  assert.equal(await git(work, 'status', '--porcelain'), '?? local.txt')
+  assert.equal(await status({ action: 'pull', branch: 'main' }), 200)
+
+  await git(work, 'branch', '--force', 'main', 'main~1')
+  await git(work, 'switch', '--quiet', 'main')
+  await git(work, 'commit', '--quiet', '--allow-empty', '-m', 'Local only')
+  await git(work, 'switch', '--quiet', 'feature')
+  const before = await git(work, 'rev-parse', 'main')
+  await assert.rejects(action({ action: 'pull', branch: 'main' }), (error: RequestError) => error.status === 409 && /once checked out/.test(error.message))
+  assert.equal(await git(work, 'rev-parse', 'main'), before)
+  // A branch that tracks nothing, a remote one and one git does not list have nothing to pull.
+  await git(work, 'branch', 'untracked')
+  assert.equal(await status({ action: 'pull', branch: 'untracked' }), 400)
+  assert.equal(await status({ action: 'pull', branch: 'origin/main' }), 400)
+  assert.equal(await status({ action: 'pull', branch: '--all' }), 400)
+})
+
+test('a pull that names the branch checked out is the pull of the working tree', async () => {
+  await writeFile(join(other, 'b.txt'), 'from elsewhere\n')
+  await git(other, 'add', '.')
+  await git(other, 'commit', '--quiet', '-m', 'Add b')
+  await git(other, 'push', '--quiet')
+  await action({ action: 'pull', branch: 'main' })
+  assert.equal(await git(work, 'log', '-1', '--format=%s'), 'Add b')
+  assert.equal(await git(work, 'status', '--porcelain'), '')
+})
+
+test('a branch is deleted, its own commits lost only when the request says so', async () => {
+  // Squash merged on the remote: the branch holds commits that main never will.
+  await action({ action: 'branch', branch: 'squashed' })
+  await git(work, 'commit', '--quiet', '--allow-empty', '-m', 'One')
+  await git(work, 'commit', '--quiet', '--allow-empty', '-m', 'Two')
+  await git(work, 'branch', 'merged', 'main')
+  await git(work, 'branch', 'pushed')
+  await git(work, 'push', '--quiet', 'origin', 'pushed')
+  await git(work, 'switch', '--quiet', 'main')
+  assert.equal(await lost('merged'), 0)
+  assert.equal(await lost('squashed'), 0)
+  await action({ action: 'delete', branch: 'merged' })
+  // The remote branch holds the commits, so nothing is lost, where git branch --delete would refuse.
+  await action({ action: 'delete', branch: 'pushed' })
+  await git(work, 'push', '--quiet', 'origin', '--delete', 'pushed')
+  assert.equal(await lost('squashed'), 2)
+  await assert.rejects(action({ action: 'delete', branch: 'squashed' }), (error: RequestError) => error.status === 409 && /^2 commits of squashed are in no other branch/.test(error.message))
+  assert.equal(await git(work, 'branch', '--format=%(refname:short)'), 'main\nsquashed')
+  await action({ action: 'delete', branch: 'squashed', force: true })
+  assert.equal(await git(work, 'branch', '--format=%(refname:short)'), 'main')
+  // The branch checked out stays, as a remote branch, an option and a name git does not list.
+  for (const branch of ['main', 'origin/main', '--all', 'nowhere', undefined]) {
+    assert.equal(await status({ action: 'delete', branch, force: true }), 400, branch)
+  }
+  await assert.rejects(lost('origin/main'), (error: RequestError) => error.status === 400)
+  await assert.rejects(lost('--all'), (error: RequestError) => error.status === 400)
 })
 
 test('a branch is created from HEAD or from a commit, under a name git accepts', async () => {

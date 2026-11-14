@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { runAction, type ActionRequest } from './actions.js'
-import { repositoryDetail, repositoryDiff } from './history.js'
+import { branchLoss, repositoryDetail, repositoryDiff } from './history.js'
 import { existsSync } from 'node:fs'
 import { pathKey, readChecks, readRepositories, type IstarciServer, type RepositoryCheck } from './istarci.js'
 import { findRepositories, findRepository, listRepositories, repositoryPath, type Root, type Run } from './repositories.js'
@@ -82,6 +82,11 @@ export function createApi(options: ApiOptions): ServerOptions['api'] {
     repository: async (query) => {
       const { root, relative } = await repository(query)
       return { version: options.version, machine: options.machine, scannedAt: new Date().toISOString(), ...(await repositoryDetail(root, relative, options.run, limitOf(query))) }
+    },
+    // What deleting a branch would lose, read when the deletion is asked, a count that costs a walk of the history.
+    branch: async (query) => {
+      const { root, relative } = await repository(query)
+      return branchLoss(root, relative, options.run, query.get('name') ?? '')
     },
     // Apart from the repository, so the history shows without waiting for IstarCI.
     checks: async (query) => {
