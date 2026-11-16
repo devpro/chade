@@ -10,8 +10,10 @@ chade never changes the system, and changes a git repository only when asked in 
 
 ## Quick start
 
+The package is on GitHub Packages, which `~/.npmrc` reaches with `@devpro:registry=https://npm.pkg.github.com` and `//npm.pkg.github.com/:_authToken=<token>`, the token having the `read:packages` scope.
+
 ```bash
-npm install --global @devprofr/chade
+npm install --global @devpro/chade
 chade init --store ~/system-snapshots
 chade discover
 chade snapshot
