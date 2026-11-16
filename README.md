@@ -2,7 +2,6 @@
 
 [![CI](https://github.com/devpro/chade/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/devpro/chade/actions/workflows/ci.yaml)
 [![PKG](https://github.com/devpro/chade/actions/workflows/pkg.yaml/badge.svg?branch=main)](https://github.com/devpro/chade/actions/workflows/pkg.yaml)
-[![npm](https://img.shields.io/npm/v/@devprofr/chade?label=npm&logo=npm)](https://www.npmjs.com/package/@devprofr/chade)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=devpro_chade&metric=alert_status)](https://sonarcloud.io/dashboard?id=devpro_chade)
 
 Command line tool and local web interface to get insights on one machine and manage its git repositories:
@@ -22,25 +21,32 @@ Command line tool and local web interface to get insights on one machine and man
 
 ## Quick start
 
-1. Install chade.
+1. Give npm access to the packages of `@devpro` on GitHub Packages, in `~/.npmrc`, with a GitHub token that has the `read:packages` scope.
 
-   ```bash
-   npm install --global @devprofr/chade
+   ```ini
+   @devpro:registry=https://npm.pkg.github.com
+   //npm.pkg.github.com/:_authToken=<token>
    ```
 
-2. Create the store and the configuration file, `~/.chade/config.yml`.
+2. Install chade.
+
+   ```bash
+   npm install --global @devpro/chade
+   ```
+
+3. Create the store and the configuration file, `~/.chade/config.yml`.
 
    ```bash
    chade init --store ~/system-snapshots
    ```
 
-3. List the configuration files present on the system, to add under `files` in the configuration.
+4. List the configuration files present on the system, to add under `files` in the configuration.
 
    ```bash
    chade discover
    ```
 
-4. Take a snapshot, then open the web interface.
+5. Take a snapshot, then open the web interface.
 
    ```bash
    chade snapshot

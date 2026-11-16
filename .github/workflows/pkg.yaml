@@ -1,7 +1,7 @@
 name: PKG
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 # purpose: Continuous Delivery (aka Packaging & Shipping)
-# description: publishes the CLI to npmjs.org (chade).
+# description: publishes the CLI to GitHub Packages (@devpro/chade).
 
 on:
   push:
@@ -21,11 +21,12 @@ jobs:
     name: "Package chade"
     permissions:
       contents: read
-      # npm trusted publishing: the package is published with a short-lived OIDC token rather than a stored secret.
-      id-token: write
+      packages: write
     uses: devpro/github-workflow-parts/.github/workflows/reusable-npm-publication.yml@398cf79719f90e41e3407bc9f060e297629d800d
     with:
       workflow-parts-version: 398cf79719f90e41e3407bc9f060e297629d800d
       # prepack builds the package.
       build-command: ""
+      registry-url: https://npm.pkg.github.com
+      scope: "@devpro"
       working-directory: packages/cli
