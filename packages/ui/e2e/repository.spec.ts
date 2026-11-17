@@ -84,10 +84,28 @@ test('the bar between the history and the changes resizes them, and the width is
   expect(await history.historyWidth()).toBe(before)
 })
 
+test('the bar between the branches and the history widens the branches, and the width is kept', async ({ page, history }) => {
+  const before = await history.branchesWidth()
+  await history.resizeBranches(120)
+  const widened = await history.branchesWidth()
+  expect(widened).toBeGreaterThan(before + 105)
+  expect(widened).toBeLessThan(before + 135)
+  await page.reload()
+  await history.expectOpen('history')
+  expect(await history.branchesWidth()).toBe(widened)
+  // The branches are never dragged down to nothing.
+  await history.resizeBranches(-2000)
+  expect(await history.branchesWidth()).toBe(120)
+  await history.sideResizer.dblclick()
+  expect(await history.branchesWidth()).toBe(before)
+})
+
 test('a repository shows its state, its branches, and its history from the newest commit @layout', async ({ page, history }, testInfo) => {
   await expect(history.state).toHaveText('main↑ 12 changed1 untracked')
   await expect(history.branches).toHaveText(['feature/graph', 'main↑1', 'origin/main'])
   await expect(history.branch('main')).toHaveClass(/head/)
+  await expect(history.tagsToggle).toHaveText('Tags (1)')
+  await expect(history.tags).toHaveCount(0)
   await expect(history.workingTree).toHaveText('Uncommitted changes3 files')
   await expect(history.subjects).toContainText(['Rename the guide', 'Merge feature/graph'])
   await expect(history.commits).toHaveCount(6)
@@ -163,6 +181,61 @@ test('a branch chooses the commit it points at', async ({ history }) => {
   await history.branch('feature/graph').click()
   await expect(history.heading).toHaveText('Draw the graph')
   await expect(history.commit('Draw the graph')).toHaveClass(/selected/)
+})
+
+test('a tag chooses the commit it points at', async ({ history }) => {
+  await history.tagsToggle.click()
+  await history.tags.filter({ hasText: 'v1.0' }).click()
+  await expect(history.heading).toHaveText('Merge feature/graph')
+  await expect(history.commit('Merge feature/graph')).toHaveClass(/selected/)
+})
+
+test('the tags start closed, show the newest once opened, all on demand, and stay open after a reload', async ({ page, server }) => {
+  const clean = new RepositoryPage(page)
+  await clean.signIn(server.url, 'wsl-ubuntu', join(server.root, 'wsl-ubuntu', 'clean'))
+  await clean.expectOpen('clean')
+  await expect(clean.tagsToggle).toHaveText('Tags (25)')
+  await expect(clean.tagsToggle).toHaveAttribute('aria-expanded', 'false')
+  await expect(clean.tags).toHaveCount(0)
+  await clean.tagsToggle.click()
+  await expect(clean.tags).toHaveCount(20)
+  await page.getByRole('button', { name: 'Show all 25 tags' }).click()
+  await expect(clean.tags).toHaveCount(25)
+  // Open is kept, and all of them is asked again.
+  await page.reload()
+  await clean.expectOpen('clean')
+  await expect(clean.tagsToggle).toHaveAttribute('aria-expanded', 'true')
+  await expect(clean.tags).toHaveCount(20)
+  await clean.tagsToggle.click()
+  await expect(clean.tags).toHaveCount(0)
+})
+
+test('a hidden branch leaves the history, stays listed as hidden after a reload, and is shown again @layout', async ({ page, server }, testInfo) => {
+  const conflict = new RepositoryPage(page)
+  await conflict.signIn(server.url, 'wsl-ubuntu', join(server.root, 'wsl-ubuntu', 'conflict'))
+  await conflict.expectOpen('conflict')
+  await expect(conflict.commit('Rename to theirs')).toHaveCount(1)
+  // The history read again takes its time, so the turning ring is seen beside the buttons, on the line of the branch.
+  await page.route('**/api/repository?**', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    await route.continue()
+  })
+  const line = page.locator('#branches .branch-line').filter({ has: page.locator('.branch-name', { hasText: /^theirs$/ }) })
+  const height = (await line.boundingBox())?.height ?? 0
+  await conflict.toggleBranch('theirs', 'Hide')
+  await expect(line.locator('.action.running')).toHaveCount(1)
+  expect((await line.boundingBox())?.height).toBe(height)
+  await expect(conflict.commit('Rename to theirs')).toHaveCount(0)
+  await expect(conflict.branch('theirs')).toHaveText('theirshidden')
+  await page.unroute('**/api/repository?**')
+  await shot(page, testInfo, 'hidden-branch')
+  await page.reload()
+  await conflict.expectOpen('conflict')
+  await expect(conflict.commit('Rename to theirs')).toHaveCount(0)
+  await expect(conflict.branch('theirs')).toHaveClass(/hidden-branch/)
+  await conflict.toggleBranch('theirs', 'Show')
+  await expect(conflict.commit('Rename to theirs')).toHaveCount(1)
+  await expect(conflict.branch('theirs')).not.toHaveClass(/hidden-branch/)
 })
 
 test('a commit subject and a line of a file are text, whatever they hold', async ({ page, server }) => {

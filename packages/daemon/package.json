@@ -4,7 +4,7 @@
   "description": "Local HTTP server of chade, bundled into the chade package and never published on its own",
   "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "exports": "./src/index.ts",
   "scripts": {
     "test": "../../scripts/with_test_tmpdir.sh node --import tsx --test --test-reporter=dot test/*.test.ts",

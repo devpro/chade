@@ -53,18 +53,22 @@ It fetches nothing, so a count behind is the one of the last fetch.
 The name of a repository opens its page, which goes from a branch to a commit, to its files, to the changes of one file.
 
 Part     | Content
----------|------------------------------------------------------------------------------------------------------------------
-Branches | Local and remote branches, the one checked out marked, each with what it is ahead and behind its upstream by
+---------|------------------------------------------------------------------------------------------------------------------------------------
+Branches | Local and remote branches, the one checked out marked, each with what it is ahead and behind its upstream by, then the tags from the newest
 History  | Commits of every branch and tag from the newest, drawn as a graph, each with the branches and tags pointing at it
 Changes  | Message, author and date of the commit chosen, and the list of the files it changed
 
-- A branch chooses the commit it points at.
+- A branch or a tag chooses the commit it points at.
+- The tags start closed under their heading, which gives their count, and once opened show the 20 newest, then all of them on demand.
+- `⊘` beside a branch hides it: the history leaves out the commits no other branch, tag or HEAD reaches, the branch stays listed and marked hidden, and `◉` shows it again.
+- The branches hidden are kept by the browser, for each repository, and the branch checked out is never hidden.
 - A file of the list opens its changes in place of the history, and Close, Escape or another commit brings the history back.
 - A merge shows what it brought to its first parent, the branch it was merged into.
 - With changes in the working tree, a first line, Uncommitted changes, lists what is staged, not staged and not tracked.
 - The history lists 300 commits, and a button at its end shows 300 older ones.
 - The changes of a file stop after 10,000 lines, and a patch of more than 2 MB is cut.
 - The bar between the history and the changes is dragged to share the room, and a double click resets it.
+- The bar between the branches and the history is dragged to widen the branches, and a double click resets it.
 - The address names the repository, the commit and the file, so the back button of the browser works.
 
 ## Git actions

@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { before, test } from 'node:test'
-import { createApi, parseBranches, parseChanges, parseCommits, RequestError, webAddress, type Detail, type Diff, type Root, type Run } from '../src/index.js'
+import { createApi, parseBranches, parseChanges, parseCommits, parseTags, RequestError, webAddress, type Detail, type Diff, type Root, type Run } from '../src/index.js'
 
 const env = { ...process.env, GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null', GIT_CONFIG_NOSYSTEM: '1' }
 
@@ -44,6 +44,13 @@ test('commits read with their parents and the names pointing at them', () => {
   assert.deepEqual(parseCommits(text), [
     { hash: 'c3', parents: ['c2', 'b1'], author: 'Ada', date: '2026-11-10T10:00:00+01:00', refs: ['HEAD -> main', 'tag: v1.0', 'origin/main'], subject: 'Merge the feature' },
     { hash: 'c1', parents: [], author: 'Ada', date: '2026-11-09T10:00:00+01:00', refs: [], subject: 'Start' },
+  ])
+})
+
+test('tags read with the commit they point at, through the tag object of an annotated one', () => {
+  assert.deepEqual(parseTags(['refs/tags/v2.0\0tag2\0c2', 'refs/tags/release/v1.0\0c1\0', ''].join('\n')), [
+    { name: 'v2.0', commit: 'c2' },
+    { name: 'release/v1.0', commit: 'c1' },
   ])
 })
 
@@ -121,6 +128,7 @@ test('a repository gives its branches, its history from the newest commit, and t
   assert.equal(merge.subject, 'Merge feature')
   assert.equal(merge.parents.length, 2)
   assert.deepEqual(merge.refs, ['HEAD -> main', 'tag: v1.0'])
+  assert.deepEqual(detail.tags, [{ name: 'v1.0', commit: merge.hash }])
   assert.equal(merge.author, 'Ada')
   assert.equal(detail.commits.at(-1)?.subject, 'Start')
   assert.equal(detail.more, false)
@@ -146,6 +154,28 @@ test('a repository gives the page of its remote, at the branch checked out once 
   await git(forge, 'update-ref', 'refs/remotes/origin/main', 'HEAD')
   await git(forge, 'branch', '--quiet', '--set-upstream-to=origin/main')
   assert.equal(await web(), 'https://github.com/ada/forge/tree/main')
+})
+
+test('a hidden branch leaves out the commits no other branch, tag or HEAD reaches, and a name git does not list hides nothing', async () => {
+  const side = join(root.folder, 'side')
+  await mkdir(side)
+  await git(side, 'init', '--quiet', '--initial-branch=main')
+  await git(side, 'commit', '--quiet', '--allow-empty', '-m', 'Start')
+  await git(side, 'switch', '--quiet', '--create', 'aside')
+  await git(side, 'commit', '--quiet', '--allow-empty', '-m', 'Aside')
+  await git(side, 'switch', '--quiet', 'main')
+  await git(side, 'tag', '--annotate', '--message', 'First', 'v0.1')
+  const subjects = async (...hide: string[]) => {
+    const params = query({ system: 'linux', path: side })
+    for (const name of hide) params.append('hide', name)
+    return ((await api.repository(params)) as Detail).commits.map((commit) => commit.subject)
+  }
+  assert.deepEqual(await subjects(), ['Aside', 'Start'])
+  assert.deepEqual(await subjects('aside'), ['Start'])
+  // The branch checked out stays, through HEAD, and a value that is no branch is no pattern either.
+  assert.deepEqual(await subjects('main', '*', '--all'), ['Aside', 'Start'])
+  const detail = (await api.repository(query({ system: 'linux', path: side }))) as Detail
+  assert.deepEqual(detail.tags, [{ name: 'v0.1', commit: detail.commits[1].hash }])
 })
 
 test('a history longer than asked says there is more', async () => {

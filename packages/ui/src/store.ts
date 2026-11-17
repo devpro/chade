@@ -2,7 +2,7 @@ import type { Machine, SnapshotDetail, Store, StoredFile } from '@chade/daemon'
 import { address, get } from './api.js'
 import { parseDiff, type DiffFile } from './diff.js'
 import { copyHash, element, node, svg } from './dom.js'
-import { contentLines, counts, diffLines, fileHead, label, resizable, statusOf } from './files.js'
+import { contentLines, counts, diffLines, fileHead, label, resizable, resizableSide, statusOf } from './files.js'
 import { ago } from './format.js'
 
 type Loaded = Store & { machine: string; version: string; scannedAt: string }
@@ -253,6 +253,7 @@ function render(current: Loaded): void {
 }
 
 resizable('store-resize', 'store-snapshots', 'store-file')
+resizableSide('store-resize-side', 'store-machines', 'store-snapshots', 'store-file', 'store-detail')
 
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && asked.file !== undefined && !store.section.hidden) go({ machine: asked.machine, commit: asked.commit, files: asked.files })

@@ -25,6 +25,12 @@ export interface Branch {
   gone?: boolean
 }
 
+export interface Tag {
+  name: string
+  // The commit the tag points at, through the tag object of an annotated tag.
+  commit: string
+}
+
 export interface FileChange {
   path: string
   // The earlier path of a renamed file.
@@ -37,6 +43,8 @@ export interface FileChange {
 export interface Detail {
   repository: Repository
   branches: Branch[]
+  // From the newest.
+  tags: Tag[]
   commits: Commit[]
   // The history goes on after the commits listed.
   more: boolean
@@ -76,6 +84,9 @@ function gitOf(root: Root, relative: string[], run: Run): Git {
 // Lists the local and the remote branches, in the form parseBranches reads.
 export const BRANCHES = ['for-each-ref', '--format=%(refname)%00%(objectname)%00%(upstream:short)%00%(upstream:track,nobracket)%00%(HEAD)', 'refs/heads', 'refs/remotes']
 
+// Lists the tags from the newest, in the form parseTags reads, with the commit of an annotated tag beside the tag object.
+export const TAGS = ['for-each-ref', '--sort=-creatordate', '--format=%(refname)%00%(objectname)%00%(*objectname)', 'refs/tags']
+
 // Counts the commits a local branch is alone to hold, which no other branch, remote branch or tag reaches.
 // A branch name holds no character --exclude reads as a wildcard.
 export const aloneIn = (name: string): string[] => ['rev-list', '--count', `refs/heads/${name}`, '--not', `--exclude=${name}`, '--branches', '--remotes', '--tags']
@@ -101,6 +112,23 @@ export function parseBranches(text: string): Branch[] {
     branches.push(branch)
   }
   return branches
+}
+
+export function parseTags(text: string): Tag[] {
+  const tags: Tag[] = []
+  for (const line of text.split('\n')) {
+    const [ref, object, peeled] = line.split('\0')
+    if (!object) continue
+    tags.push({ name: ref.replace(/^refs\/tags\//, ''), commit: peeled || object })
+  }
+  return tags
+}
+
+// The history of every branch and tag, and of HEAD for a detached one, but not of the stash, whose commits are no history.
+// A hidden branch leaves out the commits no other branch, tag or HEAD reaches, and its name holds no character --exclude reads as a wildcard.
+export function historyArgs(count: number, hidden: Branch[]): string[] {
+  const exclude = (remote: boolean) => hidden.filter((branch) => branch.remote === remote).map((branch) => `--exclude=${branch.name}`)
+  return ['log', ...exclude(false), '--branches', ...exclude(true), '--remotes', '--tags', 'HEAD', '--date-order', `--max-count=${count}`, '--format=%H%x00%P%x00%an%x00%cI%x00%D%x00%s']
 }
 
 export function parseCommits(text: string): Commit[] {
@@ -136,27 +164,30 @@ export function parseChanges(text: string): FileChange[] {
   return changes
 }
 
-export async function repositoryDetail(root: Root, relative: string[], run: Run, limit = DEFAULT_COMMITS): Promise<Detail> {
+export async function repositoryDetail(root: Root, relative: string[], run: Run, limit = DEFAULT_COMMITS, hide: string[] = []): Promise<Detail> {
   const git = gitOf(root, relative, run)
   const repository = await readRepository(root, relative, run)
-  if (repository.error !== undefined) return { repository, branches: [], commits: [], more: false, changes: [] }
+  if (repository.error !== undefined) return { repository, branches: [], tags: [], commits: [], more: false, changes: [] }
   const count = Math.min(Math.max(1, Math.floor(limit) || DEFAULT_COMMITS), MAX_COMMITS)
   const none = Promise.resolve({ code: 0, stdout: '', stderr: '' })
-  const [refs, log, status, message, unpushed] = await Promise.all([
-    git(BRANCHES),
-    // Every branch and tag, and HEAD for a detached one, but not the stash, whose commits are no history.
-    repository.head
-      ? git(['log', '--branches', '--remotes', '--tags', 'HEAD', '--date-order', `--max-count=${count + 1}`, '--format=%H%x00%P%x00%an%x00%cI%x00%D%x00%s'])
-      : none,
+  const check = (result: Awaited<ReturnType<Git>>): void => {
+    if (result.code !== 0) throw new Error((result.stderr || result.stdout).trim().split('\n')[0] || `${root.git} exited with ${result.code}`)
+  }
+  const refs = await git(BRANCHES)
+  check(refs)
+  const branches = parseBranches(refs.stdout)
+  // Only a name git lists is hidden, so a value of the request never reads as an option or a pattern.
+  const hidden = branches.filter((branch) => hide.includes(branch.name))
+  const [tags, log, status, message, unpushed] = await Promise.all([
+    git(TAGS),
+    repository.head ? git(historyArgs(count + 1, hidden)) : none,
     git(['status', '--porcelain=v1', '-z', '--untracked-files=all']),
     repository.head ? git(['log', '-1', '--format=%B', 'HEAD']) : none,
     repository.head ? git(UNPUSHED) : none,
   ])
-  for (const result of [refs, log, status, message, unpushed]) {
-    if (result.code !== 0) throw new Error((result.stderr || result.stdout).trim().split('\n')[0] || `${root.git} exited with ${result.code}`)
-  }
+  for (const result of [tags, log, status, message, unpushed]) check(result)
   const commits = parseCommits(log.stdout)
-  const detail: Detail = { repository, branches: parseBranches(refs.stdout), commits: commits.slice(0, count), more: commits.length > count, changes: parseChanges(status.stdout) }
+  const detail: Detail = { repository, branches, tags: parseTags(tags.stdout), commits: commits.slice(0, count), more: commits.length > count, changes: parseChanges(status.stdout) }
   if (repository.head) detail.last = { message: message.stdout.trim(), pushed: unpushed.stdout.trim() === '' }
   const web = await readWeb(git, repository.branch)
   if (web) detail.web = web

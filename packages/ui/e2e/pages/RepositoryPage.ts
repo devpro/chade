@@ -31,6 +31,7 @@ export class RepositoryPage {
   readonly subjects: Locator
   readonly workingTree: Locator
   readonly branches: Locator
+  readonly tags: Locator
   readonly changes: Locator
   readonly heading: Locator
   readonly body: Locator
@@ -39,6 +40,7 @@ export class RepositoryPage {
   readonly comparison: FileComparison
   readonly history: Locator
   readonly resizer: Locator
+  readonly sideResizer: Locator
   readonly notice: Locator
   readonly noticeText: Locator
   readonly commitMessage: Locator
@@ -56,6 +58,7 @@ export class RepositoryPage {
     this.subjects = this.commits.locator('.subject')
     this.workingTree = page.locator('#history .working-tree')
     this.branches = page.locator('#branches .branch-item')
+    this.tags = page.locator('#branches .tag-item')
     this.changes = page.locator('#detail')
     this.heading = this.changes.locator('h2')
     this.body = this.changes.locator('.body')
@@ -64,6 +67,7 @@ export class RepositoryPage {
     this.comparison = new FileComparison(page.locator('#diff'))
     this.history = page.locator('#history')
     this.resizer = page.getByRole('separator', { name: 'Width of the history' })
+    this.sideResizer = page.getByRole('separator', { name: 'Width of the branches' })
     this.notice = page.locator('#notice-title')
     this.noticeText = page.locator('#notice-text')
     this.commitMessage = page.getByRole('textbox', { name: 'Commit message' })
@@ -110,6 +114,17 @@ export class RepositoryPage {
 
   branch(name: string): Locator {
     return this.branches.filter({ has: this.page.locator('.branch-name', { hasText: new RegExp(`^${name}$`) }) })
+  }
+
+  // The heading of the tags, which opens and closes their list.
+  get tagsToggle(): Locator {
+    return this.page.locator('#branches .group-toggle')
+  }
+
+  // Hides the commits of a branch from the history, or shows them again.
+  async toggleBranch(branch: string, action: 'Hide' | 'Show'): Promise<void> {
+    await this.branch(branch).hover()
+    await this.page.getByRole('button', { name: `${action} ${branch}`, exact: true }).click()
   }
 
   // Opens the changes of a file of the commit chosen, from the list of its files.
@@ -184,8 +199,21 @@ export class RepositoryPage {
 
   // Drags the bar between the history and the changes, to the right by the pixels given, or to the left when negative.
   async resizeHistory(by: number): Promise<void> {
-    const box = await this.resizer.boundingBox()
-    if (!box) throw new Error('the bar that resizes the history is not shown')
+    await this.drag(this.resizer, by)
+  }
+
+  // Drags the bar between the branches and the history.
+  async resizeBranches(by: number): Promise<void> {
+    await this.drag(this.sideResizer, by)
+  }
+
+  async branchesWidth(): Promise<number> {
+    return (await this.page.locator('#branches').boundingBox())?.width ?? 0
+  }
+
+  private async drag(bar: Locator, by: number): Promise<void> {
+    const box = await bar.boundingBox()
+    if (!box) throw new Error('the bar is not shown')
     await this.page.mouse.move(box.x + box.width / 2, box.y + 100)
     await this.page.mouse.down()
     await this.page.mouse.move(box.x + box.width / 2 + by, box.y + 100, { steps: 5 })

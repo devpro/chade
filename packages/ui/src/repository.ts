@@ -1,8 +1,8 @@
-import type { Branch, Check, Commit, Detail, Diff, FileChange, LastCommit } from '@chade/daemon'
+import type { Branch, Check, Commit, Detail, Diff, FileChange, LastCommit, Tag } from '@chade/daemon'
 import { address, get, post } from './api.js'
 import { parseDiff } from './diff.js'
 import { copyHash, element, node, svg } from './dom.js'
-import { counts, diffLines, fileHead, fileOf, label, resizable, statusOf } from './files.js'
+import { counts, diffLines, fileHead, fileOf, label, resizable, resizableSide, statusOf } from './files.js'
 import { ago, changes, checkOf, sync } from './format.js'
 import { layout, type GraphRow } from './graph.js'
 import { badges, list } from './list.js'
@@ -26,6 +26,42 @@ const patches = new Map<string, Diff>()
 const rows = new Map<string, HTMLElement>()
 // What IstarCI did with each commit, read after the history so the history never waits for it.
 let checks: Record<string, Check> = {}
+// The branches whose commits the history leaves out, kept in the browser for each repository.
+let hidden = new Set<string>()
+const HIDDEN_KEY = 'chade-hidden'
+
+function readHidden(): Set<string> {
+  try {
+    const all = JSON.parse(localStorage.getItem(HIDDEN_KEY) ?? '{}') as Record<string, string[]>
+    return new Set(Array.isArray(all[key]) ? all[key] : [])
+  } catch {
+    return new Set()
+  }
+}
+
+function saveHidden(): void {
+  try {
+    const all = JSON.parse(localStorage.getItem(HIDDEN_KEY) ?? '{}') as Record<string, string[]>
+    if (hidden.size > 0) all[key] = [...hidden]
+    else delete all[key]
+    localStorage.setItem(HIDDEN_KEY, JSON.stringify(all))
+  } catch {
+    // A browser that keeps nothing hides the branches until the page is left.
+  }
+}
+
+// Hiding asks for the history again, without the commits the branch is alone to reach.
+function toggleHidden(name: string, button: HTMLElement): void {
+  if (hidden.has(name)) hidden.delete(name)
+  else hidden.add(name)
+  saveHidden()
+  button.classList.add('running')
+  void repository
+    .reload()
+    .catch(() => undefined)
+    .finally(() => button.classList.remove('running'))
+}
+
 // An action is running: the next one waits for its answer, as git changes one thing at a time in a repository.
 let acting = false
 
@@ -304,8 +340,11 @@ function renderBranches(current: Loaded): void {
   const group = (title: string, branches: Branch[]): HTMLElement[] => {
     if (branches.length === 0) return []
     const items = branches.map((branch) => {
-      const item = node('button', '', `branch-item${branch.head ? ' head' : ''}`)
+      // The branch checked out is never hidden, as HEAD keeps its commits in the history.
+      const isHidden = !branch.head && hidden.has(branch.name)
+      const item = node('button', '', `branch-item${branch.head ? ' head' : ''}${isHidden ? ' hidden-branch' : ''}`)
       item.append(node('span', branch.name, 'branch-name'))
+      if (isHidden) item.append(node('span', 'hidden', 'track muted'))
       if (branch.gone) item.append(node('span', 'gone', 'track warn'))
       if (branch.ahead) item.append(node('span', `↑${branch.ahead}`, 'track info'))
       if (branch.behind) item.append(node('span', `↓${branch.behind}`, 'track warn'))
@@ -322,6 +361,8 @@ function renderBranches(current: Loaded): void {
         line.append(button)
       }
       line.append(item)
+      if (isHidden) add('◉', `Show ${name}`, `Show ${name}: its commits come back in the history`, (button) => toggleHidden(name, button))
+      else add('⊘', `Hide ${name}`, `Hide ${name}: the history leaves out the commits no other branch or tag reaches`, (button) => toggleHidden(name, button))
       add('⇄', `Check out ${name}`, `Check out ${name}`, (button) => void act({ action: 'checkout', branch: name }, `Checked out ${name}`, button))
       if (branch.remote) return line
       if (branch.upstream && !branch.gone) {
@@ -342,7 +383,57 @@ function renderBranches(current: Loaded): void {
       'Remote',
       current.branches.filter((branch) => branch.remote),
     ),
+    ...tagGroup(current.tags),
   )
+}
+
+const TAGS_OPEN_KEY = 'chade-tags-open'
+const TAGS_SHOWN = 20
+// A repository can have hundreds of tags, so the list starts closed, and once opened shows the newest ones until asked for all.
+let allTags = false
+
+function tagsOpen(): boolean {
+  try {
+    return localStorage.getItem(TAGS_OPEN_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
+// The tags, from the newest, each choosing the commit it points at, under a heading that opens and closes them.
+function tagGroup(tags: Tag[]): HTMLElement[] {
+  if (tags.length === 0) return []
+  const open = tagsOpen()
+  const toggle = node('button', `Tags (${tags.length})`, `group-toggle${open ? ' open' : ''}`)
+  toggle.setAttribute('aria-expanded', String(open))
+  toggle.addEventListener('click', () => {
+    try {
+      localStorage.setItem(TAGS_OPEN_KEY, String(!open))
+    } catch {
+      // A browser that keeps nothing opens the tags until the page is drawn again.
+    }
+    if (detail) renderBranches(detail)
+  })
+  const heading = node('h3')
+  heading.append(toggle)
+  if (!open) return [heading]
+  const shown = allTags ? tags : tags.slice(0, TAGS_SHOWN)
+  const items: HTMLElement[] = shown.map((tag) => {
+    const item = node('button', '', 'tag-item')
+    item.append(node('span', tag.name, 'branch-name'))
+    item.title = `${tag.name}, at ${tag.commit.slice(0, 10)}`
+    item.addEventListener('click', () => choose(tag.commit))
+    return item
+  })
+  if (shown.length < tags.length) {
+    const more = node('button', `Show all ${tags.length} tags`, 'more')
+    more.addEventListener('click', () => {
+      allTags = true
+      if (detail) renderBranches(detail)
+    })
+    items.push(more)
+  }
+  return [heading, ...items]
 }
 
 // Where the changes of one file are asked from: a commit, or what is staged or not in the working tree.
@@ -531,6 +622,7 @@ function render(current: Loaded): void {
 }
 
 resizable('resize', 'history', 'diff')
+resizableSide('resize-side', 'branches', 'history', 'diff', 'detail')
 
 for (const button of actionButtons()) {
   const action = button.dataset.action as string
@@ -652,6 +744,8 @@ export const repository = {
     detail = undefined
     patches.clear()
     checks = {}
+    hidden = readHidden()
+    allTags = false
     message.value = ''
     element('branch-form').hidden = true
     closeDelete()
@@ -663,10 +757,16 @@ export const repository = {
   },
   async reload(): Promise<{ machine: string; version: string; scannedAt: string }> {
     const [system, path] = key.split('\n')
-    const loaded = await get<Loaded>('repository', { system, path, limit: String(limit) })
+    const loaded = await get<Loaded>('repository', { system, path, limit: String(limit), hide: [...hidden] })
     // The answer for a repository left meanwhile is dropped.
     if (`${system}\n${path}` !== key) return loaded
     detail = loaded
+    // A branch deleted meanwhile is forgotten, so one made again with its name shows.
+    const names = new Set(loaded.branches.map((branch) => branch.name))
+    if ([...hidden].some((name) => !names.has(name))) {
+      hidden = new Set([...hidden].filter((name) => names.has(name)))
+      saveHidden()
+    }
     render(detail)
     void loadChecks(system, path)
     return detail

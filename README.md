@@ -60,3 +60,9 @@ Command line tool and local web interface to get insights on one machine and man
 - [Commands](docs/commands.md)
 - [System clean-up](docs/cleanup.md)
 - [Web interface](docs/web-interface.md)
+
+## License
+
+[PolyForm Noncommercial 1.0.0](LICENSE): free to use, change and share for any noncommercial purpose.
+Any commercial use, including shipping chade or a part of its code in a product, needs a separate license from the author.
+Versions up to 0.1.4 were published under MIT.

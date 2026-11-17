@@ -4,7 +4,7 @@
   "description": "Web interface of chade, bundled into the chade package and never published on its own",
   "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.json && esbuild src/main.ts --bundle --loader:.md=text --format=esm --target=es2022 --minify --outfile=dist/app.js && cp src/styles.css dist/app.css && cp public/index.html public/icon.svg dist/",
     "test:e2e": "playwright test --config e2e/playwright.config.ts",

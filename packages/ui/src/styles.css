@@ -421,7 +421,7 @@ a.name {
 
 .workspace {
   display: grid;
-  grid-template-columns: 190px minmax(240px, var(--history-width, 2fr)) 8px minmax(320px, 1fr);
+  grid-template-columns: var(--side-width, 190px) 8px minmax(240px, var(--history-width, 2fr)) 8px minmax(320px, 1fr);
   gap: 2px;
   height: calc(100vh - 166px);
   min-height: 420px;
@@ -444,9 +444,25 @@ a.name {
   grid-row: 1;
 }
 
+.pane-side {
+  grid-column: 1;
+}
+
+.pane-resize.side {
+  grid-column: 2;
+}
+
 .pane-list,
 .pane-file {
-  grid-column: 2;
+  grid-column: 3;
+}
+
+.pane-resize {
+  grid-column: 4;
+}
+
+.pane-detail {
+  grid-column: 5;
 }
 
 [hidden] {
@@ -496,7 +512,6 @@ a.name {
 }
 
 .pane-side {
-  margin-right: 10px;
   padding: 4px 6px 10px;
 }
 
@@ -562,6 +577,7 @@ h3 {
 }
 
 .branch-item,
+.tag-item,
 .commit-row,
 .more {
   display: flex;
@@ -575,14 +591,21 @@ h3 {
   cursor: pointer;
 }
 
-.branch-item {
+.branch-item,
+.tag-item {
   gap: 6px;
   padding: 4px 8px;
   border-radius: 6px;
   font: 12.5px var(--mono);
 }
 
+/* A fixed line, so a label or a sign drawn from another font never moves the list when the buttons show. */
+.branch-item > * {
+  line-height: 15px;
+}
+
 .branch-item:hover,
+.tag-item:hover,
 .commit-row:hover {
   background: var(--background);
 }
@@ -618,6 +641,23 @@ h3 {
 
 .track.warn {
   color: var(--warn);
+}
+
+.track.muted {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* A hidden branch stays in the list, faded, so it is shown again from there. */
+.branch-item.hidden-branch .branch-name {
+  color: var(--muted);
+}
+
+/* While the buttons show, the one that shows the branch again says it is hidden, and the name keeps the room. */
+.branch-line:hover .hidden-branch .track.muted,
+.branch-line:focus-within .hidden-branch .track.muted,
+.branch-line:has(.action.running) .hidden-branch .track.muted {
+  display: none;
 }
 
 .commit-row {
@@ -976,10 +1016,6 @@ td.ci {
     grid-row: auto;
     grid-column: 1;
   }
-
-  .pane-side {
-    margin-right: 0;
-  }
 }
 
 /* What changes a repository: the buttons, the line that names a new branch, the commit box, and the notice of what git answered. */
@@ -1051,12 +1087,32 @@ td.ci {
 .branch-line .action {
   display: none;
   width: 22px;
+  height: 22px;
   padding: 0;
+  overflow: hidden;
 }
 
 .branch-line:hover .action,
-.branch-line:focus-within .action {
+.branch-line:focus-within .action,
+.branch-line:has(.action.running) .action {
   display: block;
+}
+
+/* The buttons of a branch are too narrow for the turning ring, which goes after them, on the same line. */
+.branch-line .action.running::after {
+  content: none;
+}
+
+.branch-line:has(.action.running)::after {
+  content: '';
+  flex: none;
+  width: 11px;
+  height: 11px;
+  margin: 0 4px;
+  border: 2px solid var(--accent);
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: turn 0.7s linear infinite;
 }
 
 /* The question asked before a branch is deleted, in the colour of a warning when commits go with it. */
@@ -1105,6 +1161,32 @@ td.ci {
   color: var(--text);
   font: 13px/1.45 system-ui, sans-serif;
   resize: vertical;
+}
+
+/* A heading that opens and closes its group, as a heading still. */
+.group-toggle {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.group-toggle::before {
+  content: '▸';
+  display: inline-block;
+  width: 12px;
+}
+
+.group-toggle.open::before {
+  content: '▾';
+}
+
+.group-toggle:hover {
+  color: var(--text);
 }
 
 h3.with-action {

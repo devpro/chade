@@ -63,7 +63,9 @@ function knownAs(folder: string, remote: string, url: string): void {
   git(folder, 'remote', 'set-url', 'origin', url)
 }
 
-repository('wsl-ubuntu', 'clean')
+// More tags than the list of a repository shows at first.
+const clean = repository('wsl-ubuntu', 'clean')
+for (let index = 1; index <= 25; index++) git(clean, 'tag', `v0.${index}`)
 
 const ahead = repository('wsl-ubuntu', 'ahead')
 knownAs(ahead, 'wsl-ubuntu-ahead', 'git@gitlab.com:chade-e2e/ahead.git')
