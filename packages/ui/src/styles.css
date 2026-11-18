@@ -752,9 +752,26 @@ td.ci {
   text-overflow: ellipsis;
 }
 
+.commit-row .short-hash {
+  flex: 0 0 7ch;
+  color: var(--muted);
+  font: 12px var(--mono);
+}
+
 .commit-row .age {
   flex: 0 0 104px;
   text-align: right;
+}
+
+/* The history is resized by hand, so the hash leaves with the width of the pane, not of the window. */
+#history {
+  container-type: inline-size;
+}
+
+@container (max-width: 520px) {
+  .commit-row .short-hash {
+    display: none;
+  }
 }
 
 .graph {

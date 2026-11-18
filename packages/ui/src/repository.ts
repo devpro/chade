@@ -304,7 +304,7 @@ function renderHistory(current: Loaded): void {
     if (onHead) drawing.append(svg('path', { d: `M ${x} ${ROW / 2} V ${ROW}`, class: 'lane pending' }))
     drawing.append(svg('circle', { cx: x, cy: ROW / 2, r: 4, class: 'dot pending' }))
     const files = `${current.changes.length} file${current.changes.length === 1 ? '' : 's'}`
-    working.append(drawing, node('span', 'Uncommitted changes', 'subject'), node('span', '', 'author'), node('span', files, 'age'))
+    working.append(drawing, node('span', 'Uncommitted changes', 'subject'), node('span', '', 'author'), node('span', '', 'short-hash'), node('span', files, 'age'))
     working.addEventListener('click', () => choose(WORKING_TREE))
     rows.set(WORKING_TREE, working)
     created.push(working)
@@ -316,7 +316,7 @@ function renderHistory(current: Loaded): void {
     text.append(...refBadges(commit, current.branches), commit.subject)
     const mark = node('span', '', 'check')
     paintMark(mark, commit.hash)
-    line.append(graphCell(graph[index], width, commit.parents.length > 1), text, mark, node('span', commit.author, 'author'), node('span', ago(commit.date, now), 'age'))
+    line.append(graphCell(graph[index], width, commit.parents.length > 1), text, mark, node('span', commit.author, 'author'), node('span', commit.hash.slice(0, 7), 'short-hash'), node('span', ago(commit.date, now), 'age'))
     line.title = commit.subject
     line.addEventListener('click', () => choose(commit.hash))
     rows.set(commit.hash, line)
