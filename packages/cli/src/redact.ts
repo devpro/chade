@@ -28,7 +28,8 @@ export function redactUrl(url: string): string {
 
 function redactLine(line: string, keys: RegExp): string {
   for (const match of line.matchAll(KEY)) {
-    if (!keys.test(match[1])) continue
+    // A dotted key names its setting last, as git config does, and its sections, credential for instance, hold settings that are no secret.
+    if (!keys.test(match[1].slice(match[1].lastIndexOf('.') + 1))) continue
     const start = (match.index ?? 0) + match[0].length
     return line.slice(0, start) + redactValue(line.slice(start))
   }
