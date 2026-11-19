@@ -446,6 +446,7 @@ a.name {
 
 .pane-side {
   grid-column: 1;
+  padding: 4px 6px 10px;
 }
 
 .pane-resize.side {
@@ -463,6 +464,7 @@ a.name {
 
 .pane-detail {
   grid-column: 5;
+  padding: 4px 14px 16px;
 }
 
 [hidden] {
@@ -509,10 +511,6 @@ a.name {
 
 .file-link.selected {
   background: var(--accent-soft);
-}
-
-.pane-side {
-  padding: 4px 6px 10px;
 }
 
 .workspace > .pane-resize {
@@ -848,10 +846,6 @@ td.ci {
   justify-content: center;
   padding: 10px;
   color: var(--accent);
-}
-
-.pane-detail {
-  padding: 4px 14px 16px;
 }
 
 .pane-detail h2 {
