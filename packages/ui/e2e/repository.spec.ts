@@ -190,6 +190,28 @@ test('a tag chooses the commit it points at', async ({ history }) => {
   await expect(history.commit('Merge feature/graph')).toHaveClass(/selected/)
 })
 
+test('a branch or a tag scrolls the history to its commit, read further when it is older than the commits shown', async ({ page, server }) => {
+  const long = new RepositoryPage(page)
+  await long.signIn(server.url, 'sandbox', join(server.root, 'sandbox', 'long'))
+  await long.expectOpen('long')
+  await expect(long.commits).toHaveCount(300)
+  await long.branch('old').click()
+  await expect(long.commit('Start long')).toHaveClass(/selected/)
+  await expect(long.commit('Start long')).toBeInViewport()
+  await expect(long.commit('Start long')).toBeFocused()
+  // Back at the newest commit, then at the tag of the oldest one, which is now among the commits read.
+  await long.branch('main').click()
+  await expect(long.commit('Step 320')).toBeInViewport()
+  await long.tagsToggle.click()
+  await long.tags.filter({ hasText: 'v0.0' }).click()
+  await expect(long.commit('Start long')).toBeInViewport()
+  // The commit already chosen, scrolled away from, is scrolled back to.
+  await long.history.evaluate((history) => (history.scrollTop = 0))
+  await expect(long.commit('Start long')).not.toBeInViewport()
+  await long.tags.filter({ hasText: 'v0.0' }).click()
+  await expect(long.commit('Start long')).toBeInViewport()
+})
+
 test('the tags start closed, show the newest once opened, all on demand, and stay open after a reload', async ({ page, server }) => {
   const clean = new RepositoryPage(page)
   await clean.signIn(server.url, 'wsl-ubuntu', join(server.root, 'wsl-ubuntu', 'clean'))

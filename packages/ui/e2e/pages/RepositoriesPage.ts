@@ -37,6 +37,11 @@ export class RepositoryRow {
   get error(): Locator {
     return this.row.locator('td.error')
   }
+
+  // The button of the row that pulls or pushes the branch checked out.
+  sync(action: 'Pull' | 'Push'): Locator {
+    return this.row.getByRole('button', { name: new RegExp(`^${action} `) })
+  }
 }
 
 // The one page of the interface: the systems as tabs, and the repositories of the system chosen.

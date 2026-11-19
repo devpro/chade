@@ -31,11 +31,11 @@ Each system of the machine is a tab, with the number of its repositories and of 
 A tab lists the git repositories found under `repos`, a Windows repository being read by the git of Windows, on WSL as well.
 
 Column       | Content
--------------|-----------------------------------------------------------------------------------------------------
+-------------|---------------------------------------------------------------------------------------------------------------------
 Repository   | Name and path
 Remote       | Mark of the host of the remote: GitHub, GitLab, Azure DevOps, or git for any other host and a folder
 Branch       | Checked out branch, or the commit of a detached HEAD
-Upstream     | Commits ahead (↑) and behind (↓) the upstream branch, `no upstream`, or `upstream gone`
+Upstream     | Commits ahead (↑) and behind (↓) the upstream branch, `no upstream`, or `upstream gone`, and the Pull or Push button
 Working tree | Files changed, untracked and in conflict
 Last commit  | Subject and age
 Fetched      | Age of the last fetch or pull, which the ahead and behind counts are as old as
@@ -43,6 +43,8 @@ Fetched      | Age of the last fetch or pull, which the ahead and behind counts 
 The mark at the start of a row is blue with commits to push, amber with something to commit or pull, and red with a conflict or a repository git cannot read.
 The remote shown is the one the branch tracks, or origin, or the only one.
 A link next to the path opens the remote on the web, at the branch checked out once pushed, on GitHub, GitLab and Bitbucket.
+Pull shows beside a branch behind its upstream, and Push beside a branch ahead and not behind, or never pushed while the repository has a remote.
+They run the Pull and Push of the page of the repository, one at a time, the button turning and a notice in the corner saying what git answered.
 The filter keeps the repositories whose name, path or branch holds every word typed, and the checkbox keeps those with something to commit, push, pull or fix.
 
 The list reads again every 30 seconds while it is looked at, when its tab comes back to the front, and at Refresh.
@@ -53,12 +55,12 @@ It fetches nothing, so a count behind is the one of the last fetch.
 The name of a repository opens its page, which goes from a branch to a commit, to its files, to the changes of one file.
 
 Part     | Content
----------|------------------------------------------------------------------------------------------------------------------------------------
+---------|--------------------------------------------------------------------------------------------------------------------------------------------
 Branches | Local and remote branches, the one checked out marked, each with what it is ahead and behind its upstream by, then the tags from the newest
 History  | Commits of every branch and tag from the newest, drawn as a graph, each with the branches and tags pointing at it
 Changes  | Message, author and date of the commit chosen, and the list of the files it changed
 
-- A branch or a tag chooses the commit it points at.
+- A branch or a tag chooses the commit it points at, and scrolls the history to it, reading older commits when it is not among those listed.
 - The tags start closed under their heading, which gives their count, and once opened show the 20 newest, then all of them on demand.
 - `⊘` beside a branch hides it: the history leaves out the commits no other branch, tag or HEAD reaches, the branch stays listed and marked hidden, and `◉` shows it again.
 - The branches hidden are kept by the browser, for each repository, and the branch checked out is never hidden.
@@ -73,7 +75,7 @@ Changes  | Message, author and date of the commit chosen, and the list of the fi
 
 ## Git actions
 
-The page of a repository changes it through these actions, and no other.
+The page of a repository changes it through these actions, and no other, the list of the repositories through its Pull and Push.
 
 Action      | Where                                      | What git runs                                                                      | Icon
 ------------|--------------------------------------------|------------------------------------------------------------------------------------|-----

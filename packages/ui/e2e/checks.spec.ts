@@ -71,7 +71,7 @@ test('a list IstarCI says nothing of has no IstarCI column', async ({ repositori
   // A system none of whose repositories IstarCI watches.
   await repositories.filter('')
   await repositories.showSystem('sandbox')
-  await expect(repositories.names).toHaveText(['work'])
+  await expect(repositories.names).toHaveText(['long', 'work'])
   await expect(repositories.page.getByRole('columnheader', { name: 'Fetched' })).toBeVisible()
   await expect(repositories.page.getByRole('columnheader', { name: 'IstarCI' })).toHaveCount(0)
 })

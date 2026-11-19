@@ -137,6 +137,19 @@ git(elsewhere, 'push', '--quiet', '--set-upstream', 'origin', 'review')
 writeFileSync(join(work, 'README.md'), '# work\n\nEdited.\n')
 writeFileSync(join(work, 'draft.txt'), 'a new file\n')
 
+// More commits than the history reads at first, under a branch and a tag that point at the oldest one.
+const long = repository('sandbox', 'long')
+git(long, 'branch', 'old')
+git(long, 'tag', 'v0.0')
+// One git command for all of them, as one each would make the run seconds longer.
+const steps = Array.from({ length: 320 }, (_, index) => {
+  const message = `Step ${index + 1}\n`
+  return `commit refs/heads/main\ncommitter e2e <e2e@example.test> ${1_700_000_000 + index} +0000\ndata ${message.length}\n${message}${index === 0 ? 'from refs/heads/main^0\n' : ''}\n`
+})
+execFileSync('git', ['-C', long, 'fast-import', '--quiet'], { env, input: steps.join('') })
+git(long, 'reset', '--quiet', '--hard')
+git(long, 'push', '--quiet')
+
 const portal = repository('windows', 'portal')
 repository('windows', 'local-only', { push: false })
 

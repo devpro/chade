@@ -735,6 +735,11 @@ h3 {
   color: var(--muted);
 }
 
+/* The pull or push of a row, beside the count that calls for it, on the line of the badges. */
+td.upstream .action {
+  vertical-align: middle;
+}
+
 td.ci {
   white-space: nowrap;
   font-size: 16px;

@@ -1,8 +1,9 @@
 import type { Repository, RepositoryCheck } from '@chade/daemon'
-import { address, get } from './api.js'
+import { address, get, post } from './api.js'
 import { element, node } from './dom.js'
 import { forgeIcon } from './forge.js'
 import { ago, changes, checkOf, matches, needsAttention, summary, sync, tone, type Badge } from './format.js'
+import { CHANGED_EVENT, notify, reason, refused } from './notice.js'
 
 interface State {
   version: string
@@ -18,6 +19,54 @@ let state: State | undefined
 // The latest check of IstarCI on each repository, by its system and its path, read after the list.
 let latest = new Map<string, RepositoryCheck>()
 const keyOf = (system: string, path: string): string => `${system}\n${path}`
+
+type Sync = 'pull' | 'push'
+// The pull or push running, one at a time, kept apart from the rows so that a list drawn again meanwhile still shows it turning.
+let running: { key: string; action: Sync } | undefined
+
+// What the list offers in one click, only when git would do it: a pull when the branch is behind,
+// a push when it is ahead and not behind, or never pushed while the repository has a remote.
+export function syncActions(repository: Repository): Sync[] {
+  if (repository.error !== undefined || !repository.branch) return []
+  if (!repository.upstream) return repository.remote ? ['push'] : []
+  if ((repository.behind ?? 0) > 0) return ['pull']
+  if ((repository.ahead ?? 0) > 0) return ['push']
+  return []
+}
+
+async function runSync(repository: Repository, action: Sync): Promise<void> {
+  if (running) return
+  const { system, path, name } = repository
+  const key = keyOf(system, path)
+  running = { key, action }
+  render()
+  notify(`${action === 'pull' ? 'Pulling' : 'Pushing'} ${name}…`, '', 'running')
+  try {
+    const { output } = await post<{ output: string }>('action', { system, path, action })
+    notify(`${action === 'pull' ? 'Pulled' : 'Pushed'} ${name}`, output, 'done')
+  } catch (error) {
+    notify(`${refused(action)} for ${name}`, reason(error), 'failed')
+  }
+  running = undefined
+  document.dispatchEvent(new CustomEvent(CHANGED_EVENT, { detail: key }))
+  await list.reload().catch(() => render())
+}
+
+function syncButton(repository: Repository, action: Sync): HTMLButtonElement {
+  const busy = running?.key === keyOf(repository.system, repository.path) && running.action === action
+  const text = action === 'pull' ? 'Pull' : 'Push'
+  const button = node('button', text, `action small sync${busy ? ' running' : ''}`) as HTMLButtonElement
+  button.type = 'button'
+  button.disabled = running !== undefined
+  const target = repository.upstream ?? 'its remote'
+  button.title = action === 'pull' ? `Pull ${repository.branch} from ${target}` : `Push ${repository.branch} to ${target}`
+  button.setAttribute('aria-label', `${text} ${repository.name}`)
+  button.addEventListener('click', (event) => {
+    event.stopPropagation()
+    void runSync(repository, action)
+  })
+  return button
+}
 
 // What IstarCI said last about the repository, grey when it is about another commit than the one checked out.
 function checkCell(repository: Repository): HTMLElement {
@@ -57,7 +106,7 @@ function row(repository: Repository, now: number, withChecks: boolean): HTMLElem
   line.append(name)
   // The whole row opens the repository, and the link stays for the keyboard and for opening in another tab.
   line.addEventListener('click', (event) => {
-    if (event.target !== link && !(event.target as HTMLElement).closest('.ci') && !getSelection()?.toString()) location.hash = link.hash
+    if (event.target !== link && !(event.target as HTMLElement).closest('.ci, .sync') && !getSelection()?.toString()) location.hash = link.hash
   })
   if (repository.error !== undefined) {
     const error = node('td', repository.error, 'error')
@@ -73,7 +122,10 @@ function row(repository: Repository, now: number, withChecks: boolean): HTMLElem
   else commit.append(node('span', 'no commit yet', 'age'))
   const remote = node('td', '', 'remote')
   remote.append(forgeIcon(repository.remote))
-  line.append(remote, branch, badges(sync(repository)), badges(changes(repository)), commit)
+  const upstream = badges(sync(repository))
+  upstream.classList.add('upstream')
+  upstream.append(...syncActions(repository).map((action) => syncButton(repository, action)))
+  line.append(remote, branch, upstream, badges(changes(repository)), commit)
   if (withChecks) line.append(checkCell(repository))
   line.append(node('td', repository.fetchedAt ? ago(repository.fetchedAt, now) : 'never', 'age'))
   return line
