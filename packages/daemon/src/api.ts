@@ -81,7 +81,7 @@ export function createApi(options: ApiOptions): ServerOptions['api'] {
     }),
     repository: async (query) => {
       const { root, relative } = await repository(query)
-      return { version: options.version, machine: options.machine, scannedAt: new Date().toISOString(), ...(await repositoryDetail(root, relative, options.run, limitOf(query))) }
+      return { version: options.version, machine: options.machine, scannedAt: new Date().toISOString(), ...(await repositoryDetail(root, relative, options.run, limitOf(query), query.getAll('hide'))) }
     },
     // What deleting a branch would lose, read when the deletion is asked, a count that costs a walk of the history.
     branch: async (query) => {

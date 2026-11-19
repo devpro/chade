@@ -5,7 +5,7 @@ import { shot } from './shot.js'
 
 test('each system is a tab, with its repositories and how many have something to do @layout', async ({ page, repositories }, testInfo) => {
   await expect(repositories.machine).toHaveText('E2E-PC')
-  await expect(repositories.tabs).toHaveText(['windows21', 'wsl-ubuntu97', /^sandbox1/])
+  await expect(repositories.tabs).toHaveText(['windows21', 'wsl-ubuntu97', /^sandbox2/])
   // The first system is shown until another is chosen.
   await expect(repositories.tab('windows')).toHaveAttribute('aria-selected', 'true')
   await expect(repositories.names).toHaveText(['local-only', 'portal'])
@@ -36,16 +36,16 @@ test('a repository shows its branch, what there is to push and pull, and the sta
   await expect(repositories.repository('history').forge).toHaveAttribute('title', 'origin on GitHub')
 
   const ahead = repositories.repository('ahead')
-  await expect(ahead.upstream).toHaveText('↑ 2')
+  await expect(ahead.upstream).toHaveText('↑ 2Push')
   await expect(ahead.row).toHaveClass('info')
   // A commit subject is text, whatever it holds.
   await expect(ahead.lastCommit).toHaveText('Change the file, which <b>is not</b> markup')
 
-  await expect(repositories.repository('behind').upstream).toHaveText('↓ 1')
+  await expect(repositories.repository('behind').upstream).toHaveText('↓ 1Pull')
   await expect(repositories.repository('dirty').workingTree).toHaveText('1 changed2 untracked')
   await expect(repositories.repository('dirty').row).toHaveClass('warn')
   await expect(repositories.repository('group/feature').branch).toHaveText('feature/never-pushed')
-  await expect(repositories.repository('group/feature').upstream).toHaveText('no upstream')
+  await expect(repositories.repository('group/feature').upstream).toHaveText('no upstreamPush')
   await expect(repositories.repository('detached').branch).toHaveText(/^detached at [0-9a-f]{7}$/)
   await expect(repositories.repository('conflict').workingTree).toHaveText('1 in conflict')
   await expect(repositories.repository('conflict').row).toHaveClass('bad')

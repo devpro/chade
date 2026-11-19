@@ -63,7 +63,9 @@ function knownAs(folder: string, remote: string, url: string): void {
   git(folder, 'remote', 'set-url', 'origin', url)
 }
 
-repository('wsl-ubuntu', 'clean')
+// More tags than the list of a repository shows at first.
+const clean = repository('wsl-ubuntu', 'clean')
+for (let index = 1; index <= 25; index++) git(clean, 'tag', `v0.${index}`)
 
 const ahead = repository('wsl-ubuntu', 'ahead')
 knownAs(ahead, 'wsl-ubuntu-ahead', 'git@gitlab.com:chade-e2e/ahead.git')
@@ -134,6 +136,19 @@ commit(elsewhere, 'review.txt', 'to review\n', 'Start the review')
 git(elsewhere, 'push', '--quiet', '--set-upstream', 'origin', 'review')
 writeFileSync(join(work, 'README.md'), '# work\n\nEdited.\n')
 writeFileSync(join(work, 'draft.txt'), 'a new file\n')
+
+// More commits than the history reads at first, under a branch and a tag that point at the oldest one.
+const long = repository('sandbox', 'long')
+git(long, 'branch', 'old')
+git(long, 'tag', 'v0.0')
+// One git command for all of them, as one each would make the run seconds longer.
+const steps = Array.from({ length: 320 }, (_, index) => {
+  const message = `Step ${index + 1}\n`
+  return `commit refs/heads/main\ncommitter e2e <e2e@example.test> ${1_700_000_000 + index} +0000\ndata ${message.length}\n${message}${index === 0 ? 'from refs/heads/main^0\n' : ''}\n`
+})
+execFileSync('git', ['-C', long, 'fast-import', '--quiet'], { env, input: steps.join('') })
+git(long, 'reset', '--quiet', '--hard')
+git(long, 'push', '--quiet')
 
 const portal = repository('windows', 'portal')
 repository('windows', 'local-only', { push: false })

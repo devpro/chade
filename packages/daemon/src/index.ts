@@ -4,6 +4,7 @@ export {
   parseBranches,
   parseChanges,
   parseCommits,
+  parseTags,
   repositoryDetail,
   repositoryDiff,
   type Branch,
@@ -12,6 +13,7 @@ export {
   type Diff,
   type FileChange,
   type LastCommit,
+  type Tag,
 } from './history.js'
 export { pathKey, readChecks, readRepositories, type Check, type CheckStatus, type IstarciServer, type RepositoryCheck } from './istarci.js'
 export type { Measure, Report, Section } from './report.js'

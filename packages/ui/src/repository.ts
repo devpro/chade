@@ -1,11 +1,12 @@
-import type { Branch, Check, Commit, Detail, Diff, FileChange, LastCommit } from '@chade/daemon'
+import type { Branch, Check, Commit, Detail, Diff, FileChange, LastCommit, Tag } from '@chade/daemon'
 import { address, get, post } from './api.js'
 import { parseDiff } from './diff.js'
 import { copyHash, element, node, svg } from './dom.js'
-import { counts, diffLines, fileHead, fileOf, label, resizable, statusOf } from './files.js'
+import { counts, diffLines, fileHead, fileOf, label, resizable, resizableSide, statusOf } from './files.js'
 import { ago, changes, checkOf, sync } from './format.js'
 import { layout, type GraphRow } from './graph.js'
 import { badges, list } from './list.js'
+import { CHANGED_EVENT, notify, reason, refused, RUNNING } from './notice.js'
 
 type Loaded = Detail & { machine: string; version: string; scannedAt: string }
 
@@ -26,43 +27,49 @@ const patches = new Map<string, Diff>()
 const rows = new Map<string, HTMLElement>()
 // What IstarCI did with each commit, read after the history so the history never waits for it.
 let checks: Record<string, Check> = {}
-// An action is running: the next one waits for its answer, as git changes one thing at a time in a repository.
-let acting = false
+// The branches whose commits the history leaves out, kept in the browser for each repository.
+let hidden = new Set<string>()
+const HIDDEN_KEY = 'chade-hidden'
 
-let noticeTimer: ReturnType<typeof setTimeout> | undefined
-
-// What an action did, or why git refused it, in the words of git, in a corner of the page.
-function notify(title: string, text: string, state: 'running' | 'done' | 'failed'): void {
-  clearTimeout(noticeTimer)
-  const notice = element('notice')
-  notice.hidden = false
-  notice.className = state
-  element('notice-title').textContent = title
-  element('notice-text').textContent = text
-  // A success leaves by itself, and a failure stays until read.
-  if (state === 'done') noticeTimer = setTimeout(() => (notice.hidden = true), 6000)
+function readHidden(): Set<string> {
+  try {
+    const all = JSON.parse(localStorage.getItem(HIDDEN_KEY) ?? '{}') as Record<string, string[]>
+    return new Set(Array.isArray(all[key]) ? all[key] : [])
+  } catch {
+    return new Set()
+  }
 }
 
-element('notice-close').addEventListener('click', () => (element('notice').hidden = true))
+function saveHidden(): void {
+  try {
+    const all = JSON.parse(localStorage.getItem(HIDDEN_KEY) ?? '{}') as Record<string, string[]>
+    if (hidden.size > 0) all[key] = [...hidden]
+    else delete all[key]
+    localStorage.setItem(HIDDEN_KEY, JSON.stringify(all))
+  } catch {
+    // A browser that keeps nothing hides the branches until the page is left.
+  }
+}
+
+// Hiding asks for the history again, without the commits the branch is alone to reach.
+function toggleHidden(name: string, button: HTMLElement): void {
+  if (hidden.has(name)) hidden.delete(name)
+  else hidden.add(name)
+  saveHidden()
+  button.classList.add('running')
+  void repository
+    .reload()
+    .catch(() => undefined)
+    .finally(() => button.classList.remove('running'))
+}
+
+// An action is running: the next one waits for its answer, as git changes one thing at a time in a repository.
+let acting = false
 
 function setBusy(busy: boolean): void {
   acting = busy
   repository.section.classList.toggle('busy', busy)
   for (const button of repository.section.querySelectorAll<HTMLButtonElement>('.action')) button.disabled = busy || button.dataset.off === 'true'
-}
-
-// What the notice says while git works, a push taking the seconds its remote takes.
-const RUNNING: Record<string, string> = {
-  fetch: 'Fetching…',
-  pull: 'Pulling…',
-  push: 'Pushing…',
-  checkout: 'Checking out…',
-  branch: 'Creating the branch…',
-  stage: 'Staging…',
-  unstage: 'Unstaging…',
-  commit: 'Committing…',
-  amend: 'Amending…',
-  delete: 'Deleting the branch…',
 }
 
 // Asks the server for one change in the repository shown, then reads the repository again.
@@ -84,7 +91,7 @@ async function act(request: Record<string, unknown>, done: string, button?: HTML
   } catch (error) {
     acting = false
     await repository.reload().catch(() => undefined)
-    notify(`${action[0].toUpperCase()}${action.slice(1)} did not go through`, error instanceof Error ? error.message : String(error), 'failed')
+    notify(refused(action), reason(error), 'failed')
   }
   button?.classList.remove('running')
   setBusy(false)
@@ -248,9 +255,41 @@ async function loadChecks(system: string, path: string): Promise<void> {
   paintChecks()
 }
 
-function choose(chosen: string): void {
+// The commit of a branch or a tag chosen in the side list, which the history scrolls to once it is drawn.
+let reveal: string | undefined
+// The history is read up to this many commits to find a commit to reveal, as many as the server gives.
+const MAX_REVEAL = 5000
+
+function choose(chosen: string, scroll = false): void {
   if (!detail) return
-  location.hash = address({ system: detail.repository.system, path: detail.repository.path, commit: chosen })
+  reveal = scroll ? chosen : undefined
+  const hash = address({ system: detail.repository.system, path: detail.repository.path, commit: chosen })
+  // The commit already chosen, after a scroll of the history away from it, changes no address, and is revealed again here.
+  if (location.hash === hash) revealTarget(detail)
+  else location.hash = hash
+}
+
+// The head of a branch can be older than the commits read, so the history is read further until it shows,
+// and a commit it never reaches, of a hidden branch for instance, is still shown in the changes panel.
+function revealTarget(current: Loaded): void {
+  if (reveal === undefined) return
+  if (reveal !== target) {
+    reveal = undefined
+    return
+  }
+  const line = rows.get(reveal)
+  if (line) {
+    reveal = undefined
+    line.scrollIntoView({ block: 'center' })
+    line.focus({ preventScroll: true })
+    return
+  }
+  if (!current.more || limit >= MAX_REVEAL) {
+    reveal = undefined
+    return
+  }
+  limit = Math.min(limit * 2, MAX_REVEAL)
+  void repository.reload().catch(() => (reveal = undefined))
 }
 
 function renderHistory(current: Loaded): void {
@@ -268,7 +307,7 @@ function renderHistory(current: Loaded): void {
     if (onHead) drawing.append(svg('path', { d: `M ${x} ${ROW / 2} V ${ROW}`, class: 'lane pending' }))
     drawing.append(svg('circle', { cx: x, cy: ROW / 2, r: 4, class: 'dot pending' }))
     const files = `${current.changes.length} file${current.changes.length === 1 ? '' : 's'}`
-    working.append(drawing, node('span', 'Uncommitted changes', 'subject'), node('span', '', 'author'), node('span', files, 'age'))
+    working.append(drawing, node('span', 'Uncommitted changes', 'subject'), node('span', '', 'author'), node('span', '', 'short-hash'), node('span', files, 'age'))
     working.addEventListener('click', () => choose(WORKING_TREE))
     rows.set(WORKING_TREE, working)
     created.push(working)
@@ -280,7 +319,7 @@ function renderHistory(current: Loaded): void {
     text.append(...refBadges(commit, current.branches), commit.subject)
     const mark = node('span', '', 'check')
     paintMark(mark, commit.hash)
-    line.append(graphCell(graph[index], width, commit.parents.length > 1), text, mark, node('span', commit.author, 'author'), node('span', ago(commit.date, now), 'age'))
+    line.append(graphCell(graph[index], width, commit.parents.length > 1), text, mark, node('span', commit.author, 'author'), node('span', commit.hash.slice(0, 7), 'short-hash'), node('span', ago(commit.date, now), 'age'))
     line.title = commit.subject
     line.addEventListener('click', () => choose(commit.hash))
     rows.set(commit.hash, line)
@@ -304,13 +343,17 @@ function renderBranches(current: Loaded): void {
   const group = (title: string, branches: Branch[]): HTMLElement[] => {
     if (branches.length === 0) return []
     const items = branches.map((branch) => {
-      const item = node('button', '', `branch-item${branch.head ? ' head' : ''}`)
+      // The branch checked out is never hidden, as HEAD keeps its commits in the history.
+      const isHidden = !branch.head && hidden.has(branch.name)
+      const item = node('button', '', `branch-item${branch.head ? ' head' : ''}${isHidden ? ' hidden-branch' : ''}`)
       item.append(node('span', branch.name, 'branch-name'))
+      if (isHidden) item.append(node('span', 'hidden', 'track muted'))
       if (branch.gone) item.append(node('span', 'gone', 'track warn'))
       if (branch.ahead) item.append(node('span', `↑${branch.ahead}`, 'track info'))
       if (branch.behind) item.append(node('span', `↓${branch.behind}`, 'track warn'))
       item.title = branch.upstream ? `${branch.name}, tracking ${branch.upstream}` : branch.name
-      item.addEventListener('click', () => choose(branch.commit))
+      // A hidden branch leaves its commits out of the history, so there is no line to scroll to.
+      item.addEventListener('click', () => choose(branch.commit, !isHidden))
       if (branch.head) return item
       // The name shows the commit of the branch, and the buttons beside it change the branch.
       const line = node('div', '', 'branch-line')
@@ -322,6 +365,8 @@ function renderBranches(current: Loaded): void {
         line.append(button)
       }
       line.append(item)
+      if (isHidden) add('◉', `Show ${name}`, `Show ${name}: its commits come back in the history`, (button) => toggleHidden(name, button))
+      else add('⊘', `Hide ${name}`, `Hide ${name}: the history leaves out the commits no other branch or tag reaches`, (button) => toggleHidden(name, button))
       add('⇄', `Check out ${name}`, `Check out ${name}`, (button) => void act({ action: 'checkout', branch: name }, `Checked out ${name}`, button))
       if (branch.remote) return line
       if (branch.upstream && !branch.gone) {
@@ -342,7 +387,57 @@ function renderBranches(current: Loaded): void {
       'Remote',
       current.branches.filter((branch) => branch.remote),
     ),
+    ...tagGroup(current.tags),
   )
+}
+
+const TAGS_OPEN_KEY = 'chade-tags-open'
+const TAGS_SHOWN = 20
+// A repository can have hundreds of tags, so the list starts closed, and once opened shows the newest ones until asked for all.
+let allTags = false
+
+function tagsOpen(): boolean {
+  try {
+    return localStorage.getItem(TAGS_OPEN_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
+// The tags, from the newest, each choosing the commit it points at, under a heading that opens and closes them.
+function tagGroup(tags: Tag[]): HTMLElement[] {
+  if (tags.length === 0) return []
+  const open = tagsOpen()
+  const toggle = node('button', `Tags (${tags.length})`, `group-toggle${open ? ' open' : ''}`)
+  toggle.setAttribute('aria-expanded', String(open))
+  toggle.addEventListener('click', () => {
+    try {
+      localStorage.setItem(TAGS_OPEN_KEY, String(!open))
+    } catch {
+      // A browser that keeps nothing opens the tags until the page is drawn again.
+    }
+    if (detail) renderBranches(detail)
+  })
+  const heading = node('h3')
+  heading.append(toggle)
+  if (!open) return [heading]
+  const shown = allTags ? tags : tags.slice(0, TAGS_SHOWN)
+  const items: HTMLElement[] = shown.map((tag) => {
+    const item = node('button', '', 'tag-item')
+    item.append(node('span', tag.name, 'branch-name'))
+    item.title = `${tag.name}, at ${tag.commit.slice(0, 10)}`
+    item.addEventListener('click', () => choose(tag.commit, true))
+    return item
+  })
+  if (shown.length < tags.length) {
+    const more = node('button', `Show all ${tags.length} tags`, 'more')
+    more.addEventListener('click', () => {
+      allTags = true
+      if (detail) renderBranches(detail)
+    })
+    items.push(more)
+  }
+  return [heading, ...items]
 }
 
 // Where the changes of one file are asked from: a commit, or what is staged or not in the working tree.
@@ -484,6 +579,7 @@ async function renderDetail(current: Loaded): Promise<void> {
   const panel = element('detail')
   for (const [name, line] of rows) line.classList.toggle('selected', name === target)
   void renderFile(current)
+  revealTarget(current)
   if (!target) {
     panel.replaceChildren(node('p', 'Choose a commit to see what it changed.', 'empty'))
     return
@@ -531,6 +627,7 @@ function render(current: Loaded): void {
 }
 
 resizable('resize', 'history', 'diff')
+resizableSide('resize-side', 'branches', 'history', 'diff', 'detail')
 
 for (const button of actionButtons()) {
   const action = button.dataset.action as string
@@ -626,6 +723,11 @@ async function askDelete(name: string, button: HTMLElement): Promise<void> {
   })
 }
 
+// A pull or a push from the list makes what was read of that repository old, so the next visit reads it again.
+document.addEventListener(CHANGED_EVENT, (event) => {
+  if ((event as CustomEvent<string>).detail === key) detail = undefined
+})
+
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && shownFile && !repository.section.hidden) open(shownFile.from, undefined)
 })
@@ -652,6 +754,8 @@ export const repository = {
     detail = undefined
     patches.clear()
     checks = {}
+    hidden = readHidden()
+    allTags = false
     message.value = ''
     element('branch-form').hidden = true
     closeDelete()
@@ -663,10 +767,16 @@ export const repository = {
   },
   async reload(): Promise<{ machine: string; version: string; scannedAt: string }> {
     const [system, path] = key.split('\n')
-    const loaded = await get<Loaded>('repository', { system, path, limit: String(limit) })
+    const loaded = await get<Loaded>('repository', { system, path, limit: String(limit), hide: [...hidden] })
     // The answer for a repository left meanwhile is dropped.
     if (`${system}\n${path}` !== key) return loaded
     detail = loaded
+    // A branch deleted meanwhile is forgotten, so one made again with its name shows.
+    const names = new Set(loaded.branches.map((branch) => branch.name))
+    if ([...hidden].some((name) => !names.has(name))) {
+      hidden = new Set([...hidden].filter((name) => names.has(name)))
+      saveHidden()
+    }
     render(detail)
     void loadChecks(system, path)
     return detail

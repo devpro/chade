@@ -42,8 +42,9 @@ function takeToken(): string | null {
   return sessionStorage.getItem(TOKEN_KEY)
 }
 
-export function get<T>(name: string, query: Record<string, string> = {}): Promise<T> {
-  const search = new URLSearchParams(query)
+// A list is sent as the same name once for each of its values.
+export function get<T>(name: string, query: Record<string, string | string[]> = {}): Promise<T> {
+  const search = new URLSearchParams(Object.entries(query).flatMap(([key, value]) => (Array.isArray(value) ? value : [value]).map((one) => [key, one])))
   const suffix = search.size > 0 ? `?${search}` : ''
   return call<T>(`api/${name}${suffix}`, {})
 }
