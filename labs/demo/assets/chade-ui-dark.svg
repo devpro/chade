@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 280" width="1000" height="280" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+  <rect width="1000" height="280" fill="#0f172a"/>
+
+  <rect x="20" y="50" width="240" height="180" rx="12" fill="#1e293b" stroke="#38bdf8"/>
+  <text x="140" y="86" text-anchor="middle" font-size="20" font-weight="600" fill="#38bdf8">Browser</text>
+  <text x="140" y="120" text-anchor="middle" font-size="13" fill="#e2e8f0">signs in with the token</text>
+  <text x="140" y="142" text-anchor="middle" font-size="13" fill="#e2e8f0">that chade ui prints</text>
+  <text x="140" y="180" text-anchor="middle" font-size="13" fill="#94a3b8">refused from another site</text>
+  <text x="140" y="202" text-anchor="middle" font-size="13" fill="#94a3b8">or another host name</text>
+
+  <rect x="380" y="50" width="240" height="180" rx="12" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/>
+  <text x="500" y="86" text-anchor="middle" font-size="20" font-weight="600" fill="#fbbf24">chade server</text>
+  <text x="500" y="110" text-anchor="middle" font-size="13" fill="#94a3b8" font-family="Consolas, monospace">127.0.0.1:7843 only</text>
+  <text x="500" y="146" text-anchor="middle" font-size="13" fill="#e2e8f0">a fixed list of actions</text>
+  <text x="500" y="168" text-anchor="middle" font-size="13" fill="#e2e8f0">each value checked against</text>
+  <text x="500" y="190" text-anchor="middle" font-size="13" fill="#e2e8f0">what git itself lists</text>
+
+  <rect x="740" y="50" width="240" height="180" rx="12" fill="#1e293b" stroke="#4ade80"/>
+  <text x="860" y="86" text-anchor="middle" font-size="20" font-weight="600" fill="#4ade80">git</text>
+  <text x="860" y="120" text-anchor="middle" font-size="13" fill="#e2e8f0">as the user, with the SSH</text>
+  <text x="860" y="142" text-anchor="middle" font-size="13" fill="#e2e8f0">agent and credential helper</text>
+  <text x="860" y="180" text-anchor="middle" font-size="13" fill="#94a3b8">no force push, no reset,</text>
+  <text x="860" y="202" text-anchor="middle" font-size="13" fill="#94a3b8">no rewrite of a pushed commit</text>
+
+  <line x1="262" y1="140" x2="376" y2="140" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <text x="319" y="128" text-anchor="middle" font-size="12" fill="#94a3b8">JSON + token</text>
+  <line x1="622" y1="140" x2="736" y2="140" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="679" y="128" text-anchor="middle" font-size="12" fill="#94a3b8">fetch, pull,</text>
+  <text x="679" y="164" text-anchor="middle" font-size="12" fill="#94a3b8">branch, commit</text>
+</svg>
