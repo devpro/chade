@@ -14,6 +14,12 @@ What is left to do, in the order agreed.
 - chade started from Windows reads no IstarCI running in WSL, its configuration being in the home of WSL.
   It could be read through `\\wsl.localhost\<distro>\home\<user>\.istarci\config.yml`, once the distribution to read is chosen.
 
+## Platform detection
+
+- A container on a WSL 2 kernel is taken for WSL, since `/proc/sys/kernel/osrelease` names `microsoft` there too, a dev container of VS Code on Windows for instance.
+  chade then names its system `wsl-linux`, asks Windows for the computer name, and the report measures `C:` and `.wslconfig`.
+  WSL also has `/proc/sys/fs/binfmt_misc/WSLInterop`, which a container does not, so requiring it as well tells them apart.
+
 ## Restore
 
 - Restore scripts generated from a snapshot, `winget import` and `code --install-extension` for instance.
