@@ -6,6 +6,8 @@ tags:
   - chade
   - demo
 sidebarWidth: 620
+# The web interface follows the system's colour mode, and the demo shows it dark.
+colorScheme: dark
 backend: container
 hosts:
   # The lab itself, whose Chrome shows the web interface.
