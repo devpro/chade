@@ -50,11 +50,13 @@ ffmpeg -i ~/chade-demo.webm -vf "fps=1/8,scale=480:-1,tile=5x7" -frames:v 1 shee
 ffmpeg -ss 190 -i ~/chade-demo.webm -frames:v 1 frame-190.png
 ```
 
-Without it, `video_frames.mjs` does the same in the Chromium of sidelab's Playwright, taking `<count>` frames evenly from `<from>` to `<to>` seconds:
+Without it, sidelab's `npm run video:frames` does the same in the Chromium of its Playwright, taking `<count>` frames evenly from `<from>` to `<to>` seconds.
+It runs from the sidelab checkout, so the paths are absolute:
 
 ```bash
-node labs/video_frames.mjs ~/chade-demo.webm sheet.png 0 236 20 5
-node labs/video_frames.mjs ~/chade-demo.webm frame-190.png 190 190 1
+cd ../sidelab
+npm run video:frames -- ~/chade-demo.webm ~/sheet.png 0 236 20 5
+npm run video:frames -- ~/chade-demo.webm ~/frame-190.png 190 190 1
 ```
 
 What to look for:
