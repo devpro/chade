@@ -1,4 +1,4 @@
-## What we saw
+# What we saw
 
 - `chade init`, `chade discover` and a short configuration file are all it takes to start.
 - `chade snapshot` commits the configuration of the machine, secrets masked, and `chade diff` tells what changed.

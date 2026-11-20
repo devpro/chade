@@ -33,8 +33,36 @@ Task                          | Effect
 A required secret is refused before any block runs, so the first run is `task lab:verify KEEP=1`, then the value goes in at the address it prints, then the next runs use that launcher:
 
 ```bash
-LAUNCHER_URL=http://localhost:<port> ADMIN_USERNAME=admin ADMIN_PASSWORD=verify-course-local-pass \
-  npm --prefix ../sidelab run verify:course -- "$PWD/labs/demo" --capabilities network
+LAUNCHER_URL=http://localhost:<port> task lab:verify
+LAUNCHER_URL=http://localhost:<port> task lab:record OUT=$HOME/chade-demo.webm
 ```
 
 The lab installs the published `@devpro/chade` at `CHADE_VERSION`, not the working tree, so it shows what a release carries.
+
+## Checking a recording
+
+A recording that passes can still show what a published video must not, so its frames are looked at before it is published.
+
+With ffmpeg, a contact sheet of a frame every 8 seconds, and one frame at full size:
+
+```bash
+ffmpeg -i ~/chade-demo.webm -vf "fps=1/8,scale=480:-1,tile=5x7" -frames:v 1 sheet.png
+ffmpeg -ss 190 -i ~/chade-demo.webm -frames:v 1 frame-190.png
+```
+
+Without it, `video_frames.mjs` does the same in the Chromium of sidelab's Playwright, taking `<count>` frames evenly from `<from>` to `<to>` seconds:
+
+```bash
+node labs/video_frames.mjs ~/chade-demo.webm sheet.png 0 236 20 5
+node labs/video_frames.mjs ~/chade-demo.webm frame-190.png 190 190 1
+```
+
+What to look for:
+
+- No secret: the npm token only as `_authToken=xxx`, no `#token=` left in the address bar after the sign-in, and the sign-in address `chade ui` prints blurred if no token is to be seen at all.
+- Text readable at 1080p, the terminal above all, watched full screen on a laptop.
+- The pace: output scrolls fast in the setup and the first snapshot, slowed or frozen in editing under a voice-over rather than in the lab.
+- Nothing of the platform in the way, such as a banner of the terminal or an infobar of the browser.
+
+The yellow dot is the cursor of the recorder, which shows where each click lands.
+YouTube takes the VP9 WebM as it is.
