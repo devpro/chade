@@ -5,7 +5,10 @@
   "private": true,
   "type": "module",
   "license": "PolyForm-Noncommercial-1.0.0",
-  "exports": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./scan": "./src/scan.ts"
+  },
   "scripts": {
     "test": "../../scripts/with_test_tmpdir.sh node --import tsx --test --test-reporter=dot test/*.test.ts",
     "typecheck": "tsc -p tsconfig.json"

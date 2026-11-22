@@ -115,7 +115,7 @@ test('a report of a Linux machine measures every source, and hints where it is w
   const host: Host = { machine: 'TEST-PC', home, run: fakeRun, systems: [{ kind: 'linux', id: 'linux' }] }
   const result = await report(undefined, host)
   const titles = result.sections.map((section) => section.title)
-  assert.deepEqual(titles, ['Memory', 'Linux disk', 'Docker', 'Journal', 'Caches'])
+  assert.deepEqual(titles, ['Memory', 'Linux disk', 'Docker', 'Journal', 'Caches', 'Security'])
   const text = renderReport(result)
   assert.match(text, /docker image prune -a --filter until=168h -f/)
   assert.match(text, /journalctl --vacuum-size=500M/)
@@ -149,7 +149,7 @@ test('a report from Windows measures with Windows tools, and leaves the Linux se
   // A C: drive exists when the test itself runs on Windows.
   assert.deepEqual(
     result.sections.map((section) => section.title).filter((title) => title !== 'Windows disk'),
-    ['Memory', 'Caches'],
+    ['Memory', 'Caches', 'Security'],
   )
   // No distribution in the registry, so no settings of WSL to suggest.
   assert.ok(!result.sections.some((section) => section.title === 'WSL settings'))

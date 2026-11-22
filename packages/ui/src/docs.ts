@@ -1,6 +1,7 @@
 import cleanup from '../../../docs/cleanup.md'
 import commands from '../../../docs/commands.md'
 import configuration from '../../../docs/configuration.md'
+import scan from '../../../docs/scan.md'
 import webInterface from '../../../docs/web-interface.md'
 import contributing from '../../../CONTRIBUTING.md'
 import readme from '../../../README.md'
@@ -23,6 +24,7 @@ const pages: Page[] = [
   { slug: 'configuration', file: 'docs/configuration.md', title: 'Configuration', source: configuration },
   { slug: 'web-interface', file: 'docs/web-interface.md', title: 'Web interface', source: webInterface },
   { slug: 'cleanup', file: 'docs/cleanup.md', title: 'System clean-up', source: cleanup },
+  { slug: 'scan', file: 'docs/scan.md', title: 'Packages and images', source: scan },
   { slug: 'contributing', file: 'CONTRIBUTING.md', title: 'Contributor guide', source: contributing },
 ]
 

@@ -1515,8 +1515,197 @@ a.tab {
   font-size: 13px;
 }
 
-#report-state.measuring {
+#report-state.measuring,
+#security-state.measuring {
   color: var(--accent);
+}
+
+/* The security page: a place for each folder or image read, opened on its findings, and what nothing uses with its command. */
+#security-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-right: auto;
+}
+
+#security-filter {
+  flex: 1 1 260px;
+  max-width: 380px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.scan-part {
+  margin-bottom: 20px;
+}
+
+.scan-part > h3 {
+  margin: 16px 0 8px;
+}
+
+.place {
+  margin-bottom: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.place > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 16px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.note {
+  margin-top: 2px;
+  color: var(--warn);
+  font-size: 13px;
+}
+
+.place-head,
+.place-cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.place-label {
+  overflow-wrap: anywhere;
+  font: 12.5px var(--mono);
+}
+
+.place-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 0;
+}
+
+.place-facts .path {
+  margin-right: 10px;
+}
+
+/* Hundreds of findings scroll inside their place, and a long summary goes on under itself. */
+.findings {
+  display: block;
+  max-height: 480px;
+  overflow: auto;
+  border-top: 1px solid var(--border);
+}
+
+.findings td,
+.malicious td,
+.unused td {
+  font-size: 13px;
+}
+
+.findings td.summary,
+.malicious td.summary,
+.unused td.summary {
+  width: 100%;
+  white-space: normal;
+}
+
+.malicious {
+  display: block;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--bad);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.findings .package,
+.malicious .package {
+  font: 12.5px var(--mono);
+}
+
+.fix.none {
+  color: var(--muted);
+}
+
+.advisory {
+  color: var(--accent);
+  font: 12.5px var(--mono);
+}
+
+.unused {
+  display: block;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.unused td.size {
+  font-weight: 600;
+}
+
+.unused .command {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.unused code {
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--background);
+  font: 12px var(--mono);
+}
+
+.copy {
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--muted);
+  font: 12px system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.copy:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.findings td.tools,
+.malicious td.tools {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.scanners {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.scanners li {
+  padding: 3px 0;
+}
+
+.scanner-part {
+  display: inline-block;
+  min-width: 170px;
+  color: var(--muted);
+  font: 12.5px var(--mono);
+}
+
+.skipped {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 /* The pages of the interface, at its top, beside the machine they are about. */

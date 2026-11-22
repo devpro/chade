@@ -1,0 +1,73 @@
+{
+ "SchemaVersion": 2,
+ "Trivy": {
+  "Version": "0.76.2"
+ },
+ "ReportID": "01a203a8-25bd-71f6-9a65-6df34d0bee5d",
+ "CreatedAt": "2026-11-22T15:28:01.08513181+01:00",
+ "ArtifactID": "sha256:f3951167083e4903a09e5a643c5f963b652c0ff1d729063d50a7315be02d606e",
+ "ArtifactName": "26b2eb03618e",
+ "ArtifactType": "container_image",
+ "Metadata": {
+  "Size": 25999872,
+  "OS": {
+   "Family": "alpine",
+   "Name": "3.18.12",
+   "EOSL": true
+  },
+  "ImageID": "sha256:26b2eb03618e749084668eaff68cff8f81dda12d06ac641be7a6398b82a6f25b",
+  "DiffIDs": [
+   "sha256:f44f286046d9443b2aeb895c0e1f4e688698247427bca4d15112c8e3432a803e",
+   "sha256:f646c8e10325628ebf7e4e4e29504f6507573a4d08b6ec91d8ff0fd92b8e1a71",
+   "sha256:811f3777554af05e129c61a8a5560c14039294055eaed4fb3b5d71537a22d694",
+   "sha256:858f5c95b990e95d446a3688ef63d976fc9eb2fbc2061f4bfb14ae307df8b92f",
+   "sha256:53c600587fd6fd570e1729c8b5b15df1352aef33a97ff2def12351d53754b3ea"
+  ],
+  "RepoTags": [
+   "registry:2"
+  ],
+  "RepoDigests": [
+   "registry@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373"
+  ],
+  "Reference": "registry:2"
+ },
+ "Results": [
+  {
+   "Target": "26b2eb03618e (alpine 3.18.12)",
+   "Class": "os-pkgs",
+   "Type": "alpine",
+   "Vulnerabilities": null
+  },
+  {
+   "Target": "bin/registry",
+   "Class": "lang-pkgs",
+   "Type": "gobinary",
+   "Vulnerabilities": [
+    {
+     "VulnerabilityID": "CVE-2024-24790",
+     "PkgName": "stdlib",
+     "InstalledVersion": "v1.20.8",
+     "FixedVersion": "1.21.11, 1.22.4",
+     "Severity": "CRITICAL",
+     "Title": "golang: net/netip: Unexpected behavior from Is methods for IPv4-mapped IPv6 addresses"
+    },
+    {
+     "VulnerabilityID": "CVE-2025-68121",
+     "PkgName": "stdlib",
+     "InstalledVersion": "v1.20.8",
+     "FixedVersion": "1.24.13, 1.25.7, 1.26.0-rc.3",
+     "Severity": "CRITICAL",
+     "Title": "crypto/tls: crypto/tls: Incorrect certificate validation during TLS session resumption"
+    },
+    {
+     "VulnerabilityID": "CVE-2023-39325",
+     "PkgName": "stdlib",
+     "InstalledVersion": "v1.20.8",
+     "FixedVersion": "1.20.10, 1.21.3",
+     "Severity": "HIGH",
+     "Title": "golang: net/http, x/net/http2: rapid stream resets can cause excessive work (CVE-2023-44487)"
+    }
+   ]
+  }
+ ]
+}

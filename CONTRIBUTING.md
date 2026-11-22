@@ -11,6 +11,7 @@
 │   ├── cleanup.md            report, clean, and the clean-up steps the report links to
 │   ├── commands.md           commands and their options
 │   ├── configuration.md      configuration, store, inventories and secrets
+│   ├── scan.md               chade scan, packages and images on the disk
 │   └── web-interface.md      chade ui
 ├── packages/
 │   ├── cli/                  chade, the published package

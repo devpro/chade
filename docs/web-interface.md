@@ -8,7 +8,7 @@ The interface opens in the browser, the one of Windows on WSL, and the command r
 Its server runs in the background, on `http://127.0.0.1:7843`: the first `chade ui` starts it, and the next ones find it running.
 `--no-open` prints the address without opening it, and `--port <number>` starts the server on another port.
 
-The top of every page names the machine and links to the four pages: Repositories, Store, Report and Docs.
+The top of every page names the machine and links to the five pages: Repositories, Store, Report, Security and Docs.
 
 ## Server
 
@@ -159,6 +159,20 @@ Report shows what `chade report` measures, a card for each section, a size drawn
 A card with something to clean gives the command or the setting, and a link to its step of the [system clean-up](cleanup.md).
 It is measured when the page opens and at Refresh, which takes a few seconds, and never by itself.
 Nothing of it is saved, and the page cleans nothing: `chade clean` does, in a terminal.
+
+## Security
+
+Security shows the last scan `chade scan` saved, which [packages and images](scan.md) describes, with a tab for each system and a filter by place, package or advisory.
+
+Part      | Content
+----------|-------------------------------------------------------------------------------------------------------------------
+Malicious | Each malicious package, with the place it lies in
+Places    | Each place with a known vulnerability, the most severe first, opened on its findings, their fix and their advisory
+Unused    | What nothing uses, largest first, with the command that removes it and a button that copies it
+Skipped   | The parts that could not run, and why
+
+Scan runs a new scan behind the page, which takes minutes, and Refresh reads the one a terminal saved since.
+The page removes nothing: the commands run in a terminal.
 
 ## Docs
 

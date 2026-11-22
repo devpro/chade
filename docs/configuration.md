@@ -35,6 +35,8 @@ cleanup:
   - name: jetbrains-cache
     command: rm -rf ~/.cache/JetBrains
   - fstrim
+scan:
+  unusedDays: 60
 ```
 
 ## Keys
@@ -49,6 +51,7 @@ Key                | Content
 `repos`            | Folders scanned for git repositories, three levels deep, into the `git-repos` inventory and the web interface
 `redact`           | Regular expressions of key names whose values are masked, on top of the defaults
 `cleanup`          | Steps `chade clean` runs, built-in names or a custom one with a `name` and a `command`
+`scan`             | `unusedDays` and `skip` of `chade scan`, as [packages and images](scan.md) says
 
 A Linux path starts with `/` or `~`.
 A Windows path starts with a drive letter or a variable such as `%USERPROFILE%`, and is written between single quotes, where YAML keeps backslashes as they are.

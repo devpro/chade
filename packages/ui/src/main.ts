@@ -5,6 +5,7 @@ import { docs } from './docs.js'
 import { list } from './list.js'
 import { reportPage } from './report.js'
 import { repository } from './repository.js'
+import { securityPage } from './security.js'
 import { store } from './store.js'
 
 // A read costs a few git commands per repository, so the page reads again twice a minute, and only while it is looked at.
@@ -30,21 +31,23 @@ interface View {
   title: (params: URLSearchParams) => string
 }
 
-const views: View[] = [list, repository, store, reportPage, docs]
+const views: View[] = [list, repository, store, reportPage, securityPage, docs]
 // The link of the top of the page each view is reached by, a repository being one of the repositories.
 const links = new Map<View, string>([
   [list, 'repositories'],
   [repository, 'repositories'],
   [store, 'store'],
   [reportPage, 'report'],
+  [securityPage, 'security'],
   [docs, 'docs'],
 ])
 
-// The view the address names: the store, the report, a repository when it gives one, the list otherwise.
+// The view the address names: the store, the report, the security page, a repository when it gives one, the list otherwise.
 function current(): View {
   const page = route().get('page')
   if (page === 'store') return store
   if (page === 'report') return reportPage
+  if (page === 'security') return securityPage
   if (page === 'docs') return docs
   return route().has('path') ? repository : list
 }
@@ -124,7 +127,7 @@ async function run(action: () => Promise<Read>): Promise<boolean> {
     read = result !== undefined
     element('message').hidden = true
     for (const each of views) each.section.hidden = each !== view
-    document.body.classList.toggle('wide', view === repository || view === store || view === reportPage)
+    document.body.classList.toggle('wide', view === repository || view === store || view === reportPage || view === securityPage)
     loaded(result)
   } catch (error) {
     // A read that failed has said why, and is not tried again behind the message.
@@ -150,9 +153,9 @@ const show = async (): Promise<void> => {
 }
 
 element('refresh').addEventListener('click', () => void reload(true))
-// A report measured behind the page says so when it is done.
+// A report measured or a scan run behind the page says so when it is done.
 document.addEventListener('chade-measured', (event) => {
-  if (current() !== reportPage) return
+  if (current() !== reportPage && current() !== securityPage) return
   const { read, error } = (event as CustomEvent<{ read?: Read; error?: unknown }>).detail
   if (error === undefined) loaded(read)
   else fail(error)

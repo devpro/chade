@@ -20,6 +20,14 @@ What is left to do, in the order agreed.
   chade then names its system `wsl-linux`, asks Windows for the computer name, and the report measures `C:` and `.wslconfig`.
   WSL also has `/proc/sys/fs/binfmt_misc/WSLInterop`, which a container does not, so requiring it as well tells them apart.
 
+## Packages and images
+
+- The pnpm store keeps its packages by content, not by name, so `chade scan` does not read it.
+- A Node.js of nvm for Windows is never called unused, as the one in use is a link whose target is not read yet.
+- A Docker of Windows with an engine of its own, not shared with WSL, is not read from WSL.
+- The images of podman, which trivy reads with `--image-src podman`, grype as `podman:<image>`, and `podman images --format json` lists.
+- More scanners as layers, each one optional: Docker Scout for images, and a reader of jars without Maven.
+
 ## Restore
 
 - Restore scripts generated from a snapshot, `winget import` and `code --install-extension` for instance.

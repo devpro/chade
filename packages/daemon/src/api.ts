@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs'
 import { pathKey, readChecks, readRepositories, type IstarciServer, type RepositoryCheck } from './istarci.js'
 import { findRepositories, findRepository, listRepositories, repositoryPath, type Root, type Run } from './repositories.js'
 import type { Report } from './report.js'
+import type { Scan } from './scan.js'
 import { RequestError, type ServerOptions } from './server.js'
 import { readSnapshot, readSnapshotFile, readSnapshotFiles, readStore, storeRepository } from './store.js'
 
@@ -17,6 +18,8 @@ export interface ApiOptions {
   store: () => Promise<string>
   // What chade report measures, which takes the seconds its commands take.
   report: () => Promise<Report>
+  // The last scan chade scan saved, and a new one, which takes minutes.
+  scan?: { read: () => Promise<Scan | undefined>; run: () => Promise<Scan> }
   // Where IstarCI answers on this machine, asked at each call, and absent when it is not set up.
   istarci?: () => Promise<IstarciServer | undefined>
   run: Run
@@ -26,7 +29,17 @@ export interface ApiOptions {
 export function createActions(options: ApiOptions): NonNullable<ServerOptions['actions']> {
   // Two commands in one repository at the same time would fight over its index.
   const busy = new Set<string>()
+  // A scan asked while one runs is that one, as two would read the same disk twice at once.
+  let scanning: Promise<Scan> | undefined
   return {
+    scan: async () => {
+      if (!options.scan) throw new RequestError(404, 'this server does not scan')
+      const scan = options.scan
+      scanning ??= scan.run().finally(() => {
+        scanning = undefined
+      })
+      return { version: options.version, ...(await scanning) }
+    },
     action: async (body) => {
       if (typeof body !== 'object' || body === null) throw new RequestError(400, 'the request names a repository and an action')
       const { system, path, ...request } = body as { system?: unknown; path?: unknown } & ActionRequest
@@ -128,6 +141,11 @@ export function createApi(options: ApiOptions): ServerOptions['api'] {
     'snapshot-files': async (query) => {
       const { machine, commit } = snapshot(query)
       return readSnapshotFiles(await options.store(), options.run, machine, commit)
+    },
+    // The last scan, never one started here, as a scan takes minutes and a read of the page is a glance.
+    scan: async () => {
+      const scan = await options.scan?.read()
+      return { version: options.version, machine: options.machine, ...(scan ? { scan } : {}) }
     },
     report: async () => {
       measuring ??= options.report().finally(() => {

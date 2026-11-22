@@ -1,0 +1,66 @@
+{
+ "SchemaVersion": 2,
+ "Trivy": {
+  "Version": "0.76.2"
+ },
+ "ArtifactName": "/home/dev/.venv",
+ "ArtifactType": "filesystem",
+ "Results": [
+  {
+   "Target": "Python",
+   "Class": "lang-pkgs",
+   "Type": "python-pkg",
+   "Packages": [
+    {
+     "Name": "pip",
+     "Version": "24.0",
+     "Identifier": {
+      "PURL": "pkg:pypi/pip@24.0"
+     }
+    },
+    {
+     "Name": "urllib3",
+     "Version": "1.26.4",
+     "Identifier": {
+      "PURL": "pkg:pypi/urllib3@1.26.4"
+     }
+    }
+   ],
+   "Vulnerabilities": [
+    {
+     "VulnerabilityID": "CVE-2025-8869",
+     "VendorIDs": [
+      "GHSA-4xh5-x5gv-qwph"
+     ],
+     "PkgName": "pip",
+     "InstalledVersion": "24.0",
+     "FixedVersion": "25.3",
+     "Severity": "MEDIUM",
+     "Title": "pip: pip missing checks on symbolic link extraction"
+    },
+    {
+     "VulnerabilityID": "CVE-2026-13346",
+     "VendorIDs": [
+      "GHSA-qwm4-qh6w-59xr"
+     ],
+     "PkgName": "pip",
+     "InstalledVersion": "24.0",
+     "FixedVersion": "26.2.0",
+     "Severity": "MEDIUM",
+     "Title": "pip: pip: Arbitrary file installation via malicious package indexes"
+    },
+    {
+     "VulnerabilityID": "CVE-2026-3219",
+     "VendorIDs": [
+      "GHSA-58qw-9mgm-455v"
+     ],
+     "PkgName": "pip",
+     "InstalledVersion": "24.0",
+     "FixedVersion": "26.1",
+     "Severity": "MEDIUM",
+     "Title": "pip: pip: Incorrect file installation due to improper archive handling"
+    }
+   ]
+  }
+ ]
+}
