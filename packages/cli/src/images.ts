@@ -90,7 +90,7 @@ export async function scanImages(run: Run, options: ImageOptions): Promise<Image
   if (listed.code !== 0) return { places: [], skipped: `docker cannot list the images: ${(listed.stderr || listed.stdout).trim().split('\n')[0]}` }
   const images = parseImages(listed.stdout)
   const used = await usedImages(run)
-  const names = options.tools.map((tool) => tool.name).sort()
+  const names = options.tools.map((tool) => tool.name).sort((a, b) => a.localeCompare(b))
   // A database that cannot be updated still reads, as it was.
   const trivy = options.tools.find((tool) => tool.name === 'trivy')
   if (trivy && !options.offline) await run(trivy.command, trivyDatabaseArgs(), { cwd: trivy.cwd, timeoutMs: 90_000 })
@@ -98,7 +98,7 @@ export async function scanImages(run: Run, options: ImageOptions): Promise<Image
   for (const image of images) {
     const place = imagePlace(image, options.system, used)
     const previous = options.previous(image.id)
-    if (previous && previous.tools.toSorted().join() === names.join()) {
+    if (previous && previous.tools.toSorted((a, b) => a.localeCompare(b)).join() === names.join()) {
       places.push({ ...place, findings: previous.findings, notes: previous.notes, tools: previous.tools, packages: previous.packages })
       continue
     }

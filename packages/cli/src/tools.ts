@@ -24,7 +24,9 @@ export interface Tool {
 
 // The first version number a --version prints, each tool printing it its own way.
 export function versionOf(output: string): string {
-  return /\d+\.\d+\.\d+/.exec(output)?.[0] ?? 'unknown'
+  // Word by word, so the expression is anchored and reads each word once.
+  const words = output.split(/\s+/).map((word) => /^v?(\d+\.\d+\.\d+)/.exec(word)?.[1])
+  return words.find((version) => version !== undefined) ?? 'unknown'
 }
 
 // The tool of the system, on the PATH or where winget put it, whose links a WSL started before the install does not see.
