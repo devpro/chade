@@ -98,13 +98,14 @@
       <section id="security" class="page" hidden>
         <div class="bar">
           <h2>Security</h2>
-          <span id="security-summary" class="page-state"></span>
           <span id="security-state" class="path"></span>
           <button id="security-scan" class="action" type="button" title="Read the packages and the images on the disk again, which takes minutes">Scan</button>
           <span class="hint">In a terminal: <code>chade scan</code> reads the disk again</span>
         </div>
-        <div class="bar">
-          <nav id="security-tabs" role="tablist" aria-label="Systems of the machine"></nav>
+        <div id="security-alert"></div>
+        <nav id="security-tabs" role="tablist" aria-label="Kinds of place"></nav>
+        <div id="security-filters" class="bar">
+          <div id="security-toggles"></div>
           <input id="security-filter" type="search" placeholder="Filter by place, package or advisory" aria-label="Filter the scan" />
         </div>
         <div id="security-content"></div>

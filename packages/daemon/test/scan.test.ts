@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { countsOf, createActions, createApi, RequestError, type Scan } from '../src/index.js'
+import { compareVersions, countsOf, packagesOf, createActions, createApi, RequestError, type Scan } from '../src/index.js'
 
 const saved: Scan = {
   machine: 'TEST-PC',
@@ -93,4 +93,21 @@ test('the report route gives the saved report, and measures again when asked fre
   // Without a saved report, the page still gets one, measured.
   const unsaved = createApi({ ...options(), report: async () => ({ machine: 'TEST-PC', date: 'measured', sections: [] }), savedReport: async () => undefined })
   assert.equal(((await unsaved.report(new URLSearchParams())) as { scannedAt: string }).scannedAt, 'measured')
+})
+
+test('versions are compared part by part, a number as a number', () => {
+  assert.equal(compareVersions('4.17.9', '4.17.21'), -1)
+  assert.equal(compareVersions('v1.26.11', '1.26.10'), 1)
+  assert.equal(compareVersions('go1.26.11', '1.26.11'), 0)
+  assert.equal(compareVersions('1.2', '1.2.1'), -1)
+  assert.deepEqual(['13.0.1', '9.0.1', '13.0.0'].sort(compareVersions), ['9.0.1', '13.0.0', '13.0.1'])
+})
+
+test('the findings of a package version are one, fixed by the highest version that fixes one of them', () => {
+  const found = (id: string, severity: Scan['places'][number]['findings'][number]['severity'], fixed?: string, name = 'lodash') => ({ ecosystem: 'npm', package: name, version: '4.17.15', ids: [id], summary: '', severity, ...(fixed ? { fixed } : {}), malicious: false, tools: ['osv-scanner'] })
+  const packages = packagesOf([found('GHSA-1', 'medium', '4.17.21'), found('GHSA-2', 'low', undefined, 'minimist'), found('GHSA-3', 'high', '4.17.19'), found('GHSA-4', 'low')])
+  assert.deepEqual(packages.map((one) => [one.package, one.fixed, one.unfixed, one.findings.map((finding) => finding.ids[0])]), [
+    ['lodash', '4.17.21', 1, ['GHSA-3', 'GHSA-1', 'GHSA-4']],
+    ['minimist', undefined, 1, ['GHSA-2']],
+  ])
 })

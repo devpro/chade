@@ -92,3 +92,53 @@ export function countsOf(value: Scan): Counts {
   }
   return counts
 }
+
+// Two versions in their order, read part by part, a number as a number, so 4.17.9 comes before 4.17.21.
+export function compareVersions(a: string, b: string): number {
+  const parts = (version: string): string[] => version.replace(/^(v|go)/, '').split(/[.+-]/)
+  const left = parts(a)
+  const right = parts(b)
+  for (let index = 0; index < Math.max(left.length, right.length); index++) {
+    const one = left[index] ?? ''
+    const other = right[index] ?? ''
+    if (one === other) continue
+    if (one === '') return -1
+    if (other === '') return 1
+    const numbers = /^\d+$/.test(one) && /^\d+$/.test(other)
+    const difference = numbers ? Number(one) - Number(other) : one.localeCompare(other)
+    if (difference !== 0) return Math.sign(difference)
+  }
+  return 0
+}
+
+// The findings of one version of one package, which one update or one removal ends.
+export interface PackageFindings {
+  ecosystem: string
+  package: string
+  version: string
+  // The most severe first.
+  findings: Finding[]
+  // The first version that fixes every advisory with a fix, absent when none has one.
+  fixed?: string
+  // The advisories with no fix yet, which the update leaves.
+  unfixed: number
+}
+
+// The packages of a place, the most severe first, then the most advisories.
+export function packagesOf(findings: Finding[]): PackageFindings[] {
+  const grouped = new Map<string, PackageFindings>()
+  for (const finding of findings) {
+    const key = `${finding.ecosystem}\n${finding.package}\n${finding.version}`
+    let group = grouped.get(key)
+    if (!group) {
+      group = { ecosystem: finding.ecosystem, package: finding.package, version: finding.version, findings: [], unfixed: 0 }
+      grouped.set(key, group)
+    }
+    group.findings.push(finding)
+    if (!finding.fixed) group.unfixed++
+    else if (!group.fixed || compareVersions(finding.fixed, group.fixed) > 0) group.fixed = finding.fixed
+  }
+  const groups = [...grouped.values()]
+  for (const group of groups) group.findings.sort((a, b) => severityRank(a) - severityRank(b))
+  return groups.sort((a, b) => severityRank(a.findings[0]) - severityRank(b.findings[0]) || b.findings.length - a.findings.length || a.package.localeCompare(b.package))
+}

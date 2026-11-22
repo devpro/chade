@@ -1520,11 +1520,20 @@ a.tab {
   color: var(--accent);
 }
 
-/* The security page: a place for each folder or image read, opened on its findings, and what nothing uses with its command. */
+/* The security page: a tab for each kind of place, filtered by system and level, each place opened on its packages. */
 #security-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+#security-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
   margin-right: auto;
 }
 
@@ -1539,12 +1548,150 @@ a.tab {
   font: inherit;
 }
 
-.scan-part {
-  margin-bottom: 20px;
+#security-filter[hidden] {
+  display: none;
 }
 
-.scan-part > h3 {
-  margin: 16px 0 8px;
+.count.warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.segmented {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.segment {
+  padding: 4px 12px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  background: none;
+  color: var(--muted);
+  font: 13px system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.segment:last-child {
+  border-right: 0;
+}
+
+.segment:hover {
+  color: var(--text);
+}
+
+.segment[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* A level chip is pressed when it is among the levels shown, every chip unpressed meaning every level. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: 600 12.5px system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--accent);
+}
+
+.chip.zero {
+  opacity: 0.5;
+}
+
+.chip.bad {
+  color: var(--bad);
+}
+
+.chip.warn {
+  color: var(--warn);
+}
+
+.chip.info {
+  color: var(--accent);
+}
+
+.chip.quiet,
+.chip.unused {
+  color: var(--muted);
+}
+
+.chip[aria-pressed='true'] {
+  border-color: currentcolor;
+  box-shadow: inset 0 0 0 1px currentcolor;
+}
+
+.chip.bad[aria-pressed='true'] {
+  background: var(--bad-soft);
+}
+
+.chip.warn[aria-pressed='true'] {
+  background: var(--warn-soft);
+}
+
+.chip.info[aria-pressed='true'] {
+  background: var(--accent-soft);
+}
+
+.chip.quiet[aria-pressed='true'],
+.chip.unused[aria-pressed='true'] {
+  background: var(--quiet-soft);
+  color: var(--text);
+}
+
+.chip-count {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.alert {
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--bad);
+  border-radius: 8px;
+  background: var(--bad-soft);
+}
+
+.alert h3 {
+  margin: 0 0 6px;
+  color: var(--bad);
+  font-size: 14px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.alert ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.alert li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+  padding: 2px 0;
+  font-size: 13px;
 }
 
 .place {
@@ -1564,22 +1711,30 @@ a.tab {
   cursor: pointer;
 }
 
-.note {
-  margin-top: 2px;
-  color: var(--warn);
-  font-size: 13px;
+.place[open] > summary {
+  border-bottom: 1px solid var(--border);
 }
 
-.place-head,
-.place-cell {
+.place-main {
   display: flex;
   flex-direction: column;
+  gap: 2px;
   min-width: 0;
 }
 
 .place-label {
   overflow-wrap: anywhere;
   font: 12.5px var(--mono);
+}
+
+.place-meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.note {
+  color: var(--warn);
+  font-size: 13px;
 }
 
 .place-facts {
@@ -1589,77 +1744,40 @@ a.tab {
   gap: 4px 0;
 }
 
-.place-facts .path {
-  margin-right: 10px;
+.badge.unused {
+  border: 1px dashed var(--muted);
+  color: var(--muted);
+  font-weight: 400;
 }
 
-/* Hundreds of findings scroll inside their place, and a long summary goes on under itself. */
-.findings {
-  display: block;
-  max-height: 480px;
-  overflow: auto;
-  border-top: 1px solid var(--border);
-}
-
-.findings td,
-.malicious td,
-.unused td {
+/* What nothing uses is removed whole, which ends every finding in it. */
+.clean {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--quiet-soft);
   font-size: 13px;
 }
 
-.findings td.summary,
-.malicious td.summary,
-.unused td.summary {
-  width: 100%;
-  white-space: normal;
+.clean p {
+  margin: 0;
 }
 
-.malicious {
-  display: block;
-  overflow-x: auto;
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--bad);
-  border-radius: 8px;
-  background: var(--surface);
-}
-
-.findings .package,
-.malicious .package {
-  font: 12.5px var(--mono);
-}
-
-.fix.none {
-  color: var(--muted);
-}
-
-.advisory {
-  color: var(--accent);
-  font: 12.5px var(--mono);
-}
-
-.unused {
-  display: block;
-  overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-}
-
-.unused td.size {
-  font-weight: 600;
-}
-
-.unused .command {
-  display: flex;
+.command {
+  display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 
-.unused code {
+.command code {
   padding: 2px 6px;
   border-radius: 5px;
   background: var(--background);
   font: 12px var(--mono);
+  overflow-wrap: anywhere;
 }
 
 .copy {
@@ -1677,8 +1795,84 @@ a.tab {
   color: var(--text);
 }
 
-.findings td.tools,
-.malicious td.tools {
+/* Thousands of findings scroll inside their place, and a long summary goes on under itself. */
+.findings {
+  display: block;
+  max-height: 520px;
+  overflow: auto;
+}
+
+.findings td {
+  vertical-align: top;
+  font-size: 13px;
+}
+
+.findings td.advisories {
+  width: 100%;
+  max-width: 0;
+}
+
+.findings .package {
+  font: 12.5px var(--mono);
+}
+
+.package {
+  font: 12.5px var(--mono);
+}
+
+.fix.none {
+  color: var(--muted);
+}
+
+/* An advisory holds one line, its whole summary shown on hover, so a package with many stays short. */
+.advisory-line {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  padding: 1px 0;
+}
+
+.advisory-line .summary {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.advisory-line > :not(.summary) {
+  flex: none;
+}
+
+.level-text {
+  min-width: 56px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.level-text.bad {
+  color: var(--bad);
+}
+
+.level-text.warn {
+  color: var(--warn);
+}
+
+.level-text.info {
+  color: var(--accent);
+}
+
+.level-text.quiet {
+  color: var(--muted);
+}
+
+.advisory {
+  color: var(--accent);
+  font: 12.5px var(--mono);
+}
+
+.advisory-line .tools {
   color: var(--muted);
   font-size: 12px;
 }

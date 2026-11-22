@@ -163,14 +163,32 @@ The page cleans nothing: `chade clean` does, in a terminal.
 
 ## Security
 
-Security shows the last scan `chade scan` saved, which [packages and images](scan.md) describes, with a tab for each system and a filter by place, package or advisory.
+Security shows the last scan `chade scan` saved, which [packages and images](scan.md) describes, with a tab for each kind of place.
 
-Part      | Content
-----------|-------------------------------------------------------------------------------------------------------------------
-Malicious | Each malicious package, with the place it lies in
-Places    | Each place with a known vulnerability, the most severe first, opened on its findings, their fix and their advisory
-Unused    | What nothing uses, largest first, with the command that removes it and a button that copies it
-Skipped   | The parts that could not run, and why
+Tab          | Content
+-------------|------------------------------------------------------------------------------
+Repositories | The folders installed in a repository, `node_modules`, `.terraform`, `.venv`
+Installed    | What is installed for the user, global packages, each Node.js of nvm, tools
+Caches       | The npx, NuGet and Terraform caches
+Images       | The container images
+Scanners     | The scanners of each system with their versions, and the parts skipped, why
+
+A malicious package shows above the tabs, whatever the tab, with the place it lies in.
+A place shows its notes, such as a system past its end of life, and the count of its findings at each level, the most severe places first.
+Opened, it lists each version of a package once, with the version that fixes all its advisories, and each advisory with a link to OSV.
+A scanner is named beside an advisory only when another one that read the place missed it.
+
+A place nothing uses is marked unused, with its size.
+Opened, it says why and gives the command that removes it, with a button that copies it, which ends every finding in it at once.
+
+Filter      | Effect
+------------|--------------------------------------------------------------------------------------------------------------
+System      | The places of one system, shown when the machine has several
+Level       | The first level chosen shows it alone, the next ones add to it, and the last one taken away shows them all again
+Unused      | Only the places nothing uses, a critical package nothing uses showing with the command that removes it
+Text filter | The places whose name, package or advisory holds the text, and in them only the packages it names
+
+The [report](#report) gives the largest places nothing uses, vulnerable or not.
 
 Scan runs a new scan behind the page, which takes minutes, and Refresh reads the one a terminal saved since.
 The page removes nothing: the commands run in a terminal.
