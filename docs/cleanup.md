@@ -26,6 +26,7 @@ The report measures, and changes nothing:
 
 Each finding comes with the command or setting that fixes it, and a link to its step below.
 `--json` prints the report as JSON.
+Each report is saved to `report.json`, beside the configuration, which the web interface opens on, and its server measures one [every day](web-interface.md#daily-runs).
 
 ## Clean
 

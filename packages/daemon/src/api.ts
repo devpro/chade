@@ -18,6 +18,8 @@ export interface ApiOptions {
   store: () => Promise<string>
   // What chade report measures, which takes the seconds its commands take.
   report: () => Promise<Report>
+  // The last report saved, by the daily run or a measure, which the page shows at once.
+  savedReport?: () => Promise<Report | undefined>
   // The last scan chade scan saved, and a new one, which takes minutes.
   scan?: { read: () => Promise<Scan | undefined>; run: () => Promise<Scan> }
   // Where IstarCI answers on this machine, asked at each call, and absent when it is not set up.
@@ -147,7 +149,10 @@ export function createApi(options: ApiOptions): ServerOptions['api'] {
       const scan = await options.scan?.read()
       return { version: options.version, machine: options.machine, ...(scan ? { scan } : {}) }
     },
-    report: async () => {
+    // The saved report unless asked to measure again, a page opening on what the day measured.
+    report: async (query) => {
+      const saved = query.get('fresh') === '1' ? undefined : await options.savedReport?.()
+      if (saved) return { version: options.version, machine: saved.machine, scannedAt: saved.date, sections: saved.sections }
       measuring ??= options.report().finally(() => {
         measuring = undefined
       })

@@ -78,3 +78,19 @@ test('a server without a scanner says so', async () => {
 test('a scan comes to its malicious packages, its findings by severity and what nothing uses', () => {
   assert.deepEqual(countsOf(saved), { malicious: 1, severities: { critical: 0, high: 1, medium: 0, low: 0, unknown: 0 }, unusedBytes: 2000, unused: 1 })
 })
+
+test('the report route gives the saved report, and measures again when asked fresh', async () => {
+  let measured = 0
+  const saved = { machine: 'TEST-PC', date: '2026-11-22T06:00:00.000Z', sections: [] }
+  const api = createApi({
+    ...options(),
+    report: async () => ({ machine: 'TEST-PC', date: `measured ${++measured}`, sections: [] }),
+    savedReport: async () => saved,
+  })
+  assert.deepEqual(await api.report(new URLSearchParams()), { version: '1.2.3', machine: 'TEST-PC', scannedAt: '2026-11-22T06:00:00.000Z', sections: [] })
+  assert.equal(measured, 0)
+  assert.deepEqual(await api.report(new URLSearchParams('fresh=1')), { version: '1.2.3', machine: 'TEST-PC', scannedAt: 'measured 1', sections: [] })
+  // Without a saved report, the page still gets one, measured.
+  const unsaved = createApi({ ...options(), report: async () => ({ machine: 'TEST-PC', date: 'measured', sections: [] }), savedReport: async () => undefined })
+  assert.equal(((await unsaved.report(new URLSearchParams())) as { scannedAt: string }).scannedAt, 'measured')
+})

@@ -42,6 +42,8 @@ export interface Config {
   cleanup: (string | CustomStep)[]
   // Absent when the configuration leaves the defaults.
   scan?: ScanConfig
+  // The scan and the report run once a day while the server of the web interface runs, unless false.
+  daily?: boolean
 }
 
 export function configPath(env: NodeJS.ProcessEnv, home: string): string {
@@ -51,7 +53,7 @@ export function configPath(env: NodeJS.ProcessEnv, home: string): string {
 export function parseConfig(text: string, home: string): Config {
   const raw: unknown = parse(text) ?? {}
   if (!isObject(raw)) throw new Error('the configuration is not a YAML mapping')
-  checkKeys(raw, ['store', 'machine', 'linux', 'windows', 'redact', 'cleanup', 'scan'], 'the configuration')
+  checkKeys(raw, ['store', 'machine', 'linux', 'windows', 'redact', 'cleanup', 'scan', 'daily'], 'the configuration')
   if (typeof raw.store !== 'string' || raw.store === '') throw new Error('store is required, the path of the git repository snapshots are written to')
   const store = expandHome(raw.store, home)
   if (!isAbsolute(store)) throw new Error(`store ${raw.store} is not an absolute path`)
@@ -74,7 +76,13 @@ export function parseConfig(text: string, home: string): Config {
     redact,
     cleanup: parseCleanup(raw.cleanup),
     ...(raw.scan === undefined || raw.scan === null ? {} : { scan: parseScan(raw.scan) }),
+    ...(raw.daily === undefined || raw.daily === null ? {} : { daily: parseDaily(raw.daily) }),
   }
+}
+
+function parseDaily(raw: unknown): boolean {
+  if (typeof raw !== 'boolean') throw new Error('daily is true or false')
+  return raw
 }
 
 function parseScan(raw: unknown): ScanConfig {

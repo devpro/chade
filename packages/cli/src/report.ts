@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { lstat, readdir, readFile, stat, statfs } from 'node:fs/promises'
 import { freemem, totalmem } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { countsOf, findRepositories, SEVERITIES, trimTrailing, type Measure, type Report, type Scan, type Section } from '@chade/daemon'
 import type { Config } from './config.js'
 import { NOT_FOUND } from './exec.js'
@@ -11,6 +11,19 @@ import { isNativeWindows, type Host } from './system.js'
 export type { Measure, Report, Section }
 
 export const GUIDE = 'https://github.com/devpro/chade/blob/main/docs/cleanup.md'
+
+// The last report, saved beside the configuration, which the interface shows at once.
+export function reportFile(configFile: string): string {
+  return join(dirname(configFile), 'report.json')
+}
+
+export async function readReport(file: string): Promise<Report | undefined> {
+  try {
+    return JSON.parse(await readFile(file, 'utf8')) as Report
+  } catch {
+    return undefined
+  }
+}
 
 const GB = 1e9
 

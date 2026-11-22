@@ -29,6 +29,7 @@ what nothing uses with its command, largest first, the scanners of each system w
 Every finding is in `chade scan --json`, and on the Security page of the [web interface](web-interface.md).
 
 The scan is saved to `scan.json`, beside the [configuration](configuration.md), where `chade report` and the web interface read it.
+The server of the web interface runs it [once a day](web-interface.md#daily-runs).
 A part left out keeps what the last scan found of it.
 `chade scan` exits with 1 when a malicious package is on the disk, so a script running it does not miss one.
 

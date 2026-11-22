@@ -157,8 +157,9 @@ The page changes nothing: a snapshot is taken in a terminal, with `chade snapsho
 
 Report shows what `chade report` measures, a card for each section, a size drawn as a bar against the largest of its card.
 A card with something to clean gives the command or the setting, and a link to its step of the [system clean-up](cleanup.md).
-It is measured when the page opens and at Refresh, which takes a few seconds, and never by itself.
-Nothing of it is saved, and the page cleans nothing: `chade clean` does, in a terminal.
+The page opens on the last report saved, by `chade report` or the [daily run](#daily-runs), and measures one when none is saved.
+Refresh measures again, which takes a few seconds.
+The page cleans nothing: `chade clean` does, in a terminal.
 
 ## Security
 
@@ -173,6 +174,14 @@ Skipped   | The parts that could not run, and why
 
 Scan runs a new scan behind the page, which takes minutes, and Refresh reads the one a terminal saved since.
 The page removes nothing: the commands run in a terminal.
+
+## Daily runs
+
+While the server runs, it scans the disk and measures the report once a day, so the pages open on what the day found.
+It looks every hour, the first time a minute after it starts, and runs each one whose last run is a day old, a day the server was stopped being caught up at its next start.
+A run asked from a page while the daily one goes is that same run.
+The output of each run goes to `daemon.log`, beside the configuration.
+`daily: false` in the [configuration](configuration.md) stops them, from the next start of the server.
 
 ## Docs
 
