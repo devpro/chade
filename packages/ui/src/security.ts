@@ -285,6 +285,11 @@ function chooseLevel(level: Level): void {
   if (levels.size === 0) levels = new Set(LEVELS)
 }
 
+function levelTitle(level: Level, shown: boolean): string {
+  if (allLevels()) return `Only ${level}`
+  return shown ? `Hide ${level}` : `Show ${level}`
+}
+
 function toggles(scan: Scan, kind: Tab): HTMLElement[] {
   const groups: HTMLElement[] = []
   const systems = [...new Set(scan.places.map((place) => place.system))]
@@ -302,8 +307,7 @@ function toggles(scan: Scan, kind: Tab): HTMLElement[] {
   group.setAttribute('aria-label', 'Level')
   for (const level of LEVELS) {
     const shown = !allLevels() && levels.has(level)
-    const title = allLevels() ? `Only ${level}` : `${shown ? 'Hide' : 'Show'} ${level}`
-    const chip = toggle(level, shown, title, () => chooseLevel(level), `chip ${TONES[level]}${counts[level] === 0 ? ' zero' : ''}`)
+    const chip = toggle(level, shown, levelTitle(level, shown), () => chooseLevel(level), `chip ${TONES[level]}${counts[level] === 0 ? ' zero' : ''}`)
     chip.append(node('span', String(counts[level]), 'chip-count'))
     group.append(chip)
   }
@@ -318,7 +322,7 @@ function toggles(scan: Scan, kind: Tab): HTMLElement[] {
 // Each scanner is a layer, so the page says which ran on each system with its version, and which is missing or failed.
 function scannerList(uses: ToolUse[]): HTMLElement {
   const list = node('ul', '', 'scanners')
-  for (const key of [...new Set(uses.map((use) => `${use.system} ${use.part}`))]) {
+  for (const key of new Set(uses.map((use) => `${use.system} ${use.part}`))) {
     const item = node('li')
     item.append(node('span', key, 'scanner-part'))
     for (const use of uses.filter((one) => `${one.system} ${one.part}` === key)) {

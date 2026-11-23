@@ -1,6 +1,6 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, posix, win32 } from 'node:path'
-import { countsOf, findRepositories, SEVERITIES, type Finding, type Place, type Scan, type Skipped, type ToolUse } from '@chade/daemon'
+import { countsOf, findRepositories, SEVERITIES, type Finding, type Place, type Root, type Scan, type Skipped, type ToolUse } from '@chade/daemon'
 import type { Config } from './config.js'
 import type { Run } from './exec.js'
 import { GRYPE_OFFLINE, grypeListArgs, readGrype } from './grype.js'
@@ -75,62 +75,75 @@ function noScanner(side: Side, part: string): Skipped {
   return { system: side.system.id, part, reason: `none of ${SCANNERS.join(', ')} is installed on ${side.windows ? 'Windows' : 'Linux'}, ${SCAN_GUIDE}#tools` }
 }
 
-export async function scan(config: Config | undefined, host: Host, options: ScanOptions): Promise<Scan> {
-  const now = options.now ?? Date.now()
-  const log = options.log ?? (() => undefined)
-  const places: Place[] = []
-  const skipped: Skipped[] = []
-  const uses: ToolUse[] = []
+// What a scan gathers, each part adding to it.
+type Gathered = Pick<Scan, 'places' | 'skipped' | 'tools'>
+
+async function sidesOf(host: Host, gathered: Gathered): Promise<Side[]> {
   const sides: Side[] = []
   for (const system of host.systems) {
-    if (system.kind === 'linux') sides.push(linuxSide(system, host.home, process.env))
-    else if (host.windows) {
-      const side = await windowsSide(system, host.windows)
-      if (side) sides.push(side)
-      else skipped.push({ system: system.id, part: 'packages', reason: 'USERPROFILE of Windows cannot be read' })
+    if (system.kind === 'linux') {
+      sides.push(linuxSide(system, host.home, process.env))
+      continue
     }
+    if (!host.windows) continue
+    const side = await windowsSide(system, host.windows)
+    if (side) sides.push(side)
+    else gathered.skipped.push({ system: system.id, part: 'packages', reason: 'USERPROFILE of Windows cannot be read' })
   }
+  return sides
+}
+
+async function scanPackages(host: Host, side: Side, roots: Root[], options: ScanOptions, now: number, gathered: Gathered): Promise<void> {
+  const tools = await scannersOf(host, side, 'packages', gathered.tools)
+  if (tools.length === 0) {
+    gathered.skipped.push(noScanner(side, 'packages'))
+    return
+  }
+  const targets = await machineTargets(side, process.version)
+  for (const root of roots.filter((known) => known.system === side.system.id)) {
+    const relatives = await findRepositories(root.folder).catch(() => [])
+    targets.push(...(await repositoryTargets(side, root, relatives, { unusedDays: options.unusedDays, now, run: host.run })))
+  }
+  options.log?.(`${side.system.id}: reading ${targets.length} place(s) with ${tools.map((tool) => tool.name).join(', ')}`)
+  const problems = await readTargets(host.run, tools, side, targets, options.offline)
+  for (const [name, problem] of problems) {
+    const use = gathered.tools.find((one) => one.system === side.system.id && one.part === 'packages' && one.tool === name)
+    if (use) use.problem = problem
+  }
+  gathered.places.push(...targets.map((one) => one.place).filter((place) => place.packages > 0 || place.findings.length > 0 || place.unused))
+}
+
+async function scanDocker(host: Host, side: Side, options: ScanOptions, now: number, gathered: Gathered): Promise<void> {
+  const tools = await scannersOf(host, side, 'images', gathered.tools)
+  options.log?.(`${side.system.id}: reading the images of Docker with ${tools.map((tool) => tool.name).join(', ') || 'no scanner'}`)
+  const fresh = options.previous && now - Date.parse(options.previous.date) < DAY_MS ? options.previous : undefined
+  const result = await scanImages(host.run, {
+    system: side.system.id,
+    offline: options.offline,
+    tools,
+    previous: (id) => fresh?.places.find((place) => place.kind === 'image' && place.path === id),
+  })
+  gathered.places.push(...result.places)
+  if (result.skipped) gathered.skipped.push({ system: side.system.id, part: 'images', reason: result.skipped })
+  else if (tools.length === 0) {
+    const skip = noScanner(side, 'images')
+    gathered.skipped.push({ ...skip, reason: `the images are listed without their vulnerabilities, as ${skip.reason}` })
+  }
+}
+
+export async function scan(config: Config | undefined, host: Host, options: ScanOptions): Promise<Scan> {
+  const now = options.now ?? Date.now()
+  const gathered: Gathered = { places: [], tools: [], skipped: [] }
+  const sides = await sidesOf(host, gathered)
   if (options.packages) {
     const roots = config ? await repositoryRoots(config, host) : []
-    for (const side of sides) {
-      const tools = await scannersOf(host, side, 'packages', uses)
-      if (tools.length === 0) {
-        skipped.push(noScanner(side, 'packages'))
-        continue
-      }
-      const targets = await machineTargets(side, process.version)
-      for (const root of roots.filter((known) => known.system === side.system.id)) {
-        targets.push(...(await repositoryTargets(side, root, await findRepositories(root.folder).catch(() => []), { unusedDays: options.unusedDays, now, run: host.run })))
-      }
-      log(`${side.system.id}: reading ${targets.length} place(s) with ${tools.map((tool) => tool.name).join(', ')}`)
-      const problems = await readTargets(host.run, tools, side, targets, options.offline)
-      for (const [name, problem] of problems) {
-        const use = uses.find((one) => one.system === side.system.id && one.part === 'packages' && one.tool === name)
-        if (use) use.problem = problem
-      }
-      places.push(...targets.map((one) => one.place).filter((place) => place.packages > 0 || place.findings.length > 0 || place.unused))
-    }
+    for (const side of sides) await scanPackages(host, side, roots, options, now, gathered)
   }
-  if (options.images) {
-    // Docker Desktop shares one engine between Windows and WSL, so the images are read once, by Linux when there is one.
-    const side = sides.find((one) => !one.windows) ?? sides[0]
-    if (side) {
-      const tools = await scannersOf(host, side, 'images', uses)
-      log(`${side.system.id}: reading the images of Docker with ${tools.map((tool) => tool.name).join(', ') || 'no scanner'}`)
-      const fresh = options.previous && now - Date.parse(options.previous.date) < DAY_MS ? options.previous : undefined
-      const result = await scanImages(host.run, {
-        system: side.system.id,
-        offline: options.offline,
-        tools,
-        previous: (id) => fresh?.places.find((place) => place.kind === 'image' && place.path === id),
-      })
-      places.push(...result.places)
-      if (result.skipped) skipped.push({ system: side.system.id, part: 'images', reason: result.skipped })
-      else if (tools.length === 0) skipped.push({ ...noScanner(side, 'images'), reason: `the images are listed without their vulnerabilities, as ${noScanner(side, 'images').reason}` })
-    }
-  }
-  await measureUnused(host, sides, places)
-  return { machine: host.machine, date: new Date(now).toISOString(), places, tools: uses, skipped }
+  // Docker Desktop shares one engine between Windows and WSL, so the images are read once, by Linux when there is one.
+  const docker = sides.find((one) => !one.windows) ?? sides[0]
+  if (options.images && docker) await scanDocker(host, docker, options, now, gathered)
+  await measureUnused(host, sides, gathered.places)
+  return { machine: host.machine, date: new Date(now).toISOString(), ...gathered }
 }
 
 // ─── Reading the places ────────────────────────────────────────────────────
@@ -159,8 +172,7 @@ const lastLine = (text: string): string =>
   text
     .trim()
     .split('\n')
-    .filter((line) => !/^(Scanned|Scanning|Starting|End status|Loaded)/.test(line))
-    .at(-1) ?? ''
+    .findLast((line) => !/^(Scanned|Scanning|Starting|End status|Loaded)/.test(line)) ?? ''
 
 // Every place read by each scanner of the system, the problems of a scanner returned by its name.
 async function readTargets(run: Run, tools: Tool[], side: Side, targets: Target[], offline: boolean): Promise<Map<Scanner, string>> {
@@ -231,14 +243,18 @@ function ownerOf(side: Side, source: OsvSource, folders: Target[]): Target | und
     .sort((a, b) => (b.folder?.length ?? 0) - (a.folder?.length ?? 0))[0]
 }
 
+function trivyArgs(one: Target, list: string | undefined, offline: boolean): string[] | undefined {
+  if (one.folder !== undefined) return trivyFolderArgs(one.folder, offline)
+  return list ? trivyListArgs(list, offline) : undefined
+}
+
 async function readWithTrivy(run: Run, tool: Tool, targets: Target[], lists: Map<string, Target>, readings: Map<Target, Reading>, offline: boolean): Promise<string | undefined> {
   // A database that cannot be updated still reads, as it was.
   if (!offline) await run(tool.command, trivyDatabaseArgs(), { cwd: tool.cwd, timeoutMs: 90_000 })
   const listOf = new Map([...lists].map(([path, one]) => [one, path]))
   const failures: string[] = []
   await pool(targets, CONCURRENCY, async (one) => {
-    const list = listOf.get(one)
-    const args = one.folder !== undefined ? trivyFolderArgs(one.folder, offline) : list ? trivyListArgs(list, offline) : undefined
+    const args = trivyArgs(one, listOf.get(one), offline)
     if (!args) return
     const result = await run(tool.command, args, { cwd: tool.cwd, timeoutMs: TOOL_TIMEOUT_MS })
     if (result.code !== 0) {
@@ -286,23 +302,23 @@ export function sizeScript(paths: string[]): string {
   ].join('\n')
 }
 
+async function measureWindows(host: Host, places: Place[]): Promise<void> {
+  for (let start = 0; start < places.length; start += FOLDERS_PER_CALL) {
+    const batch = places.slice(start, start + FOLDERS_PER_CALL)
+    const encoded = Buffer.from(sizeScript(batch.map((place) => place.path)), 'utf16le').toString('base64')
+    const result = await host.run('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded], { cwd: host.windows?.cwd(), timeoutMs: 600_000 })
+    if (result.code !== 0) continue
+    const sizes = JSON.parse(result.stdout.trim() || '{}') as Record<string, number>
+    for (const place of batch) place.bytes = sizes[place.path]
+  }
+}
+
 async function measureUnused(host: Host, sides: Side[], places: Place[]): Promise<void> {
   const unmeasured = places.filter((place) => place.unused && place.bytes === undefined)
   for (const side of sides) {
     const own = unmeasured.filter((place) => place.system === side.system.id)
-    if (own.length === 0) continue
-    if (!side.windows) {
-      for (const place of own) place.bytes = await folderSize(host, place.path)
-      continue
-    }
-    for (let start = 0; start < own.length; start += FOLDERS_PER_CALL) {
-      const batch = own.slice(start, start + FOLDERS_PER_CALL)
-      const encoded = Buffer.from(sizeScript(batch.map((place) => place.path)), 'utf16le').toString('base64')
-      const result = await host.run('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded], { cwd: host.windows?.cwd(), timeoutMs: 600_000 })
-      if (result.code !== 0) continue
-      const sizes = JSON.parse(result.stdout.trim() || '{}') as Record<string, number>
-      for (const place of batch) place.bytes = sizes[place.path]
-    }
+    if (side.windows) await measureWindows(host, own)
+    else for (const place of own) place.bytes = await folderSize(host, place.path)
   }
 }
 
@@ -328,40 +344,70 @@ function exposure(a: Place, b: Place): number {
   return 0
 }
 
-export function renderScan(value: Scan): string {
-  const counts = countsOf(value)
-  const lines = [
-    `${value.machine}, ${value.date.slice(0, 16).replace('T', ' ')} UTC`,
-    `${value.places.length} place(s), ${counts.malicious} malicious package(s), ${levelsOf(value.places.flatMap((place) => place.findings)) || 'no known vulnerability'}`,
-  ]
-  const malicious = value.places.flatMap((place) => place.findings.filter((finding) => finding.malicious).map((finding) => ({ place, finding })))
-  if (malicious.length > 0) lines.push('', 'Malicious, removed rather than updated, as they may have run at their install')
-  for (const { place, finding } of malicious) lines.push(`  ${finding.package} ${finding.version}  ${finding.ids[0]}  ${finding.summary}`.trimEnd(), `    in ${place.label} (${place.system})`)
-  const exposed = value.places.filter((place) => place.findings.some((finding) => !finding.malicious)).toSorted(exposure)
-  if (exposed.length > 0) lines.push('', 'Most exposed')
-  for (const place of exposed.slice(0, PLACES_SHOWN)) {
+// A blank line and its title, then the lines, and nothing at all without lines.
+function section(title: string, lines: string[]): string[] {
+  return lines.length > 0 ? ['', title, ...lines] : []
+}
+
+function maliciousLines(places: Place[]): string[] {
+  return places.flatMap((place) =>
+    place.findings
+      .filter((finding) => finding.malicious)
+      .flatMap((finding) => [`  ${finding.package} ${finding.version}  ${finding.ids[0]}  ${finding.summary}`.trimEnd(), `    in ${place.label} (${place.system})`]),
+  )
+}
+
+function exposedLines(places: Place[]): string[] {
+  const exposed = places.filter((place) => place.findings.some((finding) => !finding.malicious)).toSorted(exposure)
+  const lines = exposed.slice(0, PLACES_SHOWN).map((place) => {
     const packages = place.packages > 0 ? ` in ${place.packages} package(s)` : ''
-    lines.push(`  ${place.label} (${place.system}): ${levelsOf(place.findings)}${packages}`)
-  }
+    return `  ${place.label} (${place.system}): ${levelsOf(place.findings)}${packages}`
+  })
   if (exposed.length > PLACES_SHOWN) lines.push(`  and ${exposed.length - PLACES_SHOWN} more place(s) with a known vulnerability`)
-  const noted = value.places.filter((place) => place.notes.length > 0)
-  if (noted.length > 0) lines.push('', 'Notes')
-  for (const place of noted) lines.push(...place.notes.map((note) => `  ${place.label} (${place.system}): ${note}`))
-  const unused = value.places.filter((place) => place.unused).toSorted((a, b) => (b.bytes ?? 0) - (a.bytes ?? 0))
-  if (unused.length > 0) lines.push('', `Unused, ${formatBytes(counts.unusedBytes)}`)
-  for (const place of unused.slice(0, PLACES_SHOWN)) {
-    lines.push(`  ${place.label} (${place.system})${place.bytes === undefined ? '' : `, ${formatBytes(place.bytes)}`}, ${place.unused?.reason}`, `    ${place.unused?.command}`)
-  }
+  return lines
+}
+
+function unusedLines(places: Place[]): string[] {
+  const unused = places.filter((place) => place.unused).toSorted((a, b) => (b.bytes ?? 0) - (a.bytes ?? 0))
+  const lines = unused.slice(0, PLACES_SHOWN).flatMap((place) => {
+    const size = place.bytes === undefined ? '' : `, ${formatBytes(place.bytes)}`
+    return [`  ${place.label} (${place.system})${size}, ${place.unused?.reason}`, `    ${place.unused?.command}`]
+  })
   const rest = unused.slice(PLACES_SHOWN)
   if (rest.length > 0) lines.push(`  and ${rest.length} more, ${formatBytes(rest.reduce((sum, place) => sum + (place.bytes ?? 0), 0))}`)
-  // Each scanner is a layer, so the scan says which ran on each system, and which is missing or failed.
-  if ((value.tools ?? []).length > 0) lines.push('', 'Scanners')
-  for (const key of [...new Set((value.tools ?? []).map((use) => `${use.system} ${use.part}`))]) {
-    const uses = (value.tools ?? []).filter((use) => `${use.system} ${use.part}` === key)
-    lines.push(`  ${key}: ${uses.map((use) => (use.problem ? `${use.tool} ${use.version ?? ''} (${use.problem})`.replace('  ', ' ') : `${use.tool} ${use.version}`)).join(', ')}`)
-  }
-  if (value.skipped.length > 0) lines.push('', 'Skipped')
-  for (const skip of value.skipped) lines.push(`  ${skip.system} ${skip.part}: ${skip.reason}`)
-  lines.push('', 'Every finding: chade scan --json, or the Security page of chade ui')
-  return lines.join('\n')
+  return lines
+}
+
+function useText(use: ToolUse): string {
+  const name = [use.tool, use.version].filter(Boolean).join(' ')
+  return use.problem ? `${name} (${use.problem})` : name
+}
+
+// Each scanner is a layer, so the scan says which ran on each system, and which is missing or failed.
+function scannerLines(uses: ToolUse[]): string[] {
+  const keyOfUse = (use: ToolUse): string => `${use.system} ${use.part}`
+  const keys = [...new Set(uses.map(keyOfUse))]
+  return keys.map((key) => {
+    const group = uses.filter((use) => keyOfUse(use) === key)
+    return `  ${key}: ${group.map(useText).join(', ')}`
+  })
+}
+
+export function renderScan(value: Scan): string {
+  const { places } = value
+  const counts = countsOf(value)
+  const notes = places.flatMap((place) => place.notes.map((note) => `  ${place.label} (${place.system}): ${note}`))
+  const skipped = value.skipped.map((skip) => `  ${skip.system} ${skip.part}: ${skip.reason}`)
+  return [
+    `${value.machine}, ${value.date.slice(0, 16).replace('T', ' ')} UTC`,
+    `${places.length} place(s), ${counts.malicious} malicious package(s), ${levelsOf(places.flatMap((place) => place.findings)) || 'no known vulnerability'}`,
+    ...section('Malicious, removed rather than updated, as they may have run at their install', maliciousLines(places)),
+    ...section('Most exposed', exposedLines(places)),
+    ...section('Notes', notes),
+    ...section(`Unused, ${formatBytes(counts.unusedBytes)}`, unusedLines(places)),
+    ...section('Scanners', scannerLines(value.tools ?? [])),
+    ...section('Skipped', skipped),
+    '',
+    'Every finding: chade scan --json, or the Security page of chade ui',
+  ].join('\n')
 }

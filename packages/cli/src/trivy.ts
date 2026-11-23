@@ -57,7 +57,7 @@ export interface TrivyRead {
   notes: string[]
 }
 
-const LEVELS: Severity[] = ['critical', 'high', 'medium', 'low']
+const LEVELS = new Set<Severity>(['critical', 'high', 'medium', 'low'])
 
 export function readTrivy(text: string): TrivyRead {
   const report = JSON.parse(text === '' ? '{}' : text) as TrivyReport
@@ -73,7 +73,7 @@ export function readTrivy(text: string): TrivyRead {
         // The GHSA trivy knows is what osv-scanner and grype name the same advisory by.
         ids: [vulnerability.VulnerabilityID ?? '', ...(vulnerability.VendorIDs ?? [])].filter(Boolean),
         summary: vulnerability.Title ?? '',
-        severity: LEVELS.includes(severity) ? severity : 'unknown',
+        severity: LEVELS.has(severity) ? severity : 'unknown',
         // trivy joins the fixed versions of several branches with a comma, the first being the nearest.
         ...(vulnerability.FixedVersion ? { fixed: vulnerability.FixedVersion.split(',')[0].trim() } : {}),
         malicious: false,

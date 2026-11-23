@@ -22,7 +22,7 @@ export interface Side {
 }
 
 export function linuxSide(system: System, home: string, env: NodeJS.ProcessEnv): Side {
-  return { system, windows: false, home, join: posix.join, local: async (path) => path, env: async (name) => env[name] }
+  return { system, windows: false, home, join: posix.join, local: (path) => Promise.resolve(path), env: (name) => Promise.resolve(env[name]) }
 }
 
 export async function windowsSide(system: System, windows: Windows): Promise<Side | undefined> {
@@ -34,7 +34,9 @@ export async function windowsSide(system: System, windows: Windows): Promise<Sid
 // The command that removes a folder, in the shell of its system.
 export function removeCommand(side: Pick<Side, 'windows'>, path: string): string {
   if (side.windows) return `rmdir /s /q "${path}"`
-  return /^[\w./~-]+$/.test(path) ? `rm -rf ${path}` : `rm -rf '${path.replaceAll("'", String.raw`'\''`)}'`
+  if (/^[\w./~-]+$/.test(path)) return `rm -rf ${path}`
+  const quoted = path.replaceAll("'", String.raw`'\''`)
+  return `rm -rf '${quoted}'`
 }
 
 // The home folder as ~, or %USERPROFILE% on Windows, so that a label reads the same on every machine.
@@ -110,47 +112,62 @@ async function nvmTargets(side: Side, current: string): Promise<Target[]> {
 
 // ─── The places of a system ────────────────────────────────────────────────
 
+type Read = Pick<Target, 'folder' | 'list'>
+
+// Adds a place that exists, once, as two variables can name the same folder.
+type Add = (kind: Place['kind'], path: string | undefined, read: (path: string) => Read | Promise<Read>, unused?: Place['unused']) => Promise<void>
+
+const folder = (path: string): Read => ({ folder: path })
+
+async function addWindows(side: Side, add: Add): Promise<void> {
+  const { home, join } = side
+  const appData = await side.env('APPDATA')
+  const localAppData = await side.env('LOCALAPPDATA')
+  if (appData) await add('machine', join(appData, 'npm', 'node_modules'), folder)
+  // nvm for Windows keeps each version in a folder of its own, vX.Y.Z.
+  const nvm = (await side.env('NVM_HOME')) ?? (appData ? join(appData, 'nvm') : undefined)
+  if (nvm && (await exists(side, nvm))) {
+    for (const version of (await children(await side.local(nvm))).filter((name) => /^v\d/.test(name))) await add('machine', join(nvm, version, 'node_modules'), folder)
+  }
+  if (localAppData) {
+    const npx = join(localAppData, 'npm-cache', '_npx')
+    await add('cache', npx, folder, { reason: 'the packages npx fetched, which it fetches again when asked', command: removeCommand(side, npx) })
+  }
+  await add('machine', join(home, 'pipx', 'venvs'), folder)
+  if (appData) await add('cache', join(appData, 'terraform.d', 'plugin-cache'), folder)
+}
+
+async function addLinux(side: Side, add: Add): Promise<void> {
+  const { home, join } = side
+  const prefix = await side.env('NPM_CONFIG_PREFIX')
+  for (const lib of [join(home, '.npm-global'), join(home, '.local'), prefix, '/usr/local', '/usr']) {
+    if (lib) await add('machine', join(lib, 'lib', 'node_modules'), folder)
+  }
+  const npx = join(home, '.npm', '_npx')
+  await add('cache', npx, folder, { reason: 'the packages npx fetched, which it fetches again when asked', command: removeCommand(side, npx) })
+  const pnpmHome = await side.env('PNPM_HOME')
+  await add('machine', join(home, '.local', 'share', 'pnpm', 'global'), folder)
+  if (pnpmHome) await add('machine', join(pnpmHome, 'global'), folder)
+  const pipxHome = await side.env('PIPX_HOME')
+  await add('machine', join(home, '.local', 'share', 'pipx', 'venvs'), folder)
+  await add('machine', join(home, '.local', 'pipx', 'venvs'), folder)
+  if (pipxHome) await add('machine', join(pipxHome, 'venvs'), folder)
+  await add('cache', (await side.env('TF_PLUGIN_CACHE_DIR')) ?? join(home, '.terraform.d', 'plugin-cache'), folder)
+}
+
 // What tools installed for the whole user, which belongs to no repository, found by looking as IstarCI does, nvm needing a shell to answer.
 export async function machineTargets(side: Side, current: string): Promise<Target[]> {
-  const join = side.join
-  const home = side.home
+  const { home, join } = side
   const targets: Target[] = []
-  const add = async (kind: Place['kind'], path: string | undefined, read: (path: string) => Promise<{ folder?: string; list?: Listed[] }>, unused?: Place['unused']) => {
+  const add: Add = async (kind, path, read, unused) => {
     if (path && !targets.some((known) => known.place.path === path) && (await exists(side, path))) targets.push(target(side, kind, path, await read(path), unused))
   }
-  const folder = async (path: string) => ({ folder: path })
-  const nuget = async (path: string) => ({ list: await versionFolders(side, path, 'NuGet') })
+  const nuget = async (path: string): Promise<Read> => ({ list: await versionFolders(side, path, 'NuGet') })
   if (side.windows) {
-    const appData = await side.env('APPDATA')
-    const localAppData = await side.env('LOCALAPPDATA')
-    if (appData) await add('machine', join(appData, 'npm', 'node_modules'), folder)
-    // nvm for Windows keeps each version in a folder of its own, vX.Y.Z.
-    const nvm = (await side.env('NVM_HOME')) ?? (appData ? join(appData, 'nvm') : undefined)
-    if (nvm && (await exists(side, nvm))) {
-      for (const version of (await children(await side.local(nvm))).filter((name) => /^v\d/.test(name))) await add('machine', join(nvm, version, 'node_modules'), folder)
-    }
-    if (localAppData) {
-      const npx = join(localAppData, 'npm-cache', '_npx')
-      await add('cache', npx, folder, { reason: 'the packages npx fetched, which it fetches again when asked', command: removeCommand(side, npx) })
-    }
-    await add('machine', join(home, 'pipx', 'venvs'), folder)
-    if (appData) await add('cache', join(appData, 'terraform.d', 'plugin-cache'), folder)
+    await addWindows(side, add)
   } else {
     targets.push(...(await nvmTargets(side, current)))
-    const prefix = await side.env('NPM_CONFIG_PREFIX')
-    for (const lib of [join(home, '.npm-global'), join(home, '.local'), prefix, '/usr/local', '/usr']) {
-      if (lib) await add('machine', join(lib, 'lib', 'node_modules'), folder)
-    }
-    const npx = join(home, '.npm', '_npx')
-    await add('cache', npx, folder, { reason: 'the packages npx fetched, which it fetches again when asked', command: removeCommand(side, npx) })
-    const pnpmHome = await side.env('PNPM_HOME')
-    await add('machine', join(home, '.local', 'share', 'pnpm', 'global'), folder)
-    if (pnpmHome) await add('machine', join(pnpmHome, 'global'), folder)
-    const pipxHome = await side.env('PIPX_HOME')
-    await add('machine', join(home, '.local', 'share', 'pipx', 'venvs'), folder)
-    await add('machine', join(home, '.local', 'pipx', 'venvs'), folder)
-    if (pipxHome) await add('machine', join(pipxHome, 'venvs'), folder)
-    await add('cache', (await side.env('TF_PLUGIN_CACHE_DIR')) ?? join(home, '.terraform.d', 'plugin-cache'), folder)
+    await addLinux(side, add)
   }
   await add('machine', join(home, '.dotnet', 'tools', '.store'), nuget)
   const goPath = await side.env('GOPATH')

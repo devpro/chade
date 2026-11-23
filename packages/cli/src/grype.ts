@@ -26,7 +26,7 @@ interface GrypeReport {
   }[]
 }
 
-const LEVELS: Severity[] = ['critical', 'high', 'medium', 'low']
+const LEVELS = new Set<Severity>(['critical', 'high', 'medium', 'low'])
 
 // Each finding with the key of its package, which says the places it lies in, as a list holds the packages of many.
 export function readGrype(text: string): { key: string; finding: Finding }[] {
@@ -45,7 +45,7 @@ export function readGrype(text: string): { key: string; finding: Finding }[] {
         version: artifact.version ?? '',
         ids: [vulnerability.id ?? '', ...related.map((one) => one.id ?? '')].filter(Boolean),
         summary: (vulnerability.description ?? related.find((one) => one.description)?.description ?? '').split('\n')[0],
-        severity: LEVELS.includes(severity) ? severity : 'unknown',
+        severity: LEVELS.has(severity) ? severity : 'unknown',
         ...(fixed ? { fixed } : {}),
         malicious: false,
         tools: ['grype'],
