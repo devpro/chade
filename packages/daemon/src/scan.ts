@@ -55,7 +55,7 @@ export interface Skipped {
   system: string
   part: string
   reason: string
-  // Section of docs/scan.md that says what makes it run.
+  // The section of docs/scan.md that tells the user how to correct the problem.
   guide?: string
 }
 

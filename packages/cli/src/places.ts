@@ -114,7 +114,8 @@ async function nvmTargets(side: Side, current: string): Promise<Target[]> {
 
 type Read = Pick<Target, 'folder' | 'list'>
 
-// Adds a place that exists, once, as two variables can name the same folder.
+// Adds a place only if it exists and is not in the list.
+// Two variables can contain the same folder.
 type Add = (kind: Place['kind'], path: string | undefined, read: (path: string) => Read | Promise<Read>, unused?: Place['unused']) => Promise<void>
 
 const folder = (path: string): Read => ({ folder: path })

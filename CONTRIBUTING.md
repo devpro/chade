@@ -225,7 +225,8 @@ The modules that run only in Chromium, and the entry point of the CLI, are left 
 
 [IstarCI](https://github.com/devpro/istarci) runs the same pipeline in Docker before a push, with the settings of `.istarci.yml`.
 Its Sonar analysis runs against a SonarQube on the machine, and fails the run when the quality gate fails, where SonarCloud only reports it on the pull request.
-Its quality profile is the one of SonarCloud, `Sonar way comprehensive`, as the default of SonarQube lacks half of its TypeScript rules.
+The local SonarQube uses the same quality profile as SonarCloud, `Sonar way comprehensive`.
+The default profile of SonarQube has only half of its TypeScript rules.
 It skips the Windows job, which `scripts/run_on_windows.sh --check` runs on the Windows of a WSL machine.
 `istarci add` and `istarci install-hook` set it up for this repository.
 

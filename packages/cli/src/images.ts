@@ -108,7 +108,7 @@ export async function scanImages(run: Run, options: ImageOptions): Promise<Image
   return { places }
 }
 
-// The place of an image filled with what every scanner finds in it.
+// Reads an image with each scanner and puts the results in its place.
 async function readPlace(run: Run, place: Place, image: DockerImage, options: ImageOptions): Promise<void> {
   const findings: Finding[] = []
   const packages = new Set<string>()

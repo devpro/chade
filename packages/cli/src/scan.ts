@@ -74,7 +74,7 @@ function noScanner(side: Side, part: string): Skipped {
   return { system: side.system.id, part, reason: `none of ${SCANNERS.join(', ')} is installed on ${side.windows ? 'Windows' : 'Linux'}`, guide: 'installing-the-scanners' }
 }
 
-// What a scan gathers, each part adding to it.
+// Each part of the scan adds its results here.
 type Gathered = Pick<Scan, 'places' | 'skipped' | 'tools'>
 
 async function sidesOf(host: Host, gathered: Gathered): Promise<Side[]> {
@@ -138,7 +138,8 @@ export async function scan(config: Config | undefined, host: Host, options: Scan
     const roots = config ? await repositoryRoots(config, host) : []
     for (const side of sides) await scanPackages(host, side, roots, options, now, gathered)
   }
-  // Docker Desktop shares one engine between Windows and WSL, so the images are read once, by Linux when there is one.
+  // Windows and WSL use the same Docker Desktop engine.
+  // Thus, only one system reads the images: Linux if it is available.
   const docker = sides.find((one) => !one.windows) ?? sides[0]
   if (options.images && docker) await scanDocker(host, docker, options, now, gathered)
   await measureUnused(host, sides, gathered.places)
@@ -343,7 +344,7 @@ function exposure(a: Place, b: Place): number {
   return 0
 }
 
-// A blank line and its title, then the lines, and nothing at all without lines.
+// A section without lines does not show its title.
 function section(title: string, lines: string[]): string[] {
   return lines.length > 0 ? ['', title, ...lines] : []
 }
@@ -382,7 +383,8 @@ function useText(use: ToolUse): string {
   return use.problem ? `${name} (${use.problem})` : name
 }
 
-// Each scanner is a layer, so the scan says which ran on each system, and which is missing or failed.
+// The scanners find different problems.
+// Thus, the user must know which scanners ran, and which are not installed or failed.
 function scannerLines(uses: ToolUse[]): string[] {
   const keyOfUse = (use: ToolUse): string => `${use.system} ${use.part}`
   const keys = [...new Set(uses.map(keyOfUse))]
