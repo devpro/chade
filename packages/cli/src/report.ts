@@ -4,13 +4,12 @@ import { freemem, totalmem } from 'node:os'
 import { dirname, join } from 'node:path'
 import { countsOf, findRepositories, SEVERITIES, trimTrailing, type Measure, type Report, type Scan, type Section } from '@chade/daemon'
 import type { Config } from './config.js'
+import { docsPointer } from './docs.js'
 import { NOT_FOUND } from './exec.js'
 import { expandHome } from './paths.js'
 import { isNativeWindows, type Host } from './system.js'
 
 export type { Measure, Report, Section }
-
-export const GUIDE = 'https://github.com/devpro/chade/blob/main/docs/cleanup.md'
 
 // The last report, saved beside the configuration, which the interface shows at once.
 export function reportFile(configFile: string): string {
@@ -535,7 +534,7 @@ export function renderReport(value: Report): string {
       lines.push(`  ${measure.label.padEnd(width)}  ${parts.join(', ')}`)
     }
     for (const hint of section.hints) lines.push(hint.startsWith('  ') ? `    ${hint.trimStart()}` : `  → ${hint}`)
-    if (section.hints.length > 0 && section.guide) lines.push(`    ${GUIDE}#${section.guide}`)
+    if (section.hints.length > 0 && section.guide) lines.push(`    ${docsPointer('cleanup', section.guide)}`)
   }
   return lines.join('\n')
 }

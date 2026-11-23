@@ -61,6 +61,8 @@ program
   .option('--force', 'overwrite an existing configuration')
   .action(async (options: { store: string; force?: boolean }) => {
     const file = configFile()
+    // This check prevents damage to other files when the path is incorrect.
+    if (!/\.ya?ml$/i.test(file)) throw new Error(`${file} is not a .yml or .yaml file`)
     if (existsSync(file) && !options.force) throw new Error(`${file} already exists, --force overwrites it`)
     const store = resolve(expandHome(options.store, home))
     const root = await repositoryRoot(run, store)

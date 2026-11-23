@@ -1,6 +1,7 @@
 // The scan module alone, as the rest of the daemon is for Node and not for the page.
-import { packagesOf, SEVERITIES, type Finding, type PackageFindings, type Place, type PlaceKind, type Scan, type Severity, type ToolUse } from '@chade/daemon/scan'
+import { packagesOf, SEVERITIES, type Finding, type PackageFindings, type Place, type PlaceKind, type Scan, type Severity, type Skipped, type ToolUse } from '@chade/daemon/scan'
 import { get, post } from './api.js'
+import { docsAddress } from './docs.js'
 import { element, node } from './dom.js'
 import { bytes } from './format.js'
 
@@ -285,6 +286,11 @@ function chooseLevel(level: Level): void {
   if (levels.size === 0) levels = new Set(LEVELS)
 }
 
+function levelTitle(level: Level, shown: boolean): string {
+  if (allLevels()) return `Only ${level}`
+  return shown ? `Hide ${level}` : `Show ${level}`
+}
+
 function toggles(scan: Scan, kind: Tab): HTMLElement[] {
   const groups: HTMLElement[] = []
   const systems = [...new Set(scan.places.map((place) => place.system))]
@@ -302,8 +308,7 @@ function toggles(scan: Scan, kind: Tab): HTMLElement[] {
   group.setAttribute('aria-label', 'Level')
   for (const level of LEVELS) {
     const shown = !allLevels() && levels.has(level)
-    const title = allLevels() ? `Only ${level}` : `${shown ? 'Hide' : 'Show'} ${level}`
-    const chip = toggle(level, shown, title, () => chooseLevel(level), `chip ${TONES[level]}${counts[level] === 0 ? ' zero' : ''}`)
+    const chip = toggle(level, shown, levelTitle(level, shown), () => chooseLevel(level), `chip ${TONES[level]}${counts[level] === 0 ? ' zero' : ''}`)
     chip.append(node('span', String(counts[level]), 'chip-count'))
     group.append(chip)
   }
@@ -318,7 +323,7 @@ function toggles(scan: Scan, kind: Tab): HTMLElement[] {
 // Each scanner is a layer, so the page says which ran on each system with its version, and which is missing or failed.
 function scannerList(uses: ToolUse[]): HTMLElement {
   const list = node('ul', '', 'scanners')
-  for (const key of [...new Set(uses.map((use) => `${use.system} ${use.part}`))]) {
+  for (const key of new Set(uses.map((use) => `${use.system} ${use.part}`))) {
     const item = node('li')
     item.append(node('span', key, 'scanner-part'))
     for (const use of uses.filter((one) => `${one.system} ${one.part}` === key)) {
@@ -330,6 +335,16 @@ function scannerList(uses: ToolUse[]): HTMLElement {
   return list
 }
 
+function skippedItem(skip: Skipped): HTMLElement {
+  const item = node('li', `${skip.system} ${skip.part}: ${skip.reason}`)
+  if (skip.guide) {
+    const guide = node('a', 'How to, step by step', 'guide') as HTMLAnchorElement
+    guide.href = docsAddress('scan', skip.guide)
+    item.append(' ', guide)
+  }
+  return item
+}
+
 function scannersContent(scan: Scan): HTMLElement[] {
   const content: HTMLElement[] = []
   const uses = (scan.tools ?? []).filter((use) => system === undefined || use.system === system)
@@ -337,7 +352,7 @@ function scannersContent(scan: Scan): HTMLElement[] {
   const skipped = scan.skipped.filter((skip) => system === undefined || skip.system === system)
   if (skipped.length > 0) {
     const list = node('ul', '', 'skipped')
-    list.append(...skipped.map((skip) => node('li', `${skip.system} ${skip.part}: ${skip.reason}`)))
+    list.append(...skipped.map(skippedItem))
     content.push(node('h3', 'Skipped'), list)
   }
   return content.length > 0 ? content : [node('p', 'No scanner ran', 'empty')]

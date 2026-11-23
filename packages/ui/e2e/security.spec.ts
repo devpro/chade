@@ -17,7 +17,7 @@ test('the malicious packages show above a tab for each kind of place, each place
   // Each malicious package with where it lies, the place to remove it from, whatever the tab.
   await expect(security.alert).toHaveText(['@zalastax/nolb-_extri 1.0.0MAL-2025-10000in ~/repos/portal/node_modules, wsl-ubuntu'])
   // The first tab with something to show, the scanners counting what is missing.
-  await expect(security.tabs).toHaveText(['Repositories2', 'Installed1', 'Caches1', 'Images1', 'Scanners1'])
+  await expect(security.tabs).toHaveText(['Repositories2', 'Installed1', 'Caches1', 'Images1', 'Scanners2'])
   await expect(security.tab('Repositories')).toHaveAttribute('aria-selected', 'true')
   await expect(security.levels).toHaveText(['malicious1', 'critical2', 'high1', 'medium1', 'low0', 'unknown1', 'unused1'])
   // The most critical findings first, the kind never repeated, the system said as several are listed.
@@ -62,6 +62,10 @@ test('the images tab gives the notes of each image, and the scanners tab each sc
     'wsl-ubuntu imagesosv-scanner 2.7.1trivy 0.76.2grype 0.122.1',
     'windows packagesosv-scanner 2.7.0trivy 0.76.2grype: not installed',
   ])
+  await expect(security.guide).toHaveAttribute('href', '#docs?name=scan&at=installing-the-scanners')
+  await shot(page, testInfo, 'security-scanners')
+  await security.guide.click()
+  await expect(page.locator('#installing-the-scanners')).toBeInViewport()
 })
 
 test('the system, the levels, unused and the filter narrow the places', async ({ page, server }, testInfo) => {
@@ -69,7 +73,7 @@ test('the system, the levels, unused and the filter narrow the places', async ({
   await security.signIn(server.url)
   await security.system('windows').click()
   await expect(security.system('windows')).toHaveAttribute('aria-pressed', 'true')
-  await expect(security.tabs).toHaveText(['Repositories0', 'Installed1', 'Caches0', 'Images0', 'Scanners1'])
+  await expect(security.tabs).toHaveText(['Repositories0', 'Installed1', 'Caches0', 'Images0', 'Scanners2'])
   await expect(security.alert).toHaveCount(0)
   await security.tab('Installed').click()
   // One system listed, it is not said again on each place.
@@ -80,7 +84,7 @@ test('the system, the levels, unused and the filter narrow the places', async ({
   await security.level('critical').click()
   await expect(security.level('critical')).toHaveAttribute('aria-pressed', 'true')
   await expect(security.place('~/repos/portal/node_modules').badges).toHaveText(['1 critical'])
-  await expect(security.tabs).toHaveText(['Repositories2', 'Installed1', 'Caches0', 'Images0', 'Scanners1'])
+  await expect(security.tabs).toHaveText(['Repositories2', 'Installed1', 'Caches0', 'Images0', 'Scanners2'])
   await security.level('high').click()
   await security.tab('Caches').click()
   await expect(security.places.locator('summary .place-label')).toHaveText(['~/.nuget/packages'])

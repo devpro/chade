@@ -98,28 +98,33 @@ export async function scanImages(run: Run, options: ImageOptions): Promise<Image
   for (const image of images) {
     const place = imagePlace(image, options.system, used)
     const previous = options.previous(image.id)
-    if (previous && previous.tools.toSorted((a, b) => a.localeCompare(b)).join() === names.join()) {
+    if (previous?.tools.toSorted((a, b) => a.localeCompare(b)).join() === names.join()) {
       places.push({ ...place, findings: previous.findings, notes: previous.notes, tools: previous.tools, packages: previous.packages })
       continue
     }
-    const findings: Finding[] = []
-    const packages = new Set<string>()
-    for (const tool of options.tools) {
-      const read = await readImage(run, tool, image, options.offline)
-      if (typeof read === 'string') {
-        place.notes.push(`${tool.name} could not read it: ${read}`)
-        continue
-      }
-      findings.push(...read.findings)
-      for (const pkg of read.packages) packages.add(pkg)
-      for (const note of read.notes) if (!place.notes.includes(note)) place.notes.push(note)
-      place.tools.push(tool.name)
-    }
-    place.findings = mergeFindings(findings)
-    place.packages = packages.size
+    await readPlace(run, place, image, options)
     places.push(place)
   }
   return { places }
+}
+
+// Reads an image with each scanner and puts the results in its place.
+async function readPlace(run: Run, place: Place, image: DockerImage, options: ImageOptions): Promise<void> {
+  const findings: Finding[] = []
+  const packages = new Set<string>()
+  for (const tool of options.tools) {
+    const read = await readImage(run, tool, image, options.offline)
+    if (typeof read === 'string') {
+      place.notes.push(`${tool.name} could not read it: ${read}`)
+      continue
+    }
+    findings.push(...read.findings)
+    for (const pkg of read.packages) packages.add(pkg)
+    for (const note of read.notes) if (!place.notes.includes(note)) place.notes.push(note)
+    place.tools.push(tool.name)
+  }
+  place.findings = mergeFindings(findings)
+  place.packages = packages.size
 }
 
 function imagePlace(image: DockerImage, system: string, used: Set<string> | undefined): Place {

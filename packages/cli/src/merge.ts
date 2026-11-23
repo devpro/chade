@@ -37,12 +37,16 @@ export function mergeFindings(findings: Finding[]): Finding[] {
       merged.push({ ...finding, ids: [...finding.ids], tools: [...finding.tools] })
       continue
     }
-    for (const id of finding.ids) if (!same.ids.some((known) => known.toUpperCase() === id.toUpperCase())) same.ids.push(id)
-    for (const tool of finding.tools) if (!same.tools.includes(tool)) same.tools.push(tool)
-    if (SEVERITIES.indexOf(finding.severity) < SEVERITIES.indexOf(same.severity)) same.severity = finding.severity
-    if (finding.fixed && (!same.fixed || compareVersions(finding.fixed, same.fixed) < 0)) same.fixed = finding.fixed
-    same.summary ||= finding.summary
-    same.malicious ||= finding.malicious
+    mergeInto(same, finding)
   }
   return merged
+}
+
+function mergeInto(same: Finding, finding: Finding): void {
+  for (const id of finding.ids) if (!same.ids.some((known) => known.toUpperCase() === id.toUpperCase())) same.ids.push(id)
+  for (const tool of finding.tools) if (!same.tools.includes(tool)) same.tools.push(tool)
+  if (SEVERITIES.indexOf(finding.severity) < SEVERITIES.indexOf(same.severity)) same.severity = finding.severity
+  if (finding.fixed && (!same.fixed || compareVersions(finding.fixed, same.fixed) < 0)) same.fixed = finding.fixed
+  same.summary ||= finding.summary
+  same.malicious ||= finding.malicious
 }

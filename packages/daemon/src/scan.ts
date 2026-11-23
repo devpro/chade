@@ -55,6 +55,8 @@ export interface Skipped {
   system: string
   part: string
   reason: string
+  // The section of docs/scan.md that tells the user how to correct the problem.
+  guide?: string
 }
 
 export interface Scan {
