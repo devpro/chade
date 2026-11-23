@@ -1,6 +1,6 @@
 {
   "name": "@devpro/chade",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Snapshot the configuration of a system, files, installed applications, extensions, services and repositories, into a git repository, one folder per machine",
   "type": "module",
   "license": "PolyForm-Noncommercial-1.0.0",
