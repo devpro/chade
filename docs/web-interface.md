@@ -156,9 +156,11 @@ The page changes nothing: a snapshot is taken in a terminal, with `chade snapsho
 ## Report
 
 Report shows what `chade report` measures, a card for each section, a size drawn as a bar against the largest of its card.
+A tab shows each system measured, Windows and the distribution on WSL, with the number of its cards and of those with something to clean.
+The tab chosen is the same on Report and Repositories.
 A card with something to clean gives the command or the setting, and a link to its step of the [system clean-up](cleanup.md).
 The page opens on the last report saved, by `chade report` or the [daily run](#daily-runs), and measures one when none is saved.
-Refresh measures again, which takes a few seconds.
+Refresh measures again, which can take a minute.
 The page cleans nothing: `chade clean` does, in a terminal.
 
 ## Security

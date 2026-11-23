@@ -109,7 +109,8 @@ main {
   margin-bottom: 12px;
 }
 
-#tabs {
+#tabs,
+#report-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;

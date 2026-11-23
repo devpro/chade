@@ -6,6 +6,8 @@ export interface Measure {
 }
 
 export interface Section {
+  // The system measured, absent from a report an earlier version saved.
+  system?: string
   title: string
   measures: Measure[]
   // What to do about a measure, each the command or setting the machine documentation gives.

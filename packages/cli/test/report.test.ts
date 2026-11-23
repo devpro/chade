@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
+import type { Config } from '../src/config.js'
 import { NOT_FOUND, run, type Run } from '../src/exec.js'
 import {
   disabledSnaps,
@@ -12,6 +13,7 @@ import {
   parseLxss,
   parseMeminfo,
   parsePs,
+  parseRobocopy,
   parseSize,
   parseTasklist,
   renderReport,
@@ -135,12 +137,65 @@ test('tasklist gives the memory of each process in kB, whatever the digit groupi
   ])
 })
 
+const robocopySummary = (bytes: number): string =>
+  ['', '              Total    Copi\u00e9   Ignor\u00e9 Discordance \u00c9CHEC  Extras', '   R\u00e9p. :  54  54  0  0  0  0', 'Fichiers :  155  155  0  0  0  0', `  Octets :  ${bytes}  ${bytes}  0  0  0  0`, '  Heures :   0:00:00   0:00:00   0:00:00   0:00:00', ''].join('\r\n')
+
+test('robocopy gives the bytes of a folder, whatever the language of Windows', () => {
+  assert.equal(parseRobocopy(robocopySummary(138_530_576)), 138_530_576)
+  assert.equal(parseRobocopy('ERROR 2 (0x00000002) Accessing Source Directory'), undefined)
+})
+
+// Stands in for Windows, where C:\ is a folder of the test and every folder has the same size.
+function windowsTools(drive: string, bytes: number): Run {
+  const variables: Record<string, string> = { '%USERPROFILE%': String.raw`C:\Users\me`, '%LOCALAPPDATA%': String.raw`C:\Users\me\AppData\Local` }
+  return (command, args) => {
+    const answer = (stdout: string, code = 0) => Promise.resolve({ code, stdout, stderr: '' })
+    if (command === 'cmd.exe') return args[2] === 'echo' ? answer(variables[args[3]] ?? args[3]) : answer('', NOT_FOUND)
+    if (command === 'wslpath') return answer(join(drive, args[1].slice(3).replaceAll('\\', '/')))
+    if (command === 'tasklist.exe') return answer('"Code.exe","4120","Console","1","2 000 K"\r\n')
+    if (command === 'powershell.exe') return answer('66540240\r\n15509544\r\n')
+    // A listing that finds files exits with 1.
+    if (command === 'robocopy.exe') return answer(robocopySummary(bytes), 1)
+    return answer('', NOT_FOUND)
+  }
+}
+
+test('a report from WSL measures Windows and the distribution, each in its own sections', { skip: linuxOnly }, async () => {
+  const drive = await mkdtemp(join(tmpdir(), 'chade-report-'))
+  const home = await mkdtemp(join(tmpdir(), 'chade-report-'))
+  const profile = join(drive, 'Users', 'me')
+  await mkdir(join(profile, '.nuget', 'packages'), { recursive: true })
+  await mkdir(join(profile, '.claude', 'projects', 'one'), { recursive: true })
+  await writeFile(join(profile, '.claude', 'projects', 'one', 'session.jsonl'), '{}')
+  await mkdir(join(profile, 'projects', 'portal', '.git'), { recursive: true })
+  const fakeRun = windowsTools(drive, 17_000_000_000)
+  const host: Host = {
+    machine: 'TEST-PC',
+    home,
+    run: fakeRun,
+    windows: new Windows(fakeRun),
+    systems: [
+      { kind: 'windows', id: 'windows' },
+      { kind: 'linux', id: 'wsl-test' },
+    ],
+  }
+  const config = { store: '', redact: [], cleanup: [], windows: { files: [], inventories: [], repos: [String.raw`%NOWHERE%\projects`, String.raw`%USERPROFILE%\projects`] } } as unknown as Config
+  const result = await report(config, host)
+  const titles = (system: string) => result.sections.filter((section) => section.system === system && !section.title.endsWith('disk')).map((section) => section.title)
+  assert.deepEqual(titles('windows'), ['Memory', 'Caches', 'Agent sessions', 'Repositories', 'Security'])
+  assert.deepEqual(titles('wsl-test').filter((title) => title !== 'Memory'), ['Security'])
+  const text = renderReport(result)
+  assert.match(text, /=== windows ===[\s\S]+=== wsl-test ===/)
+  assert.match(text, /RAM\s+52\.3 GB used of 68\.1 GB/)
+  assert.match(text, /%USERPROFILE%\\\.nuget\\packages holds 17\.0 GB, cleared from a Windows prompt with:/)
+  assert.match(text, /%USERPROFILE%\\\.claude\\projects\s+17\.0 GB, 1 session\(s\), 0 older/)
+  assert.match(text, /%USERPROFILE%\\projects\\portal\s+17\.0 GB/)
+})
+
 test('a report from Windows measures with Windows tools, and leaves the Linux sections out', async () => {
   const home = await mkdtemp(join(tmpdir(), 'chade-report-'))
-  await mkdir(join(home, 'AppData', 'Local', 'npm-cache', 'index'), { recursive: true })
-  await writeFile(join(home, 'AppData', 'Local', 'npm-cache', 'index', 'blob'), 'x'.repeat(2000))
   const fakeRun: Run = async (command) => {
-    if (command === 'tasklist') return { code: 0, stdout: '"Code.exe","4120","Console","1","2 000 K"\r\n', stderr: '' }
+    if (command === 'tasklist.exe') return { code: 0, stdout: '"Code.exe","4120","Console","1","2 000 K"\r\n', stderr: '' }
     if (command === 'cmd.exe' || command === 'docker') return { code: NOT_FOUND, stdout: '', stderr: '' }
     throw new Error(`${command} is not a Windows tool`)
   }
@@ -149,12 +204,13 @@ test('a report from Windows measures with Windows tools, and leaves the Linux se
   // A C: drive exists when the test itself runs on Windows.
   assert.deepEqual(
     result.sections.map((section) => section.title).filter((title) => title !== 'Windows disk'),
-    ['Memory', 'Caches', 'Security'],
+    ['Memory', 'Security'],
   )
   // No distribution in the registry, so no settings of WSL to suggest.
   assert.ok(!result.sections.some((section) => section.title === 'WSL settings'))
   const text = renderReport(result)
   assert.match(text, /RAM\s+.+ used of /)
   assert.match(text, /process Code\.exe\s+2\.0 MB/)
-  assert.match(text, /~\/AppData\/Local\/npm-cache\s+2\.0 kB/)
+  // A single system needs no heading of its own.
+  assert.doesNotMatch(text, /===/)
 })

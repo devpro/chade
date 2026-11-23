@@ -3,6 +3,7 @@ import { get } from './api.js'
 import { docsAddress } from './docs.js'
 import { element, node } from './dom.js'
 import { bytes } from './format.js'
+import { chosenSystem, systemTabs } from './systems.js'
 
 type Loaded = Omit<Report, 'date'> & { version: string; scannedAt: string }
 
@@ -64,7 +65,7 @@ function card(section: Section): HTMLElement {
 }
 
 function stateText(): string {
-  if (measuring) return 'Measuring the machine, which takes a few seconds…'
+  if (measuring) return 'Measuring the machine, which can take a minute…'
   return report ? `Measured ${new Date(report.scannedAt).toLocaleString()}` : ''
 }
 
@@ -74,17 +75,28 @@ function render(): void {
   state.classList.toggle('measuring', measuring)
   const created: HTMLElement[] = []
   if (report) {
-    const todo = report.sections.filter((section) => section.hints.length > 0).length
+    const { sections: all } = report
+    const systems = [...new Set(all.flatMap((section) => section.system ?? []))]
+    const shown = chosenSystem(systems)
+    const ofSystem = (system: string | undefined): Section[] => all.filter((section) => section.system === undefined || section.system === system)
+    const todoOf = (listed: Section[]): number => listed.filter((section) => section.hints.length > 0).length
+    const tabs = systems.map((system) => ({ system, count: ofSystem(system).length, todo: todoOf(ofSystem(system)) }))
+    element('report-tabs').replaceChildren(...systemTabs(tabs, shown, render))
+    const listed = ofSystem(shown)
+    const todo = todoOf(listed)
     const sections = todo === 1 ? 'section' : 'sections'
     element('report-summary').textContent = todo === 0 ? 'Nothing to clean' : `${todo} ${sections} with something to clean`
     const grid = node('div', '', 'cards')
-    grid.append(...report.sections.map(card))
+    grid.append(...listed.map(card))
     created.push(grid)
-  } else element('report-summary').textContent = ''
+  } else {
+    element('report-summary').textContent = ''
+    element('report-tabs').replaceChildren()
+  }
   element('report-sections').replaceChildren(...created)
 }
 
-// A report takes the seconds its commands take, so it is measured behind the page, which stays free to leave.
+// A report takes the time its commands take, so it is measured behind the page, which stays free to leave.
 // The page that holds the views is told the outcome, to say it as it says any read or any failure.
 // The saved report when the page opens, measured again only when asked.
 function measure(fresh: boolean): void {

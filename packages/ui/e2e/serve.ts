@@ -213,6 +213,7 @@ const report = async (): Promise<Report> => {
     date: new Date().toISOString(),
     sections: [
       {
+        system: 'windows',
         title: 'Windows disk',
         measures: [
           { label: 'C:', detail: '615.8 GB used of 1.0 TB, 406.3 GB free' },
@@ -222,6 +223,26 @@ const report = async (): Promise<Report> => {
         guide: 'disk-image-compaction',
       },
       {
+        system: 'windows',
+        title: 'Memory',
+        measures: [
+          { label: 'RAM', detail: '50.1 GB used of 68.1 GB' },
+          { label: 'process Code.exe', bytes: 3_100_000_000 },
+        ],
+        hints: [],
+      },
+      {
+        system: 'windows',
+        title: 'Caches',
+        measures: [
+          { label: String.raw`%LOCALAPPDATA%\npm-cache`, bytes: 1_700_000_000 },
+          { label: String.raw`%USERPROFILE%\.nuget\packages`, bytes: 17_000_000_000 },
+        ],
+        hints: [String.raw`%USERPROFILE%\.nuget\packages holds 17.0 GB, cleared from a Windows prompt with:`, '  dotnet nuget locals all --clear'],
+        guide: 'caches',
+      },
+      {
+        system: 'wsl-ubuntu',
         title: 'Memory',
         measures: [
           { label: 'RAM', detail: `5.9 GB used of 44.2 GB, measured ${measured} time${measured === 1 ? '' : 's'}` },
@@ -232,6 +253,7 @@ const report = async (): Promise<Report> => {
         hints: [],
       },
       {
+        system: 'wsl-ubuntu',
         title: 'Docker',
         measures: [
           { label: 'Images', bytes: 48_200_000_000, detail: '31.0 GB unused' },
@@ -241,8 +263,9 @@ const report = async (): Promise<Report> => {
         hints: ['31.0 GB of images are unused, and removed with:', '  docker image prune -a --filter until=168h -f'],
         guide: 'docker',
       },
-      { title: 'Journal', measures: [{ label: 'systemd journal', bytes: 839_500_000 }], hints: [] },
+      { system: 'wsl-ubuntu', title: 'Journal', measures: [{ label: 'systemd journal', bytes: 839_500_000 }], hints: [] },
       {
+        system: 'wsl-ubuntu',
         title: 'Repositories',
         measures: [
           { label: '3 repositories', bytes: 5_400_000_000 },

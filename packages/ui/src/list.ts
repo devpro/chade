@@ -4,6 +4,7 @@ import { element, node } from './dom.js'
 import { forgeIcon } from './forge.js'
 import { ago, changes, checkOf, matches, needsAttention, summary, sync, tone, type Badge } from './format.js'
 import { CHANGED_EVENT, notify, reason, refused } from './notice.js'
+import { chosenSystem, systemTabs } from './systems.js'
 
 interface State {
   version: string
@@ -12,8 +13,6 @@ interface State {
   repositories: Repository[]
   warnings: string[]
 }
-
-const TAB_KEY = 'chade-system'
 
 let state: State | undefined
 // The latest check of IstarCI on each repository, by its system and its path, read after the list.
@@ -142,33 +141,12 @@ function systems(current: State): string[] {
   return [...new Set(current.repositories.map((repository) => repository.system))]
 }
 
-// The system shown, the one chosen last when the machine still has it.
-function selected(current: State): string | undefined {
-  const all = systems(current)
-  const chosen = sessionStorage.getItem(TAB_KEY)
-  return chosen !== null && all.includes(chosen) ? chosen : all[0]
-}
-
 function renderTabs(current: State, shown: string | undefined): void {
   const tabs = systems(current).map((system) => {
     const repositories = current.repositories.filter((repository) => repository.system === system)
-    const todo = repositories.filter(needsAttention).length
-    const tab = node('button', '', 'tab')
-    tab.setAttribute('role', 'tab')
-    tab.setAttribute('aria-selected', String(system === shown))
-    tab.append(node('span', system), node('span', String(repositories.length), 'count'))
-    if (todo > 0) {
-      const mark = node('span', String(todo), 'count todo')
-      mark.title = `${todo} with something to do`
-      tab.append(mark)
-    }
-    tab.addEventListener('click', () => {
-      sessionStorage.setItem(TAB_KEY, system)
-      render()
-    })
-    return tab
+    return { system, count: repositories.length, todo: repositories.filter(needsAttention).length }
   })
-  element('tabs').replaceChildren(...tabs)
+  element('tabs').replaceChildren(...systemTabs(tabs, shown, render))
 }
 
 function render(): void {
@@ -176,7 +154,7 @@ function render(): void {
   const filter = element<HTMLInputElement>('filter').value
   const attention = element<HTMLInputElement>('attention').checked
   const now = Date.now()
-  const shown = selected(state)
+  const shown = chosenSystem(systems(state))
   renderTabs(state, shown)
   element('warnings').replaceChildren(...state.warnings.map((warning) => node('li', warning)))
   const ofSystem = state.repositories.filter((repository) => repository.system === shown)

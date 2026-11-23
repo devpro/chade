@@ -7,7 +7,9 @@ import type { Config } from './config.js'
 import { docsPointer } from './docs.js'
 import { NOT_FOUND } from './exec.js'
 import { expandHome } from './paths.js'
-import { isNativeWindows, type Host } from './system.js'
+import { resolveRoot } from './roots.js'
+import { isNativeWindows, type Host, type System } from './system.js'
+import type { Windows } from './windows.js'
 
 export type { Measure, Report, Section }
 
@@ -31,31 +33,47 @@ const WORTH = 5 * GB
 
 export async function report(config: Config | undefined, host: Host, scanned?: Scan): Promise<Report> {
   const sections: Section[] = []
-  const add = (section: Section | undefined) => {
-    if (section && (section.measures.length > 0 || section.hints.length > 0)) sections.push(section)
+  for (const system of host.systems) {
+    const measured = system.kind === 'windows' ? await windowsSections(config, host, system) : await linuxSections(config, host, system)
+    const places = scanned?.places.filter((place) => place.system === system.id) ?? []
+    measured.push(security(scanned && { ...scanned, places }))
+    for (const section of measured) {
+      if (section && (section.measures.length > 0 || section.hints.length > 0)) sections.push({ ...section, system: system.id })
+    }
   }
-  // A run from Windows has no Linux system, so the sections of Linux tools are left out.
-  const native = isNativeWindows(host)
-  const linuxRoot = native ? undefined : await diskUsage('/')
-  if (host.windows) {
-    const lxss = await host.windows.exec(['reg', 'query', String.raw`HKCU\Software\Microsoft\Windows\CurrentVersion\Lxss`, '/s'])
-    const distributions = parseLxss(lxss.stdout)
-    add(await windowsDisk(host, linuxRoot, native, distributions))
-    // A Windows without a distribution has no use for the settings of WSL.
-    if (distributions.length > 0) add(await wslConfig(host))
-  }
-  add(await memory(host, native))
-  if (!native) add(await linuxDisk(host, linuxRoot))
-  add(await docker(host, native))
-  if (!native) {
-    add(await journal(host))
-    add(await snaps(host))
-  }
-  add(await caches(host, native))
-  add(await agentSessions(host))
-  add(await repositories(config, host))
-  add(security(scanned))
   return { machine: host.machine, date: new Date().toISOString(), sections }
+}
+
+async function windowsSections(config: Config | undefined, host: Host, system: System): Promise<(Section | undefined)[]> {
+  const windows = host.windows
+  if (!windows) return []
+  const native = isNativeWindows(host)
+  const lxss = await windows.exec(['reg', 'query', String.raw`HKCU\Software\Microsoft\Windows\CurrentVersion\Lxss`, '/s'])
+  const distributions = parseLxss(lxss.stdout)
+  return [
+    await windowsDisk(windows, native ? undefined : await diskUsage('/'), native, distributions),
+    // A Windows without a distribution has no use for the settings of WSL.
+    distributions.length > 0 ? await wslConfig(windows) : undefined,
+    await windowsMemory(host, windows, native),
+    // On WSL, the Docker that answers is the one of the distribution.
+    native ? await docker(host, native) : undefined,
+    await windowsCaches(host, windows),
+    await windowsAgentSessions(host, windows),
+    await repositories(config, host, system),
+  ]
+}
+
+async function linuxSections(config: Config | undefined, host: Host, system: System): Promise<(Section | undefined)[]> {
+  return [
+    await memory(host),
+    await linuxDisk(host, await diskUsage('/')),
+    await docker(host, false),
+    await journal(host),
+    await snaps(host),
+    await caches(host),
+    await agentSessions(host),
+    await repositories(config, host, system),
+  ]
 }
 
 // ── Parsing ────────────────────────────────────────────────────────────────
@@ -191,35 +209,41 @@ export async function diskUsage(path: string): Promise<Usage | undefined> {
   return { size: info.blocks * info.bsize, used: (info.blocks - info.bfree) * info.bsize, available: info.bavail * info.bsize }
 }
 
-// Windows has no du, and an unreadable folder counts for nothing there as it does for du.
-async function walkSize(path: string): Promise<number> {
-  let total = 0
-  for (const entry of await readdir(path, { withFileTypes: true }).catch(() => [])) {
-    const child = join(path, entry.name)
-    if (entry.isDirectory()) total += await walkSize(child)
-    else if (entry.isFile()) total += (await lstat(child).catch(() => undefined))?.size ?? 0
-  }
-  return total
-}
-
 // du exits with 1 for a single unreadable folder, while its total of the rest is still right.
 export async function folderSize(host: Host, path: string): Promise<number | undefined> {
   if (!existsSync(path)) return undefined
-  if (isNativeWindows(host)) return walkSize(path)
   const result = await host.run('du', ['-sb', path], { timeoutMs: 600_000 })
   const size = Number(result.stdout.trim().split(/\s+/)[0])
   return result.stdout.trim() !== '' && Number.isFinite(size) ? size : undefined
+}
+
+// The labels of the robocopy summary depend on the language of Windows, and their order does not: folders, files, then bytes.
+export function parseRobocopy(output: string): number | undefined {
+  const totals = [...output.matchAll(/^[^:\r\n]+:[ \t]+(\d+)(?:[ \t]+\d+){5}[ \t]*\r?$/gm)]
+  return totals.length === 3 ? Number(totals[2][1]) : undefined
+}
+
+// Through /mnt/c, du takes minutes where robocopy takes seconds.
+// /L makes robocopy list the files without a copy, and /XJ keeps it out of the junctions.
+async function windowsFolderSize(host: Host, windows: Windows, path: string): Promise<number | undefined> {
+  if (!(await windowsFolderExists(windows, path))) return undefined
+  const args = [path, 'NUL', '/L', '/E', '/XJ', '/NFL', '/NDL', '/NJH', '/NP', '/BYTES', '/R:0', '/W:0']
+  const result = await host.run('robocopy.exe', args, { cwd: windows.cwd(), timeoutMs: 600_000 })
+  return parseRobocopy(result.stdout)
+}
+
+async function windowsFolderExists(windows: Windows, path: string): Promise<boolean> {
+  return existsSync(await windows.linuxPath(path).catch(() => ''))
 }
 
 function usageDetail(usage: Usage): string {
   return `${formatBytes(usage.used)} used of ${formatBytes(usage.size)}, ${formatBytes(usage.available)} free`
 }
 
-async function windowsDisk(host: Host, linuxRoot: Usage | undefined, native: boolean, distributions: Distribution[]): Promise<Section> {
+async function windowsDisk(windows: Windows, linuxRoot: Usage | undefined, native: boolean, distributions: Distribution[]): Promise<Section> {
   const section: Section = { title: 'Windows disk', measures: [], hints: [], guide: 'disk-image-compaction' }
   const drive = await diskUsage(native ? 'C:\\' : '/mnt/c')
   if (drive) section.measures.push({ label: 'C:', detail: usageDetail(drive) })
-  const windows = host.windows!
   const current = process.env.WSL_DISTRO_NAME
   for (const distribution of distributions) {
     const image = String.raw`${distribution.basePath}\ext4.vhdx`
@@ -244,9 +268,8 @@ async function windowsDisk(host: Host, linuxRoot: Usage | undefined, native: boo
   return section
 }
 
-async function wslConfig(host: Host): Promise<Section> {
+async function wslConfig(windows: Windows): Promise<Section> {
   const section: Section = { title: 'WSL settings', measures: [], hints: [], guide: 'wsl-memory' }
-  const windows = host.windows!
   const profile = await windows.env('USERPROFILE')
   if (!profile) return section
   const file = await windows.linuxPath(String.raw`${profile}\.wslconfig`)
@@ -262,15 +285,27 @@ async function wslConfig(host: Host): Promise<Section> {
 // Services that hold memory as long as they run, and that a development machine starts for a while and forgets.
 const SERVICES = [{ process: 'kubelite', hint: 'MicroK8s is running, and stopping it frees its memory until it is started again:', command: 'sudo microk8s stop' }]
 
-async function memory(host: Host, native: boolean): Promise<Section> {
+// Total and free memory in kB, one on each line. Windows counts its standby cache as free, as MemAvailable does on Linux.
+const WINDOWS_MEMORY = 'Get-CimInstance Win32_OperatingSystem | ForEach-Object { $_.TotalVisibleMemorySize; $_.FreePhysicalMemory }'
+
+async function windowsRam(host: Host, windows: Windows, native: boolean): Promise<{ total: number; free: number } | undefined> {
+  if (native) return { total: totalmem(), free: freemem() }
+  const result = await host.run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', WINDOWS_MEMORY], { cwd: windows.cwd(), timeoutMs: 60_000 })
+  const [total, free] = result.stdout.trim().split(/\s+/).map((value) => Number(value) * 1024)
+  return total > 0 && free >= 0 ? { total, free } : undefined
+}
+
+async function windowsMemory(host: Host, windows: Windows, native: boolean): Promise<Section> {
+  const section: Section = { title: 'Memory', measures: [], hints: [] }
+  const ram = await windowsRam(host, windows, native)
+  if (ram) section.measures.push({ label: 'RAM', detail: `${formatBytes(ram.total - ram.free)} used of ${formatBytes(ram.total)}` })
+  const tasklist = await host.run('tasklist.exe', ['/fo', 'csv', '/nh'], { cwd: windows.cwd() })
+  for (const process of topProcesses(parseTasklist(tasklist.stdout), 8)) section.measures.push({ ...process, label: `process ${process.label}` })
+  return section
+}
+
+async function memory(host: Host): Promise<Section> {
   const section: Section = { title: 'Memory', measures: [], hints: [], guide: 'running-services' }
-  if (native) {
-    // Windows counts its standby cache as free, as MemAvailable does on Linux.
-    section.measures.push({ label: 'RAM', detail: `${formatBytes(totalmem() - freemem())} used of ${formatBytes(totalmem())}` })
-    const tasklist = await host.run('tasklist', ['/fo', 'csv', '/nh'])
-    for (const process of topProcesses(parseTasklist(tasklist.stdout), 8)) section.measures.push({ ...process, label: `process ${process.label}` })
-    return section
-  }
   const info = parseMeminfo(await readFile('/proc/meminfo', 'utf8').catch(() => ''))
   if (info.MemTotal) {
     section.measures.push({ label: 'RAM', detail: `${formatBytes(info.MemTotal - info.MemAvailable)} used of ${formatBytes(info.MemTotal)}` })
@@ -388,16 +423,17 @@ const CACHES: Cache[] = [
 
 // The same tools on Windows, which keep most of their caches under %LOCALAPPDATA%.
 const WINDOWS_CACHES: Cache[] = [
-  { path: '~/AppData/Local/npm-cache', command: 'npm cache clean --force' },
-  { path: '~/.nuget/packages', command: 'dotnet nuget locals all --clear' },
-  { path: '~/AppData/Local/pnpm/store', command: 'pnpm store prune' },
-  { path: '~/AppData/Local/ms-playwright', command: 'npx playwright uninstall --all', note: 'the browsers the projects use are installed again after it' },
+  { path: String.raw`%LOCALAPPDATA%\npm-cache`, command: 'npm cache clean --force' },
+  { path: String.raw`%USERPROFILE%\.nuget\packages`, command: 'dotnet nuget locals all --clear' },
+  { path: String.raw`%LOCALAPPDATA%\pnpm\store`, command: 'pnpm store prune' },
+  { path: String.raw`%LOCALAPPDATA%\ms-playwright`, command: 'npx playwright uninstall --all', note: 'the browsers the projects use are installed again after it' },
+  { path: String.raw`%LOCALAPPDATA%\Temp`, note: 'and Storage Sense or Disk Cleanup removes the temporary files no program uses' },
 ]
 
-function cacheHints(cache: Cache, bytes: number): string[] {
+function cacheHints(cache: Cache, bytes: number, prompt = ''): string[] {
   if (bytes <= WORTH) return []
   const note = cache.note ? `, ${cache.note}` : ''
-  const hint = `${cache.path} holds ${formatBytes(bytes)}${note}${cache.command ? ':' : '.'}`
+  const hint = `${cache.path} holds ${formatBytes(bytes)}${note}${cache.command ? `${prompt}:` : '.'}`
   return cache.command ? [hint, `  ${cache.command}`] : [hint]
 }
 
@@ -416,15 +452,28 @@ async function largestCaches(host: Host): Promise<Measure[]> {
     .filter((child) => !CACHES.some((known) => known.path === child.label))
 }
 
-async function caches(host: Host, native: boolean): Promise<Section> {
+async function caches(host: Host): Promise<Section> {
   const section: Section = { title: 'Caches', measures: [], hints: [], guide: 'caches' }
-  for (const cache of native ? WINDOWS_CACHES : CACHES) {
+  for (const cache of CACHES) {
     const bytes = await folderSize(host, expandHome(cache.path, host.home))
     if (bytes === undefined) continue
     section.measures.push({ label: cache.path, bytes })
     section.hints.push(...cacheHints(cache, bytes))
   }
-  if (!native) section.measures.push(...(await largestCaches(host)))
+  section.measures.push(...(await largestCaches(host)))
+  return section
+}
+
+async function windowsCaches(host: Host, windows: Windows): Promise<Section> {
+  const section: Section = { title: 'Caches', measures: [], hints: [], guide: 'caches' }
+  for (const cache of WINDOWS_CACHES) {
+    const path = await windows.expand(cache.path).catch(() => undefined)
+    const bytes = path && (await windowsFolderSize(host, windows, path))
+    if (!bytes) continue
+    section.measures.push({ label: cache.path, bytes })
+    // In a terminal of WSL, the same command clears the cache of Linux.
+    section.hints.push(...cacheHints(cache, bytes, ', cleared from a Windows prompt with'))
+  }
   return section
 }
 
@@ -453,34 +502,50 @@ async function countSessions(folder: string, before: number): Promise<Sessions> 
 }
 
 // Transcripts of Claude Code sessions, kept for cleanupPeriodDays, 30 by default.
-async function agentSessions(host: Host): Promise<Section | undefined> {
-  const folder = join(host.home, '.claude', 'projects')
-  if (!existsSync(folder)) return undefined
+async function sessionsSection(folder: string, home: string, bytes: number | undefined): Promise<Section> {
   const { count, old, oldBytes } = await countSessions(folder, Date.now() - 30 * 24 * 3600 * 1000)
+  const separator = home === '~' ? '/' : '\\'
   const section: Section = {
     title: 'Agent sessions',
     guide: 'agent-sessions',
-    measures: [
-      { label: '~/.claude/projects', bytes: await folderSize(host, folder), detail: `${count} session(s), ${old} older than 30 days` },
-    ],
+    measures: [{ label: [home, '.claude', 'projects'].join(separator), bytes, detail: `${count} session(s), ${old} older than 30 days` }],
     hints: [],
   }
-  if (oldBytes > GB) section.hints.push(`${formatBytes(oldBytes)} of sessions are older than 30 days, cleanupPeriodDays in ~/.claude/settings.json sets how long Claude Code keeps them.`)
+  const settings = [home, '.claude', 'settings.json'].join(separator)
+  if (oldBytes > GB) section.hints.push(`${formatBytes(oldBytes)} of sessions are older than 30 days, cleanupPeriodDays in ${settings} sets how long Claude Code keeps them.`)
   return section
 }
 
-async function repositories(config: Config | undefined, host: Host): Promise<Section | undefined> {
-  const roots = config?.linux?.repos ?? []
-  if (roots.length === 0) return undefined
+async function agentSessions(host: Host): Promise<Section | undefined> {
+  const folder = join(host.home, '.claude', 'projects')
+  return existsSync(folder) ? sessionsSection(folder, '~', await folderSize(host, folder)) : undefined
+}
+
+async function windowsAgentSessions(host: Host, windows: Windows): Promise<Section | undefined> {
+  const profile = await windows.env('USERPROFILE')
+  if (!profile) return undefined
+  const path = String.raw`${profile}\.claude\projects`
+  if (!(await windowsFolderExists(windows, path))) return undefined
+  return sessionsSection(await windows.linuxPath(path), '%USERPROFILE%', await windowsFolderSize(host, windows, path))
+}
+
+async function repositories(config: Config | undefined, host: Host, system: System): Promise<Section | undefined> {
   const sizes: Measure[] = []
-  for (const root of roots) {
-    const folder = expandHome(root, host.home)
-    if (!existsSync(folder)) continue
-    for (const relative of await findRepositories(folder)) {
-      const bytes = await folderSize(host, join(folder, ...relative))
-      if (bytes !== undefined) sizes.push({ label: [trimTrailing(root, '/'), ...relative].join('/'), bytes })
+  let found = false
+  for (const root of config?.[system.kind]?.repos ?? []) {
+    // A folder that cannot be resolved stays out of the report, and the others are measured.
+    const resolved = await resolveRoot(system, root, host).catch(() => undefined)
+    if (!resolved) continue
+    found = true
+    if (!existsSync(resolved.folder)) continue
+    const { separator, path } = resolved
+    for (const relative of await findRepositories(resolved.folder)) {
+      const full = [trimTrailing(path, separator), ...relative].join(separator)
+      const bytes = system.kind === 'windows' ? await windowsFolderSize(host, host.windows!, full) : await folderSize(host, full)
+      if (bytes !== undefined) sizes.push({ label: [trimTrailing(root, separator), ...relative].join(separator), bytes })
     }
   }
+  if (!found) return undefined
   sizes.sort((a, b) => (b.bytes ?? 0) - (a.bytes ?? 0))
   const total = sizes.reduce((sum, measure) => sum + (measure.bytes ?? 0), 0)
   return {
@@ -515,7 +580,7 @@ export function security(scanned: Scan | undefined, now = Date.now()): Section {
   const unused = scanned.places.filter((place) => place.unused && (place.bytes ?? 0) > GB / 10).toSorted((a, b) => (b.bytes ?? 0) - (a.bytes ?? 0))
   if (unused.length > 0) {
     section.hints.push(`${formatBytes(counts.unusedBytes)} of folders and images nothing uses, the largest removed with:`)
-    // The NuGet cache of Windows and of WSL clear with one same command, given once.
+    // Several places clear with the same command, given once.
     const commands = [...new Set(unused.map((place) => place.unused?.command ?? ''))]
     section.hints.push(...commands.slice(0, UNUSED_SHOWN).map((command) => `  ${command}`))
   }
@@ -526,7 +591,11 @@ export function security(scanned: Scan | undefined, now = Date.now()): Section {
 
 export function renderReport(value: Report): string {
   const lines = [`${value.machine}, ${value.date.slice(0, 16).replace('T', ' ')} UTC`]
+  const several = new Set(value.sections.map((section) => section.system)).size > 1
+  let system: string | undefined
   for (const section of value.sections) {
+    if (several && section.system && section.system !== system) lines.push('', `=== ${section.system} ===`)
+    system = section.system
     lines.push('', section.title)
     const width = Math.max(...section.measures.map((measure) => measure.label.length), 0)
     for (const measure of section.measures) {
