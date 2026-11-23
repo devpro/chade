@@ -219,8 +219,11 @@ export async function folderSize(host: Host, path: string): Promise<number | und
 
 // The labels of the robocopy summary depend on the language of Windows, and their order does not: folders, files, then bytes.
 export function parseRobocopy(output: string): number | undefined {
-  const totals = [...output.matchAll(/^[^:\r\n]+:[ \t]+(\d+)(?:[ \t]+\d+){5}[ \t]*\r?$/gm)]
-  return totals.length === 3 ? Number(totals[2][1]) : undefined
+  const totals = output
+    .split('\n')
+    .map((line) => line.slice(line.indexOf(':') + 1).trim().split(/\s+/))
+    .filter((values) => values.length === 6 && values.every((value) => /^\d+$/.test(value)))
+  return totals.length === 3 ? Number(totals[2][0]) : undefined
 }
 
 // Through /mnt/c, du takes minutes where robocopy takes seconds.
@@ -433,7 +436,8 @@ const WINDOWS_CACHES: Cache[] = [
 function cacheHints(cache: Cache, bytes: number, prompt = ''): string[] {
   if (bytes <= WORTH) return []
   const note = cache.note ? `, ${cache.note}` : ''
-  const hint = `${cache.path} holds ${formatBytes(bytes)}${note}${cache.command ? `${prompt}:` : '.'}`
+  const end = cache.command ? `${prompt}:` : '.'
+  const hint = `${cache.path} holds ${formatBytes(bytes)}${note}${end}`
   return cache.command ? [hint, `  ${cache.command}`] : [hint]
 }
 
@@ -596,14 +600,19 @@ export function renderReport(value: Report): string {
   for (const section of value.sections) {
     if (several && section.system && section.system !== system) lines.push('', `=== ${section.system} ===`)
     system = section.system
-    lines.push('', section.title)
-    const width = Math.max(...section.measures.map((measure) => measure.label.length), 0)
-    for (const measure of section.measures) {
-      const parts = [measure.bytes !== undefined ? formatBytes(measure.bytes) : undefined, measure.detail].filter(Boolean)
-      lines.push(`  ${measure.label.padEnd(width)}  ${parts.join(', ')}`)
-    }
-    for (const hint of section.hints) lines.push(hint.startsWith('  ') ? `    ${hint.trimStart()}` : `  → ${hint}`)
-    if (section.hints.length > 0 && section.guide) lines.push(`    ${docsPointer('cleanup', section.guide)}`)
+    lines.push(...sectionLines(section))
   }
   return lines.join('\n')
+}
+
+function sectionLines(section: Section): string[] {
+  const lines = ['', section.title]
+  const width = Math.max(...section.measures.map((measure) => measure.label.length), 0)
+  for (const measure of section.measures) {
+    const parts = [measure.bytes !== undefined ? formatBytes(measure.bytes) : undefined, measure.detail].filter(Boolean)
+    lines.push(`  ${measure.label.padEnd(width)}  ${parts.join(', ')}`)
+  }
+  for (const hint of section.hints) lines.push(hint.startsWith('  ') ? `    ${hint.trimStart()}` : `  → ${hint}`)
+  if (section.hints.length > 0 && section.guide) lines.push(`    ${docsPointer('cleanup', section.guide)}`)
+  return lines
 }
