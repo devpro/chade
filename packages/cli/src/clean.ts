@@ -13,7 +13,7 @@ export interface Step {
   linux?: boolean
 }
 
-const fixed = (...commands: string[][]) => async () => commands
+const fixed = (...commands: string[][]) => () => Promise.resolve(commands)
 
 // In the order they run: what frees space first, the trim last, so the space just freed reaches the disk image.
 export const STEPS: Step[] = [

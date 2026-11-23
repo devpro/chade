@@ -123,7 +123,8 @@ export const reportPage = {
     return get<{ machine: string; version: string }>('ping')
   },
   // Measured again when asked, and not by the page reading itself again, as a report is no glance at a repository.
-  async reload(asked = false): Promise<void> {
+  reload(asked = false): Promise<void> {
     if (asked) measure(true)
+    return Promise.resolve()
   },
 }

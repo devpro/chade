@@ -1,6 +1,6 @@
 # Commands
 
-`--config <path>` applies to every command.
+`--config <path>` applies to every command, and `chade init` writes it as a `.yml` or `.yaml` file only.
 
 Command                     | Effect
 ----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
