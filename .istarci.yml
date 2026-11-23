@@ -4,8 +4,12 @@ runner:
     "markup-lint*": ghcr.io/devpro/ubuntu-node:latest
     "build-test__*": ghcr.io/devpro/ubuntu-node-playwright:latest
   docker: ["image-scan*"]
+  # SonarCloud analyzes with this profile, and the default of the local SonarQube, Sonar way core, lacks half of its rules
   sonarqube:
     gate: true
+    profile: Sonar way comprehensive
+    projects:
+      - chade
 
 workflow:
   onDisallowedAction: fail
