@@ -1,40 +1,33 @@
 title: "chade"
-description: "Get started with chade: snapshot the configuration of a machine into git, see its git repositories in one page and work on them, and measure what takes disk and memory."
+description: >
+  Get started with chade: snapshot the configuration of a machine into git,
+  see its git repositories in one page and work on them, and measure what takes disk and memory.
 duration: 20
 tags:
   - git
   - chade
   - demo
 sidebarWidth: 620
-# The web interface follows the system's colour mode, and the demo shows it dark.
 colorScheme: dark
 backend: container
 hosts:
-  # The lab itself, whose Chrome shows the web interface.
   - name: control
-  # A Linux machine of its own, with its own kernel, so chade sees a plain Linux and not the system the lab runs on.
   - name: laptop
     runtime: vm
     cores: 2
     memory: 2048
     disk: 4096
-    # chade listens on the loopback of the laptop only, and this makes the lab's own 127.0.0.1:7843, where its browser runs, the laptop's.
+    # gives access to chade
     forward:
       - 7843
 env:
-  # https://www.npmjs.com/package/npm, a registry tarball carries its dependencies, so it runs once unpacked.
-  NPM_VERSION: 12.2.0
-  # https://registry.npmjs.org, where npm is downloaded from, with the metadata that holds its checksum.
+  NPM_VERSION: 12.2.0  # ref. https://www.npmjs.com/package/npm
   NPM_REGISTRY_URL: https://registry.npmjs.org
-  # The identity commits are recorded with.
   GIT_USER_NAME: Ada Lovelace
   GIT_USER_EMAIL: ada@example.com
-  # https://github.com/gitleaks/gitleaks/releases, the secret scanner chade runs before each commit of the store.
-  GITLEAKS_VERSION: 8.30.1
-  # https://github.com/devpro/chade/pkgs/npm/chade, pinned so the output shown in the steps stays the one the lab gets.
-  CHADE_VERSION: 0.1.4
-  # https://www.npmjs.com/package/cowsay, a global package installed between two snapshots.
-  COWSAY_VERSION: 1.6.0
+  GITLEAKS_VERSION: 8.30.1  # ref. https://github.com/gitleaks/gitleaks/releases
+  CHADE_VERSION: 0.1.4  # ref. https://github.com/devpro/chade/pkgs/npm/chade
+  COWSAY_VERSION: 1.6.0  # ref. https://www.npmjs.com/package/cowsay
 secrets:
   - name: CHADE_NPM_TOKEN
     description: GitHub token with the read:packages scope, for the @devpro packages on GitHub Packages
