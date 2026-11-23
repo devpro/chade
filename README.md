@@ -9,6 +9,7 @@ Command line tool and local web interface to get insights on one machine and man
 - Commits the configuration of the system into a git repository.
 - Lists every git repository of the machine with its current state and provides common git actions.
 - Measures what takes disk and memory and how to clean it.
+- Finds the vulnerable and malicious packages and the container images on the disk, and what nothing uses.
 
 > [!IMPORTANT]
 > Chade never changes the system, and changes a git repository only when asked in the web interface.
@@ -59,6 +60,7 @@ Command line tool and local web interface to get insights on one machine and man
 - [Contributor guide](CONTRIBUTING.md)
 - [Commands](docs/commands.md)
 - [System clean-up](docs/cleanup.md)
+- [Packages and images](docs/scan.md)
 - [Web interface](docs/web-interface.md)
 
 ## License

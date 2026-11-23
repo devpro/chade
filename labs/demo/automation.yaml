@@ -1,0 +1,84 @@
+version: 1
+
+defaults:
+  # ms per step primitive, the report takes a few seconds to measure
+  timeout: 20000
+
+pages:
+  # One tab for the whole lab: the web interface of the laptop, which forward: brings to the lab's own 127.0.0.1:7843.
+  chade:
+    url: "http://127.0.0.1:7843/"
+    selectors:
+      nav: { role: navigation, name: Pages }
+      repositoriesLink: { role: link, name: Repositories, exact: true, within: nav }
+      storeLink: { role: link, name: Store, exact: true, within: nav }
+      reportLink: { role: link, name: Report, exact: true, within: nav }
+      refresh: { role: button, name: Refresh }
+      helloWorld: { role: link, name: Hello-World, exact: true }
+      history: '#history .commit-row'
+      workingTree: '#history .working-tree'
+      newBranch: { role: button, name: New branch }
+      branchName: { role: textbox, name: Name of the new branch }
+      createBranch: { role: button, name: Create branch }
+      stageAll: { role: button, name: Stage all changed files }
+      message: { role: textbox, name: Commit message }
+      commit: { role: button, name: Commit, exact: true }
+      snapshots: '#store-snapshots .commit-row'
+      reportCard: '#report .card h3'
+
+actions:
+  # The token is the one chade ui printed, captured from the terminal, and the tab keeps it for the next actions.
+  ui.sign-in:
+    page: chade
+    steps:
+      - goto: "http://127.0.0.1:7843/#token=${code}"
+      - waitFor: { target: helloWorld }
+
+  ui.repositories:
+    page: chade
+    steps:
+      - click: repositoriesLink
+      - waitFor: { target: helloWorld }
+
+  ui.refresh:
+    page: chade
+    steps:
+      - click: repositoriesLink
+      - click: refresh
+      - waitFor: { target: helloWorld }
+
+  ui.open-hello-world:
+    page: chade
+    steps:
+      - click: repositoriesLink
+      - click: helloWorld
+      - waitFor: { target: history }
+
+  # course verify follows no :action: link, so this action opens the repository itself.
+  ui.commit:
+    page: chade
+    steps:
+      - click: repositoriesLink
+      - click: helloWorld
+      - waitFor: { target: workingTree }
+      - click: newBranch
+      - fill: { target: branchName, value: "hello-from-chade" }
+      - click: createBranch
+      - waitFor: { target: workingTree }
+      - click: workingTree
+      - click: stageAll
+      - fill: { target: message, value: "Say hello from the chade demo" }
+      - click: commit
+      - waitFor: { target: workingTree, state: hidden }
+
+  ui.store:
+    page: chade
+    steps:
+      - click: storeLink
+      - waitFor: { target: snapshots }
+
+  ui.report:
+    page: chade
+    steps:
+      - click: reportLink
+      - waitFor: { target: reportCard }

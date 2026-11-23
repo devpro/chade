@@ -10,6 +10,8 @@ export interface RunOptions {
   cwd?: string
   encoding?: BufferEncoding
   timeoutMs?: number
+  // Variables added to those of this process.
+  env?: NodeJS.ProcessEnv
 }
 
 export type Run = (command: string, args: string[], options?: RunOptions) => Promise<Result>
@@ -22,7 +24,7 @@ export const run: Run = (command, args, options = {}) =>
     execFile(
       command,
       args,
-      { cwd: options.cwd, encoding: 'buffer', maxBuffer: 256 * 1024 * 1024, timeout: options.timeoutMs ?? 300_000, windowsHide: true },
+      { cwd: options.cwd, env: options.env ? { ...process.env, ...options.env } : undefined, encoding: 'buffer', maxBuffer: 256 * 1024 * 1024, timeout: options.timeoutMs ?? 300_000, windowsHide: true },
       (error, stdout, stderr) => {
         resolve({ code: exitCode(error), stdout: stdout.toString(options.encoding ?? 'utf8'), stderr: stderr.toString('utf8') })
       },

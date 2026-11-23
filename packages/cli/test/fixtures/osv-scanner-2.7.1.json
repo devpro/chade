@@ -1,0 +1,1052 @@
+{
+ "results": [
+  {
+   "source": {
+    "path": "/home/dev/repos/terraform-projects/examples/azure-vm/.terraform/providers/registry.terraform.io/hashicorp/azurerm/5.13.0/linux_amd64/terraform-provider-azurerm_v5.13.0_x5",
+    "type": "artifact"
+   },
+   "packages": [
+    {
+     "package": {
+      "name": "stdlib",
+      "version": "1.26.10",
+      "ecosystem": "Go",
+      "purl": "pkg:golang/go@1.26.10"
+     },
+     "groups": [
+      {
+       "ids": [
+        "GO-2026-6859"
+       ],
+       "aliases": [
+        "CVE-2026-97054",
+        "GO-2026-6859"
+       ],
+       "max_severity": ""
+      }
+     ],
+     "vulnerabilities": [
+      {
+       "affected": [
+        {
+         "database_specific": {
+          "source": "https://vuln.go.dev/ID/GO-2026-6859.json"
+         },
+         "package": {
+          "ecosystem": "Go",
+          "name": "stdlib",
+          "purl": "pkg:golang/stdlib"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "1.26.11"
+            },
+            {
+             "introduced": "1.27.0-0"
+            },
+            {
+             "fixed": "1.27.4"
+            }
+           ],
+           "type": "SEMVER"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2026-97054"
+       ],
+       "database_specific": {
+        "review_status": "REVIEWED",
+        "url": "https://pkg.go.dev/vuln/GO-2026-6859"
+       },
+       "details": "For HTTP/1 servers, when MaxBytesReader's limit is exceeded, \"Connection: close\" header is automatically set without syn",
+       "id": "GO-2026-6859",
+       "modified": "2026-11-11T03:15:14.805898236Z",
+       "published": "2026-11-11T02:51:11Z",
+       "schema_version": "1.9.2",
+       "summary": "HTTP/1 server crash due to MaxBytesReader header race in net/http"
+      }
+     ]
+    },
+    {
+     "package": {
+      "name": "golang.org/x/crypto",
+      "version": "0.58.0",
+      "ecosystem": "Go",
+      "purl": "pkg:golang/golang.org/x/crypto@0.58.0"
+     },
+     "groups": [
+      {
+       "ids": [
+        "GO-2026-5932"
+       ],
+       "aliases": [
+        "GO-2026-5932"
+       ],
+       "max_severity": ""
+      }
+     ],
+     "vulnerabilities": [
+      {
+       "affected": [
+        {
+         "database_specific": {
+          "source": "https://vuln.go.dev/ID/GO-2026-5932.json"
+         },
+         "package": {
+          "ecosystem": "Go",
+          "name": "golang.org/x/crypto",
+          "purl": "pkg:golang/golang.org/x/crypto"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "0.58.1-0.20261009181718-2f1f834330b2"
+            }
+           ],
+           "type": "SEMVER"
+          }
+         ]
+        },
+        {
+         "database_specific": {
+          "source": "https://vuln.go.dev/ID/GO-2026-5932.json"
+         },
+         "package": {
+          "ecosystem": "Go",
+          "name": "golang.org/x/crypto/openpgp",
+          "purl": "pkg:golang/golang.org/x/crypto/openpgp"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            }
+           ],
+           "type": "SEMVER"
+          }
+         ]
+        }
+       ],
+       "database_specific": {
+        "review_status": "REVIEWED",
+        "url": "https://pkg.go.dev/vuln/GO-2026-5932"
+       },
+       "details": "The golang.org/x/crypto/openpgp package is unsafe by design, has numerous known security issues, is not maintained, and ",
+       "id": "GO-2026-5932",
+       "modified": "2026-11-02T22:15:06.677088389Z",
+       "published": "2026-07-07T22:15:29Z",
+       "schema_version": "1.9.2",
+       "summary": "The golang.org/x/crypto/openpgp package is unmaintained, unsafe by design, and has known security issues"
+      }
+     ]
+    },
+    {
+     "package": {
+      "name": "github.com/Azure/azure-sdk-for-go",
+      "version": "66.0.0+incompatible",
+      "ecosystem": "Go",
+      "purl": "pkg:golang/github.com/azure/azure-sdk-for-go@66.0.0%2Bincompatible"
+     }
+    }
+   ]
+  },
+  {
+   "source": {
+    "path": "/home/dev/scan/plant/node_modules/@zalastax/nolb-_extri/package.json",
+    "type": "unknown"
+   },
+   "packages": [
+    {
+     "package": {
+      "name": "@zalastax/nolb-_extri",
+      "version": "1.0.0",
+      "ecosystem": "npm",
+      "purl": "pkg:npm/%40zalastax/nolb-_extri@1.0.0?source=UNKNOWN"
+     },
+     "groups": [
+      {
+       "ids": [
+        "MAL-2025-10000"
+       ],
+       "aliases": [
+        "MAL-2025-10000"
+       ],
+       "max_severity": ""
+      }
+     ],
+     "vulnerabilities": [
+      {
+       "affected": [
+        {
+         "database_specific": {
+          "source": "https://github.com/ossf/malicious-packages/blob/main/osv/malicious/npm/@zalastax/nolb-_extri/MAL-2025-10000.json"
+         },
+         "package": {
+          "ecosystem": "npm",
+          "name": "@zalastax/nolb-_extri",
+          "purl": "pkg:npm/%40zalastax/nolb-_extri"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            }
+           ],
+           "type": "SEMVER"
+          }
+         ]
+        }
+       ],
+       "database_specific": {
+        "malicious-packages-origins": null
+       },
+       "details": "The package @zalastax/nolb-_extri was found to contain malicious code.",
+       "id": "MAL-2025-10000",
+       "modified": "2025-08-14T18:52:04Z",
+       "published": "2025-08-14T18:52:04Z",
+       "schema_version": "1.7.3",
+       "summary": "Malicious code in @zalastax/nolb-_extri (npm)"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "source": {
+    "path": "/home/dev/scan/plant/node_modules/lodash/package.json",
+    "type": "unknown"
+   },
+   "packages": [
+    {
+     "package": {
+      "name": "lodash",
+      "version": "4.17.15",
+      "ecosystem": "npm",
+      "purl": "pkg:npm/lodash@4.17.15?source=UNKNOWN"
+     },
+     "groups": [
+      {
+       "ids": [
+        "GHSA-29mw-wpgm-hmr9"
+       ],
+       "aliases": [
+        "CVE-2020-28500",
+        "GHSA-29mw-wpgm-hmr9"
+       ],
+       "max_severity": "5.3"
+      },
+      {
+       "ids": [
+        "GHSA-35jh-r3h4-6jhm"
+       ],
+       "aliases": [
+        "CVE-2021-23337",
+        "GHSA-35jh-r3h4-6jhm"
+       ],
+       "max_severity": "7.2"
+      }
+     ],
+     "vulnerabilities": [
+      {
+       "affected": [
+        {
+         "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2022/01/GHSA-29mw-wpgm-hmr9/GHSA-29mw-wpgm-hmr9.json"
+         },
+         "package": {
+          "ecosystem": "npm",
+          "name": "lodash",
+          "purl": "pkg:npm/lodash"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "4.0.0"
+            },
+            {
+             "fixed": "4.17.21"
+            }
+           ],
+           "type": "SEMVER"
+          }
+         ]
+        },
+        {
+         "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2022/01/GHSA-29mw-wpgm-hmr9/GHSA-29mw-wpgm-hmr9.json"
+         },
+         "package": {
+          "ecosystem": "npm",
+          "name": "lodash-es",
+          "purl": "pkg:npm/lodash-es"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "4.0.0"
+            },
+            {
+             "fixed": "4.17.21"
+            }
+           ],
+           "type": "SEMVER"
+          }
+         ]
+        },
+        {
+         "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2022/01/GHSA-29mw-wpgm-hmr9/GHSA-29mw-wpgm-hmr9.json"
+         },
+         "package": {
+          "ecosystem": "npm",
+          "name": "lodash.trimend",
+          "purl": "pkg:npm/lodash.trimend"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "4.0.0"
+            },
+            {
+             "last_affected": "4.5.1"
+            }
+           ],
+           "type": "SEMVER"
+          }
+         ]
+        },
+        {
+         "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2022/01/GHSA-29mw-wpgm-hmr9/GHSA-29mw-wpgm-hmr9.json"
+         },
+         "package": {
+          "ecosystem": "npm",
+          "name": "lodash.trim",
+          "purl": "pkg:npm/lodash.trim"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "4.0.0"
+            },
+            {
+             "last_affected": "4.5.1"
+            }
+           ],
+           "type": "SEMVER"
+          }
+         ]
+        },
+        {
+         "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2022/01/GHSA-29mw-wpgm-hmr9/GHSA-29mw-wpgm-hmr9.json"
+         },
+         "package": {
+          "ecosystem": "RubyGems",
+          "name": "lodash-rails",
+          "purl": "pkg:gem/lodash-rails"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "4.0.0"
+            },
+            {
+             "fixed": "4.17.21"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2020-28500"
+       ],
+       "database_specific": {
+        "cwe_ids": [
+         "CWE-1333",
+         "CWE-400"
+        ],
+        "github_reviewed": true,
+        "github_reviewed_at": "2021-03-19T22:45:28Z",
+        "nvd_published_at": "2021-02-15T11:15:00Z",
+        "severity": "MODERATE"
+       },
+       "details": "All versions of package lodash prior to 4.17.21 are vulnerable to Regular Expression Denial of Service (ReDoS) via the `",
+       "id": "GHSA-29mw-wpgm-hmr9",
+       "modified": "2025-09-29T21:12:31.102523Z",
+       "published": "2022-01-06T20:30:46Z",
+       "schema_version": "1.9.0",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L",
+         "type": "CVSS_V3"
+        }
+       ],
+       "summary": "Regular Expression Denial of Service (ReDoS) in lodash"
+      },
+      {
+       "affected": [
+        {
+         "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2021/05/GHSA-35jh-r3h4-6jhm/GHSA-35jh-r3h4-6jhm.json"
+         },
+         "package": {
+          "ecosystem": "npm",
+          "name": "lodash",
+          "purl": "pkg:npm/lodash"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "4.17.21"
+            }
+           ],
+           "type": "SEMVER"
+          }
+         ]
+        },
+        {
+         "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2021/05/GHSA-35jh-r3h4-6jhm/GHSA-35jh-r3h4-6jhm.json"
+         },
+         "package": {
+          "ecosystem": "npm",
+          "name": "lodash-es",
+          "purl": "pkg:npm/lodash-es"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "4.17.21"
+            }
+           ],
+           "type": "SEMVER"
+          }
+         ]
+        },
+        {
+         "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2021/05/GHSA-35jh-r3h4-6jhm/GHSA-35jh-r3h4-6jhm.json"
+         },
+         "package": {
+          "ecosystem": "npm",
+          "name": "lodash.template",
+          "purl": "pkg:npm/lodash.template"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "last_affected": "4.5.0"
+            }
+           ],
+           "type": "SEMVER"
+          }
+         ]
+        },
+        {
+         "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2021/05/GHSA-35jh-r3h4-6jhm/GHSA-35jh-r3h4-6jhm.json"
+         },
+         "package": {
+          "ecosystem": "npm",
+          "name": "lodash-template",
+          "purl": "pkg:npm/lodash-template"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "last_affected": "1.0.0"
+            }
+           ],
+           "type": "SEMVER"
+          }
+         ]
+        },
+        {
+         "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2021/05/GHSA-35jh-r3h4-6jhm/GHSA-35jh-r3h4-6jhm.json"
+         },
+         "package": {
+          "ecosystem": "RubyGems",
+          "name": "lodash-rails",
+          "purl": "pkg:gem/lodash-rails"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "4.17.21"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2021-23337"
+       ],
+       "database_specific": {
+        "cwe_ids": [
+         "CWE-77",
+         "CWE-94"
+        ],
+        "github_reviewed": true,
+        "github_reviewed_at": "2021-03-31T23:59:26Z",
+        "nvd_published_at": "2021-02-15T13:15:00Z",
+        "severity": "HIGH"
+       },
+       "details": "`lodash` versions prior to 4.17.21 are vulnerable to Command Injection via the template function.",
+       "id": "GHSA-35jh-r3h4-6jhm",
+       "modified": "2026-10-17T02:55:38.085813876Z",
+       "published": "2021-05-06T16:05:51Z",
+       "schema_version": "1.9.0",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:H/I:H/A:H",
+         "type": "CVSS_V3"
+        }
+       ],
+       "summary": "Command Injection in lodash"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "source": {
+    "path": "/home/dev/scan/sbom/list.cdx.json",
+    "type": "sbom"
+   },
+   "packages": [
+    {
+     "package": {
+      "name": "event-stream",
+      "version": "3.3.6",
+      "ecosystem": "npm",
+      "purl": "pkg:npm/event-stream@3.3.6"
+     },
+     "groups": [
+      {
+       "ids": [
+        "GHSA-mh6f-8j2x-4483"
+       ],
+       "aliases": [
+        "GHSA-mh6f-8j2x-4483"
+       ],
+       "max_severity": "9.8"
+      }
+     ],
+     "vulnerabilities": [
+      {
+       "affected": [
+        {
+         "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2018/11/GHSA-mh6f-8j2x-4483/GHSA-mh6f-8j2x-4483.json"
+         },
+         "package": {
+          "ecosystem": "npm",
+          "name": "event-stream",
+          "purl": "pkg:npm/event-stream"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "3.3.6"
+            },
+            {
+             "fixed": "4.0.0"
+            }
+           ],
+           "type": "SEMVER"
+          }
+         ]
+        },
+        {
+         "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2018/11/GHSA-mh6f-8j2x-4483/GHSA-mh6f-8j2x-4483.json"
+         },
+         "package": {
+          "ecosystem": "npm",
+          "name": "flatmap-stream",
+          "purl": "pkg:npm/flatmap-stream"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            }
+           ],
+           "type": "SEMVER"
+          }
+         ]
+        }
+       ],
+       "database_specific": {
+        "cwe_ids": [
+         "CWE-506"
+        ],
+        "github_reviewed": true,
+        "github_reviewed_at": "2020-06-16T21:46:17Z",
+        "nvd_published_at": null,
+        "severity": "CRITICAL"
+       },
+       "details": "The NPM package `flatmap-stream` is considered malicious.  A malicious actor added this package as a dependency to the N",
+       "id": "GHSA-mh6f-8j2x-4483",
+       "modified": "2021-09-15T20:08:26Z",
+       "published": "2018-11-26T23:58:21Z",
+       "schema_version": "1.9.0",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+         "type": "CVSS_V3"
+        }
+       ],
+       "summary": "Critical severity vulnerability that affects event-stream and flatmap-stream"
+      }
+     ]
+    },
+    {
+     "package": {
+      "name": "lodash",
+      "version": "4.17.15",
+      "ecosystem": "npm",
+      "purl": "pkg:npm/lodash@4.17.15"
+     },
+     "groups": [
+      {
+       "ids": [
+        "GHSA-29mw-wpgm-hmr9"
+       ],
+       "aliases": [
+        "CVE-2020-28500",
+        "GHSA-29mw-wpgm-hmr9"
+       ],
+       "max_severity": "5.3"
+      },
+      {
+       "ids": [
+        "GHSA-35jh-r3h4-6jhm"
+       ],
+       "aliases": [
+        "CVE-2021-23337",
+        "GHSA-35jh-r3h4-6jhm"
+       ],
+       "max_severity": "7.2"
+      }
+     ],
+     "vulnerabilities": [
+      {
+       "affected": [
+        {
+         "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2022/01/GHSA-29mw-wpgm-hmr9/GHSA-29mw-wpgm-hmr9.json"
+         },
+         "package": {
+          "ecosystem": "npm",
+          "name": "lodash",
+          "purl": "pkg:npm/lodash"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "4.0.0"
+            },
+            {
+             "fixed": "4.17.21"
+            }
+           ],
+           "type": "SEMVER"
+          }
+         ]
+        },
+        {
+         "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2022/01/GHSA-29mw-wpgm-hmr9/GHSA-29mw-wpgm-hmr9.json"
+         },
+         "package": {
+          "ecosystem": "npm",
+          "name": "lodash-es",
+          "purl": "pkg:npm/lodash-es"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "4.0.0"
+            },
+            {
+             "fixed": "4.17.21"
+            }
+           ],
+           "type": "SEMVER"
+          }
+         ]
+        },
+        {
+         "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2022/01/GHSA-29mw-wpgm-hmr9/GHSA-29mw-wpgm-hmr9.json"
+         },
+         "package": {
+          "ecosystem": "npm",
+          "name": "lodash.trimend",
+          "purl": "pkg:npm/lodash.trimend"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "4.0.0"
+            },
+            {
+             "last_affected": "4.5.1"
+            }
+           ],
+           "type": "SEMVER"
+          }
+         ]
+        },
+        {
+         "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2022/01/GHSA-29mw-wpgm-hmr9/GHSA-29mw-wpgm-hmr9.json"
+         },
+         "package": {
+          "ecosystem": "npm",
+          "name": "lodash.trim",
+          "purl": "pkg:npm/lodash.trim"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "4.0.0"
+            },
+            {
+             "last_affected": "4.5.1"
+            }
+           ],
+           "type": "SEMVER"
+          }
+         ]
+        },
+        {
+         "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2022/01/GHSA-29mw-wpgm-hmr9/GHSA-29mw-wpgm-hmr9.json"
+         },
+         "package": {
+          "ecosystem": "RubyGems",
+          "name": "lodash-rails",
+          "purl": "pkg:gem/lodash-rails"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "4.0.0"
+            },
+            {
+             "fixed": "4.17.21"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2020-28500"
+       ],
+       "database_specific": {
+        "cwe_ids": [
+         "CWE-1333",
+         "CWE-400"
+        ],
+        "github_reviewed": true,
+        "github_reviewed_at": "2021-03-19T22:45:28Z",
+        "nvd_published_at": "2021-02-15T11:15:00Z",
+        "severity": "MODERATE"
+       },
+       "details": "All versions of package lodash prior to 4.17.21 are vulnerable to Regular Expression Denial of Service (ReDoS) via the `",
+       "id": "GHSA-29mw-wpgm-hmr9",
+       "modified": "2025-09-29T21:12:31.102523Z",
+       "published": "2022-01-06T20:30:46Z",
+       "schema_version": "1.9.0",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L",
+         "type": "CVSS_V3"
+        }
+       ],
+       "summary": "Regular Expression Denial of Service (ReDoS) in lodash"
+      },
+      {
+       "affected": [
+        {
+         "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2021/05/GHSA-35jh-r3h4-6jhm/GHSA-35jh-r3h4-6jhm.json"
+         },
+         "package": {
+          "ecosystem": "npm",
+          "name": "lodash",
+          "purl": "pkg:npm/lodash"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "4.17.21"
+            }
+           ],
+           "type": "SEMVER"
+          }
+         ]
+        },
+        {
+         "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2021/05/GHSA-35jh-r3h4-6jhm/GHSA-35jh-r3h4-6jhm.json"
+         },
+         "package": {
+          "ecosystem": "npm",
+          "name": "lodash-es",
+          "purl": "pkg:npm/lodash-es"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "4.17.21"
+            }
+           ],
+           "type": "SEMVER"
+          }
+         ]
+        },
+        {
+         "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2021/05/GHSA-35jh-r3h4-6jhm/GHSA-35jh-r3h4-6jhm.json"
+         },
+         "package": {
+          "ecosystem": "npm",
+          "name": "lodash.template",
+          "purl": "pkg:npm/lodash.template"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "last_affected": "4.5.0"
+            }
+           ],
+           "type": "SEMVER"
+          }
+         ]
+        },
+        {
+         "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2021/05/GHSA-35jh-r3h4-6jhm/GHSA-35jh-r3h4-6jhm.json"
+         },
+         "package": {
+          "ecosystem": "npm",
+          "name": "lodash-template",
+          "purl": "pkg:npm/lodash-template"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "last_affected": "1.0.0"
+            }
+           ],
+           "type": "SEMVER"
+          }
+         ]
+        },
+        {
+         "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2021/05/GHSA-35jh-r3h4-6jhm/GHSA-35jh-r3h4-6jhm.json"
+         },
+         "package": {
+          "ecosystem": "RubyGems",
+          "name": "lodash-rails",
+          "purl": "pkg:gem/lodash-rails"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "4.17.21"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2021-23337"
+       ],
+       "database_specific": {
+        "cwe_ids": [
+         "CWE-77",
+         "CWE-94"
+        ],
+        "github_reviewed": true,
+        "github_reviewed_at": "2021-03-31T23:59:26Z",
+        "nvd_published_at": "2021-02-15T13:15:00Z",
+        "severity": "HIGH"
+       },
+       "details": "`lodash` versions prior to 4.17.21 are vulnerable to Command Injection via the template function.",
+       "id": "GHSA-35jh-r3h4-6jhm",
+       "modified": "2026-10-17T02:55:38.085813876Z",
+       "published": "2021-05-06T16:05:51Z",
+       "schema_version": "1.9.0",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:H/I:H/A:H",
+         "type": "CVSS_V3"
+        }
+       ],
+       "summary": "Command Injection in lodash"
+      }
+     ]
+    },
+    {
+     "package": {
+      "name": "newtonsoft.json",
+      "version": "12.0.1",
+      "ecosystem": "NuGet",
+      "purl": "pkg:nuget/newtonsoft.json@12.0.1"
+     },
+     "groups": [
+      {
+       "ids": [
+        "GHSA-5crp-9r3c-p9vr"
+       ],
+       "aliases": [
+        "CVE-2024-21907",
+        "GHSA-5crp-9r3c-p9vr"
+       ],
+       "max_severity": "7.5"
+      }
+     ],
+     "vulnerabilities": [
+      {
+       "affected": [
+        {
+         "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2022/06/GHSA-5crp-9r3c-p9vr/GHSA-5crp-9r3c-p9vr.json"
+         },
+         "package": {
+          "ecosystem": "NuGet",
+          "name": "Newtonsoft.Json",
+          "purl": "pkg:nuget/Newtonsoft.Json"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "13.0.1"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2024-21907"
+       ],
+       "database_specific": {
+        "cwe_ids": [
+         "CWE-755"
+        ],
+        "github_reviewed": true,
+        "github_reviewed_at": "2022-06-22T15:08:47Z",
+        "nvd_published_at": null,
+        "severity": "HIGH"
+       },
+       "details": "Newtonsoft.Json prior to version 13.0.1 is vulnerable to Insecure Defaults due to improper handling of expressions with ",
+       "id": "GHSA-5crp-9r3c-p9vr",
+       "modified": "2026-07-08T06:53:11.583483075Z",
+       "published": "2022-06-22T15:08:47Z",
+       "schema_version": "1.9.0",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+         "type": "CVSS_V3"
+        }
+       ],
+       "summary": "Improper Handling of Exceptional Conditions in Newtonsoft.Json"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "experimental_config": {
+  "licenses": {
+   "summary": false,
+   "allowlist": null
+  }
+ }
+}

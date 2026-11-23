@@ -16,6 +16,7 @@
         <a href="#" data-view="repositories">Repositories</a>
         <a href="#store" data-view="store">Store</a>
         <a href="#report" data-view="report">Report</a>
+        <a href="#security" data-view="security">Security</a>
         <a href="#docs" data-view="docs">Docs</a>
       </nav>
       <span id="scanned"></span>
@@ -93,6 +94,21 @@
           <span class="hint">In a terminal: <code>chade report</code> prints this report, <code>chade clean</code> cleans up</span>
         </div>
         <div id="report-sections"></div>
+      </section>
+      <section id="security" class="page" hidden>
+        <div class="bar">
+          <h2>Security</h2>
+          <span id="security-state" class="path"></span>
+          <button id="security-scan" class="action" type="button" title="Read the packages and the images on the disk again, which takes minutes">Scan</button>
+          <span class="hint">In a terminal: <code>chade scan</code> reads the disk again</span>
+        </div>
+        <div id="security-alert"></div>
+        <nav id="security-tabs" role="tablist" aria-label="Kinds of place"></nav>
+        <div id="security-filters" class="bar">
+          <div id="security-toggles"></div>
+          <input id="security-filter" type="search" placeholder="Filter by place, package or advisory" aria-label="Filter the scan" />
+        </div>
+        <div id="security-content"></div>
       </section>
       <section id="docs" hidden>
         <nav id="docs-nav" aria-label="Documentation"></nav>

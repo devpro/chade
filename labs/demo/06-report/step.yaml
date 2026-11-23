@@ -1,0 +1,7 @@
+title: Report
+resetTerminal: false
+layout:
+  - type: vnc
+    page: chade
+  - type: terminal
+    target: laptop

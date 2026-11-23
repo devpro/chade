@@ -20,6 +20,19 @@ export interface SystemConfig {
   repos: string[]
 }
 
+export const SCAN_PARTS = ['packages', 'images'] as const
+
+export type ScanPart = (typeof SCAN_PARTS)[number]
+
+export interface ScanConfig {
+  // Days without a commit, a change or an install after which a repository's installed folders are called unused.
+  unusedDays: number
+  // Parts chade scan leaves out, a machine without Docker for instance.
+  skip: ScanPart[]
+}
+
+export const DEFAULT_SCAN: ScanConfig = { unusedDays: 30, skip: [] }
+
 export interface Config {
   store: string
   machine?: string
@@ -27,6 +40,10 @@ export interface Config {
   windows?: SystemConfig
   redact: string[]
   cleanup: (string | CustomStep)[]
+  // Absent when the configuration leaves the defaults.
+  scan?: ScanConfig
+  // The scan and the report run once a day while the server of the web interface runs, unless false.
+  daily?: boolean
 }
 
 export function configPath(env: NodeJS.ProcessEnv, home: string): string {
@@ -36,7 +53,7 @@ export function configPath(env: NodeJS.ProcessEnv, home: string): string {
 export function parseConfig(text: string, home: string): Config {
   const raw: unknown = parse(text) ?? {}
   if (!isObject(raw)) throw new Error('the configuration is not a YAML mapping')
-  checkKeys(raw, ['store', 'machine', 'linux', 'windows', 'redact', 'cleanup'], 'the configuration')
+  checkKeys(raw, ['store', 'machine', 'linux', 'windows', 'redact', 'cleanup', 'scan', 'daily'], 'the configuration')
   if (typeof raw.store !== 'string' || raw.store === '') throw new Error('store is required, the path of the git repository snapshots are written to')
   const store = expandHome(raw.store, home)
   if (!isAbsolute(store)) throw new Error(`store ${raw.store} is not an absolute path`)
@@ -58,7 +75,26 @@ export function parseConfig(text: string, home: string): Config {
     windows: parseSystem(raw.windows, 'windows'),
     redact,
     cleanup: parseCleanup(raw.cleanup),
+    ...(raw.scan === undefined || raw.scan === null ? {} : { scan: parseScan(raw.scan) }),
+    ...(raw.daily === undefined || raw.daily === null ? {} : { daily: parseDaily(raw.daily) }),
   }
+}
+
+function parseDaily(raw: unknown): boolean {
+  if (typeof raw !== 'boolean') throw new Error('daily is true or false')
+  return raw
+}
+
+function parseScan(raw: unknown): ScanConfig {
+  if (!isObject(raw)) throw new Error('scan is a mapping of unusedDays and skip')
+  checkKeys(raw, ['unusedDays', 'skip'], 'scan')
+  const unusedDays = raw.unusedDays ?? DEFAULT_SCAN.unusedDays
+  if (typeof unusedDays !== 'number' || !Number.isInteger(unusedDays) || unusedDays < 1) throw new Error('scan.unusedDays is a whole number of days, 1 or more')
+  const skip = stringList(raw.skip, 'scan.skip')
+  for (const part of skip) {
+    if (!(SCAN_PARTS as readonly string[]).includes(part)) throw new Error(`scan.skip: ${part} is not one of ${SCAN_PARTS.join(', ')}`)
+  }
+  return { unusedDays, skip: skip as ScanPart[] }
 }
 
 function parseCleanup(raw: unknown): (string | CustomStep)[] {

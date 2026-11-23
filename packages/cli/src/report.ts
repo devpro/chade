@@ -1,8 +1,8 @@
 import { existsSync } from 'node:fs'
 import { lstat, readdir, readFile, stat, statfs } from 'node:fs/promises'
 import { freemem, totalmem } from 'node:os'
-import { join } from 'node:path'
-import { findRepositories, trimTrailing, type Measure, type Report, type Section } from '@chade/daemon'
+import { dirname, join } from 'node:path'
+import { countsOf, findRepositories, SEVERITIES, trimTrailing, type Measure, type Report, type Scan, type Section } from '@chade/daemon'
 import type { Config } from './config.js'
 import { NOT_FOUND } from './exec.js'
 import { expandHome } from './paths.js'
@@ -12,12 +12,25 @@ export type { Measure, Report, Section }
 
 export const GUIDE = 'https://github.com/devpro/chade/blob/main/docs/cleanup.md'
 
+// The last report, saved beside the configuration, which the interface shows at once.
+export function reportFile(configFile: string): string {
+  return join(dirname(configFile), 'report.json')
+}
+
+export async function readReport(file: string): Promise<Report | undefined> {
+  try {
+    return JSON.parse(await readFile(file, 'utf8')) as Report
+  } catch {
+    return undefined
+  }
+}
+
 const GB = 1e9
 
 // A size the cleanup is worth running for, below which a hint would be noise.
 const WORTH = 5 * GB
 
-export async function report(config: Config | undefined, host: Host): Promise<Report> {
+export async function report(config: Config | undefined, host: Host, scanned?: Scan): Promise<Report> {
   const sections: Section[] = []
   const add = (section: Section | undefined) => {
     if (section && (section.measures.length > 0 || section.hints.length > 0)) sections.push(section)
@@ -42,6 +55,7 @@ export async function report(config: Config | undefined, host: Host): Promise<Re
   add(await caches(host, native))
   add(await agentSessions(host))
   add(await repositories(config, host))
+  add(security(scanned))
   return { machine: host.machine, date: new Date().toISOString(), sections }
 }
 
@@ -190,7 +204,7 @@ async function walkSize(path: string): Promise<number> {
 }
 
 // du exits with 1 for a single unreadable folder, while its total of the rest is still right.
-async function folderSize(host: Host, path: string): Promise<number | undefined> {
+export async function folderSize(host: Host, path: string): Promise<number | undefined> {
   if (!existsSync(path)) return undefined
   if (isNativeWindows(host)) return walkSize(path)
   const result = await host.run('du', ['-sb', path], { timeoutMs: 600_000 })
@@ -475,6 +489,38 @@ async function repositories(config: Config | undefined, host: Host): Promise<Sec
     measures: [{ label: `${sizes.length} repositories`, bytes: total }, ...sizes.slice(0, 10)],
     hints: [],
   }
+}
+
+// A scan takes minutes, so the report reads the last one chade scan saved rather than scanning.
+const SCAN_STALE_DAYS = 7
+const UNUSED_SHOWN = 3
+
+export function security(scanned: Scan | undefined, now = Date.now()): Section {
+  const section: Section = { title: 'Security', measures: [], hints: [], guide: 'packages-and-images' }
+  if (!scanned) {
+    section.measures.push({ label: 'last scan', detail: 'never' })
+    section.hints.push('chade scan reads the packages and the images on the disk, for vulnerabilities, malicious packages and what nothing uses.')
+    return section
+  }
+  const counts = countsOf(scanned)
+  const levels = SEVERITIES.filter((level) => counts.severities[level] > 0).map((level) => `${counts.severities[level]} ${level}`)
+  section.measures.push(
+    { label: 'last scan', detail: scanned.date.slice(0, 16).replace('T', ' ') },
+    { label: 'malicious packages', detail: String(counts.malicious) },
+    { label: 'vulnerabilities', detail: levels.length > 0 ? levels.join(', ') : 'none known' },
+    { label: `${counts.unused} unused`, bytes: counts.unusedBytes },
+  )
+  if (counts.malicious > 0) section.hints.push(`${counts.malicious} malicious package(s) are on the disk, and may have run at their install: chade scan says where, and they are removed rather than updated.`)
+  const days = Math.floor((now - Date.parse(scanned.date)) / (24 * 3600 * 1000))
+  if (days >= SCAN_STALE_DAYS) section.hints.push(`The last scan is ${days} days old, and chade scan reads the disk again.`)
+  const unused = scanned.places.filter((place) => place.unused && (place.bytes ?? 0) > GB / 10).toSorted((a, b) => (b.bytes ?? 0) - (a.bytes ?? 0))
+  if (unused.length > 0) {
+    section.hints.push(`${formatBytes(counts.unusedBytes)} of folders and images nothing uses, the largest removed with:`)
+    // The NuGet cache of Windows and of WSL clear with one same command, given once.
+    const commands = [...new Set(unused.map((place) => place.unused?.command ?? ''))]
+    section.hints.push(...commands.slice(0, UNUSED_SHOWN).map((command) => `  ${command}`))
+  }
+  return section
 }
 
 // ── Rendering ──────────────────────────────────────────────────────────────

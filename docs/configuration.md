@@ -35,12 +35,14 @@ cleanup:
   - name: jetbrains-cache
     command: rm -rf ~/.cache/JetBrains
   - fstrim
+scan:
+  unusedDays: 60
 ```
 
 ## Keys
 
 Key                | Content
--------------------|--------------------------------------------------------------------------------------------------------------
+-------------------|-------------------------------------------------------------------------------------------------------------------------
 `store`            | Folder the snapshots are written to, the root of a git repository or a subfolder of one, required
 `machine`          | Name of the machine folder, detected when absent
 `linux`, `windows` | One section per system, a system without its section is not captured
@@ -49,6 +51,8 @@ Key                | Content
 `repos`            | Folders scanned for git repositories, three levels deep, into the `git-repos` inventory and the web interface
 `redact`           | Regular expressions of key names whose values are masked, on top of the defaults
 `cleanup`          | Steps `chade clean` runs, built-in names or a custom one with a `name` and a `command`
+`scan`             | `unusedDays` and `skip` of `chade scan`, as [packages and images](scan.md) says
+`daily`            | `false` stops the daily scan and report of the [web interface](web-interface.md#daily-runs) server, which run by default
 
 A Linux path starts with `/` or `~`.
 A Windows path starts with a drive letter or a variable such as `%USERPROFILE%`, and is written between single quotes, where YAML keeps backslashes as they are.

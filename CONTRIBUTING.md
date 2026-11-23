@@ -11,6 +11,7 @@
 │   ├── cleanup.md            report, clean, and the clean-up steps the report links to
 │   ├── commands.md           commands and their options
 │   ├── configuration.md      configuration, store, inventories and secrets
+│   ├── scan.md               chade scan, packages and images on the disk
 │   └── web-interface.md      chade ui
 ├── packages/
 │   ├── cli/                  chade, the published package
@@ -82,6 +83,10 @@ Task                      | Effect
 `task test:pkg`           | Runs the packaging smoke test
 `task check`              | Runs what CI runs: typecheck, build, unit tests, packaging smoke test, end to end tests
 `task dev:bump`           | Bumps `chade` to the next patch version, in `packages/cli/package.json` and `package-lock.json`
+`task lab:lint`           | Checks the demo lab of `labs/demo` with the sidelab checkout beside this repository, see [labs](labs/README.md)
+`task lab:verify`         | Runs the blocks of the demo lab against a disposable sidelab launcher
+`task lab:record`         | Records the demo lab as a WebM, `OUT=<file>.webm` naming the file
+`task lab:stop`           | Stops a sidelab launcher a lab task left behind
 
 ## Testing
 

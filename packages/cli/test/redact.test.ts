@@ -32,6 +32,12 @@ test('a key that only looks like auth is kept', () => {
   assert.equal(redact('author: me').text, 'author: me')
 })
 
+test('a dotted key is read from its last part, as git config lists it', () => {
+  const input = 'credential.interactive=never\ncredential.helper=manager'
+  assert.deepEqual(redact(input), { text: input, count: 0 })
+  assert.equal(redact('github.token=ghp_abc123').text, 'github.token=xxx')
+})
+
 test('credentials in a URL are masked, the user kept', () => {
   assert.equal(redactUrl('https://me:s3cret@gitlab.com/group/repo.git'), 'https://me:xxx@gitlab.com/group/repo.git')
   assert.equal(redactUrl('git@github.com:devpro/chade.git'), 'git@github.com:devpro/chade.git')

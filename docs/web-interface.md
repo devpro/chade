@@ -8,7 +8,7 @@ The interface opens in the browser, the one of Windows on WSL, and the command r
 Its server runs in the background, on `http://127.0.0.1:7843`: the first `chade ui` starts it, and the next ones find it running.
 `--no-open` prints the address without opening it, and `--port <number>` starts the server on another port.
 
-The top of every page names the machine and links to the four pages: Repositories, Store, Report and Docs.
+The top of every page names the machine and links to the five pages: Repositories, Store, Report, Security and Docs.
 
 ## Server
 
@@ -157,8 +157,49 @@ The page changes nothing: a snapshot is taken in a terminal, with `chade snapsho
 
 Report shows what `chade report` measures, a card for each section, a size drawn as a bar against the largest of its card.
 A card with something to clean gives the command or the setting, and a link to its step of the [system clean-up](cleanup.md).
-It is measured when the page opens and at Refresh, which takes a few seconds, and never by itself.
-Nothing of it is saved, and the page cleans nothing: `chade clean` does, in a terminal.
+The page opens on the last report saved, by `chade report` or the [daily run](#daily-runs), and measures one when none is saved.
+Refresh measures again, which takes a few seconds.
+The page cleans nothing: `chade clean` does, in a terminal.
+
+## Security
+
+Security shows the last scan `chade scan` saved, which [packages and images](scan.md) describes, with a tab for each kind of place.
+
+Tab          | Content
+-------------|------------------------------------------------------------------------------
+Repositories | The folders installed in a repository, `node_modules`, `.terraform`, `.venv`
+Installed    | What is installed for the user, global packages, each Node.js of nvm, tools
+Caches       | The npx, NuGet and Terraform caches
+Images       | The container images
+Scanners     | The scanners of each system with their versions, and the parts skipped, why
+
+A malicious package shows above the tabs, whatever the tab, with the place it lies in.
+A place shows its notes, such as a system past its end of life, and the count of its findings at each level, the most severe places first.
+Opened, it lists each version of a package once, with the version that fixes all its advisories, and each advisory with a link to OSV.
+A scanner is named beside an advisory only when another one that read the place missed it.
+
+A place nothing uses is marked unused, with its size.
+Opened, it says why and gives the command that removes it, with a button that copies it, which ends every finding in it at once.
+
+Filter      | Effect
+------------|--------------------------------------------------------------------------------------------------------------
+System      | The places of one system, shown when the machine has several
+Level       | The first level chosen shows it alone, the next ones add to it, and the last one taken away shows them all again
+Unused      | Only the places nothing uses, a critical package nothing uses showing with the command that removes it
+Text filter | The places whose name, package or advisory holds the text, and in them only the packages it names
+
+The [report](#report) gives the largest places nothing uses, vulnerable or not.
+
+Scan runs a new scan behind the page, which takes minutes, and Refresh reads the one a terminal saved since.
+The page removes nothing: the commands run in a terminal.
+
+## Daily runs
+
+While the server runs, it scans the disk and measures the report once a day, so the pages open on what the day found.
+It looks every hour, the first time a minute after it starts, and runs each one whose last run is a day old, a day the server was stopped being caught up at its next start.
+A run asked from a page while the daily one goes is that same run.
+The output of each run goes to `daemon.log`, beside the configuration.
+`daily: false` in the [configuration](configuration.md) stops them, from the next start of the server.
 
 ## Docs
 

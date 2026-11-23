@@ -86,7 +86,8 @@ function render(): void {
 
 // A report takes the seconds its commands take, so it is measured behind the page, which stays free to leave.
 // The page that holds the views is told the outcome, to say it as it says any read or any failure.
-function measure(): void {
+// The saved report when the page opens, measured again only when asked.
+function measure(fresh: boolean): void {
   if (measuring) return
   measuring = true
   render()
@@ -95,7 +96,7 @@ function measure(): void {
     render()
     document.dispatchEvent(new CustomEvent('chade-measured', { detail }))
   }
-  get<Loaded>('report').then(
+  get<Loaded>('report', fresh ? { fresh: '1' } : {}).then(
     (read) => {
       report = read
       done({ read })
@@ -117,12 +118,12 @@ export const reportPage = {
   async show(): Promise<{ machine: string; version: string; scannedAt?: string }> {
     render()
     if (report) return report
-    measure()
+    measure(false)
     // The machine is named at once, without waiting for its report.
     return get<{ machine: string; version: string }>('ping')
   },
   // Measured again when asked, and not by the page reading itself again, as a report is no glance at a repository.
   async reload(asked = false): Promise<void> {
-    if (asked) measure()
+    if (asked) measure(true)
   },
 }

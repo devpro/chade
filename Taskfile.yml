@@ -3,6 +3,10 @@ version: '3'
 # Every workflow of CONTRIBUTING.md as a single command, `task` alone lists them.
 # Arguments for the CLI come after --, for example: task run -- snapshot --dry-run
 
+vars:
+  # The demo lab is checked by the sidelab checkout beside this repository, so the checks are those of the launcher that runs it.
+  SIDELAB_DIR: '{{.SIDELAB_DIR | default (print .ROOT_DIR "/../sidelab")}}'
+
 tasks:
 
   default:
@@ -83,3 +87,45 @@ tasks:
     desc: Bump chade to the next patch version in packages/cli/package.json and package-lock.json
     cmds:
       - npm version patch --no-git-tag-version --workspace=packages/cli
+
+  # ── Demo lab ────────────────────────────────────────────────────────────────
+
+  lab:lint:
+    desc: Check the demo lab without a launcher
+    dir: '{{.SIDELAB_DIR}}'
+    cmds:
+      - npm run --silent build:course-kit
+      - ./node_modules/.bin/tsx packages/cli/src/bin.ts course lint "{{.ROOT_DIR}}/labs/demo"
+
+  # A required secret lives in the database of a launcher, so a run that needs one goes to the launcher already holding it, named by LAUNCHER_URL,
+  # and without it to a disposable launcher, which refuses the lab until the secret is entered there.
+  lab:verify:
+    desc: 'Run the blocks of the demo lab, against the launcher of LAUNCHER_URL or a disposable one: task lab:verify [STEPS=1-3] [KEEP=1] [-- --show-output]'
+    cmds:
+      - task: lab:run
+        vars: { COMMAND: verify:course, ARGS: '--steps {{.STEPS | default "all"}} {{.CLI_ARGS}}' }
+
+  lab:record:
+    desc: 'Record the demo lab as a WebM, against the launcher of LAUNCHER_URL or a disposable one: task lab:record OUT=<absolute path>.webm [KEEP=1]'
+    requires:
+      vars: [OUT]
+    cmds:
+      - task: lab:run
+        vars: { COMMAND: record:course, ARGS: '--out {{.OUT}} {{.CLI_ARGS}}' }
+
+  lab:run:
+    internal: true
+    cmds:
+      - |
+        if [ -n "${LAUNCHER_URL:-}" ]; then
+          cd "{{.SIDELAB_DIR}}" && \
+          ADMIN_USERNAME="${ADMIN_USERNAME:-admin}" ADMIN_PASSWORD="${ADMIN_PASSWORD:-verify-course-local-pass}" \
+          npm run --silent {{.COMMAND}} -- "{{.ROOT_DIR}}/labs/demo" --capabilities network {{.ARGS}}
+        else
+          task -d "{{.SIDELAB_DIR}}" {{.COMMAND}} COURSE="{{.ROOT_DIR}}/labs/demo" KEEP={{.KEEP | default "0"}} CLI_ARGS="--capabilities network {{.ARGS}}"
+        fi
+
+  lab:stop:
+    desc: Stop the disposable launchers a lab:verify or lab:record run left behind (KEEP=1, or a run killed before its cleanup)
+    cmds:
+      - task -d "{{.SIDELAB_DIR}}" verify:course:stop

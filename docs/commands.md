@@ -3,7 +3,7 @@
 `--config <path>` applies to every command.
 
 Command                     | Effect
-----------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 `chade init --store <path>` | Writes the [configuration](configuration.md), creates the store folder, and a git repository when the folder is in none
 `chade discover`            | Prints the known configuration files present on the system and missing from the configuration, and the Debian configuration files changed since their installation
 `chade snapshot`            | Collects, redacts, writes and commits the snapshot
@@ -12,11 +12,12 @@ Command                     | Effect
 `chade daemon <action>`     | `start`, `stop`, `status` or `run` the server of the web interface
 `chade report`              | Measures disk and memory and suggests what to clean, without changing anything, see [system clean-up](cleanup.md)
 `chade clean`               | Runs the `cleanup` steps of the configuration after a confirmation
+`chade scan`                | Reads the packages and container images on the disk for vulnerabilities, malicious packages and what nothing uses, without changing anything, see [packages and images](scan.md)
 
 ## Options
 
 Command          | Option             | Effect
------------------|--------------------|-----------------------------------------------------------
+-----------------|--------------------|--------------------------------------------------------------------
 `chade init`     | `--force`          | Overwrites an existing configuration
 `chade snapshot` | `--dry-run`        | Lists what would be written, without writing or committing
 `chade snapshot` | `--push`           | Pushes the repository of the store after the commit
@@ -30,3 +31,7 @@ Command          | Option             | Effect
 `chade report`   | `--json`           | Prints the report as JSON
 `chade clean`    | `--dry-run`        | Shows the steps without running them
 `chade clean`    | `--yes`            | Runs the steps without asking, for a timer or a script
+`chade scan`     | `--json`           | Prints the scan as JSON
+`chade scan`     | `--packages`       | Reads the packages only
+`chade scan`     | `--images`         | Reads the container images only
+`chade scan`     | `--offline`        | Downloads no vulnerability database, and reads those on the machine

@@ -9,15 +9,17 @@ import { createActions, createApi, startServer } from '@chade/daemon'
 import { Command } from 'commander'
 import { planCleanup, renderPlan, runCleanup } from './clean.js'
 import { DEFAULT_PORT, removeState, runningDaemon, signInUrl, startDaemon, stopDaemon, writeState, type DaemonState } from './daemon.js'
-import { configPath, initialConfig, parseConfig, type Config } from './config.js'
+import { configPath, DEFAULT_SCAN, initialConfig, parseConfig, type Config } from './config.js'
+import { single, startDaily } from './daily.js'
 import { diff } from './diff.js'
 import { discover } from './discover.js'
 import { run, runInherit } from './exec.js'
 import { istarciServer } from './istarci.js'
 import { openBrowser } from './open.js'
 import { expandHome } from './paths.js'
-import { diskUsage, formatBytes, renderReport, report } from './report.js'
+import { diskUsage, formatBytes, readReport, renderReport, report, reportFile, type Report } from './report.js'
 import { repositoryRoots } from './roots.js'
+import { countsOf, readScan, renderScan, saveScan, scan, scanFile, type Scan } from './scan.js'
 import { snapshot, type Logger } from './snapshot.js'
 import { git, repositoryRoot } from './store.js'
 import { detectHost, systemKinds, type Host } from './system.js'
@@ -137,8 +139,59 @@ program
     // The report needs no store, so it also runs before chade init.
     const config = existsSync(configFile()) ? await loadConfig() : undefined
     const host = await detectHost({ machine: config?.machine })
-    const result = await report(config, host)
+    const result = await measureReport(config, host)
     log.info(options.json ? JSON.stringify(result, null, 2) : renderReport(result))
+  })
+
+// Measures the report and saves it, for the interface to show the last one at once.
+async function measureReport(config: Config | undefined, host: Host): Promise<Report> {
+  const result = await report(config, host, await readScan(scanFile(configFile())))
+  const file = reportFile(configFile())
+  await mkdir(dirname(file), { recursive: true })
+  await writeFile(file, `${JSON.stringify(result, null, 2)}\n`)
+  return result
+}
+
+interface ScanFlags {
+  json?: boolean
+  packages?: boolean
+  images?: boolean
+  offline?: boolean
+}
+
+// Scans the disk and saves what it found, for chade report and the interface to read.
+async function scanMachine(config: Config | undefined, host: Host, flags: ScanFlags, progress?: (line: string) => void): Promise<Scan> {
+  const settings = config?.scan ?? DEFAULT_SCAN
+  // Naming a part reads that part alone, whatever the configuration skips.
+  const named = flags.packages || flags.images
+  const file = scanFile(configFile())
+  const previous = await readScan(file)
+  const packages = named ? Boolean(flags.packages) : !settings.skip.includes('packages')
+  const images = named ? Boolean(flags.images) : !settings.skip.includes('images')
+  const result = await scan(config, host, { packages, images, offline: Boolean(flags.offline), unusedDays: settings.unusedDays, previous, log: progress })
+  // A part left out keeps what the last scan found of it.
+  const kept = (previous?.places ?? []).filter((place) => (place.kind === 'image' ? !images : !packages))
+  result.places.push(...kept)
+  await mkdir(dirname(file), { recursive: true })
+  await saveScan(file, result)
+  return result
+}
+
+program
+  .command('scan')
+  .description('Read what is installed on the disk, packages and container images, for vulnerabilities, malicious packages and what nothing uses, without changing anything')
+  .option('--json', 'print the scan as JSON')
+  .option('--packages', 'read the packages only')
+  .option('--images', 'read the container images only')
+  .option('--offline', 'download no database, and read those already on the machine')
+  .action(async (options: ScanFlags) => {
+    // The scan needs no store, so it also runs before chade init.
+    const config = existsSync(configFile()) ? await loadConfig() : undefined
+    const host = await detectHost({ machine: config?.machine })
+    const result = await scanMachine(config, host, options, options.json ? undefined : (line) => console.error(line))
+    log.info(options.json ? JSON.stringify(result, null, 2) : renderScan(result))
+    // A malicious package may have run at its install already, which a script running the scan must not miss.
+    if (countsOf(result).malicious > 0) process.exitCode = 1
   })
 
 program
@@ -172,14 +225,27 @@ program
     if (result.failed.length > 0) process.exitCode = 1
   })
 
+// The report and the scan of the server, one run of each at a time, which the page and the daily run share.
+function work(host: Host): { report: () => Promise<Report>; scan: () => Promise<Scan> } {
+  return {
+    report: single(async () => measureReport(await loadConfig(), host)),
+    scan: single(async () => scanMachine(await loadConfig(), host, {})),
+  }
+}
+
 // The routes of the server over the repositories and the store of the configuration.
-function routes(host: Host): { api: ReturnType<typeof createApi>; actions: ReturnType<typeof createActions> } {
+function routes(host: Host, runs: ReturnType<typeof work>): { api: ReturnType<typeof createApi>; actions: ReturnType<typeof createActions> } {
   const options = {
     version,
     machine: host.machine,
     roots: async () => repositoryRoots(await loadConfig(), host),
     store: async () => (await loadConfig()).store,
-    report: async () => report(await loadConfig(), host),
+    report: runs.report,
+    savedReport: async () => readReport(reportFile(configFile())),
+    scan: {
+      read: async () => readScan(scanFile(configFile())),
+      run: runs.scan,
+    },
     istarci: async () => istarciServer(homedir()),
     run,
   }
@@ -257,12 +323,13 @@ daemon
     process.env.GIT_TERMINAL_PROMPT = '0'
     // The interface is built beside the bundle, which a run from the sources reaches the same way.
     const uiDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'ui')
+    const runs = work(host)
     if (!existsSync(join(uiDir, 'index.html'))) throw new Error(`the web interface is not built in ${uiDir}, npm run build builds it`)
     const server = await startServer({
       port: portOf(options.port),
       uiDir,
       // The configuration is read at each call, so a folder added to repos shows without a restart.
-      ...routes(host),
+      ...routes(host, runs),
     })
     await writeState(file, { pid: process.pid, address: server.address, token: server.token, version, startedAt: new Date().toISOString() })
     const stop = () => {
@@ -271,6 +338,16 @@ daemon
     process.on('SIGINT', stop)
     process.on('SIGTERM', stop)
     log.info(`chade serves ${host.machine} on ${server.address}`)
+    // The daily runs follow the configuration read at start, as a change of daily applies with the next server.
+    if ((await loadConfig()).daily !== false) {
+      startDaily(
+        [
+          { name: 'scan', last: async () => (await readScan(scanFile(file)))?.date, run: runs.scan },
+          { name: 'report', last: async () => (await readReport(reportFile(file)))?.date, run: runs.report },
+        ],
+        (line) => log.info(`${new Date().toISOString()} ${line}`),
+      )
+    }
   })
 
 try {

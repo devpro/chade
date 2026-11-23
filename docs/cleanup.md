@@ -22,9 +22,11 @@ The report measures, and changes nothing:
 - Docker data and what of it is unused
 - on Linux and WSL, the swap, the timers that trim the disk, the systemd journal, snap revisions kept for a rollback
 - the caches of the tools, the Claude Code sessions, and the size of the repositories under `repos`
+- what the last `chade scan` found, malicious packages, vulnerabilities and what nothing uses
 
 Each finding comes with the command or setting that fixes it, and a link to its step below.
 `--json` prints the report as JSON.
+Each report is saved to `report.json`, beside the configuration, which the web interface opens on, and its server measures one [every day](web-interface.md#daily-runs).
 
 ## Clean
 
@@ -217,6 +219,16 @@ Cache                           | Clear
 `~/.nuget/packages`             | `dotnet nuget locals all --clear`
 `~/AppData/Local/pnpm/store`    | `pnpm store prune`, which keeps the packages a project still references
 `~/AppData/Local/ms-playwright` | `npx playwright uninstall --all`, then the browsers each project installs
+
+## Packages and images
+
+The report gives the counts of the last `chade scan`, and the largest of what nothing uses with the commands that remove it.
+
+```bash
+chade scan
+```
+
+[Packages and images](scan.md) describes what the scan reads and the commands it gives.
 
 ## Agent sessions
 

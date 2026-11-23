@@ -7,7 +7,7 @@ import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createActions, createApi, startServer, type Report, type Root, type Run } from '@chade/daemon'
+import { createActions, createApi, startServer, type Report, type Root, type Run, type Scan } from '@chade/daemon'
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 const stateFile = process.env.E2E_STATE
@@ -290,12 +290,111 @@ const istarci = createServer((request, response) => {
 await new Promise<void>((resolve) => istarci.listen(0, '127.0.0.1', resolve))
 const istarciUrl = `http://127.0.0.1:${(istarci.address() as AddressInfo).port}`
 
+// A scan with what the security page tells apart: a malicious package, findings of each severity, a note, what nothing uses and a part skipped.
+const ALL = ['osv-scanner', 'trivy', 'grype']
+const finding = (ecosystem: string, name: string, version: string, id: string, severity: Scan['places'][number]['findings'][number]['severity'], summary: string, fixed?: string, tools = ALL) => ({
+  ecosystem,
+  package: name,
+  version,
+  ids: [id],
+  summary,
+  severity,
+  ...(fixed ? { fixed } : {}),
+  malicious: id.startsWith('MAL-'),
+  tools,
+})
+const scanned: Scan = {
+  machine: 'E2E-PC',
+  date: new Date(Date.now() - 2 * 3600_000).toISOString(),
+  places: [
+    {
+      system: 'wsl-ubuntu',
+      kind: 'repository',
+      label: '~/repos/portal/node_modules',
+      path: '/home/e2e/repos/portal/node_modules',
+      packages: 371,
+      notes: [],
+      tools: ALL,
+      findings: [
+        finding('npm', 'lodash', '4.17.15', 'GHSA-29mw-wpgm-hmr9', 'medium', 'Regular Expression Denial of Service (ReDoS) in lodash', '4.17.21'),
+        finding('npm', '@zalastax/nolb-_extri', '1.0.0', 'MAL-2025-10000', 'unknown', 'Malicious code in @zalastax/nolb-_extri (npm)', undefined, ['osv-scanner']),
+        finding('npm', 'next', '15.3.2', 'GHSA-9qr9-h5gf-34mp', 'critical', 'Next.js is vulnerable to RCE in React flight protocol', '15.3.6'),
+        finding('npm', 'lodash', '4.17.15', 'GHSA-35jh-r3h4-6jhm', 'high', 'Command Injection in lodash', '4.17.21'),
+      ],
+    },
+    {
+      system: 'wsl-ubuntu',
+      kind: 'repository',
+      label: '~/repos/infra/.terraform',
+      path: '/home/e2e/repos/infra/.terraform',
+      bytes: 412_000_000,
+      packages: 232,
+      notes: [],
+      tools: ALL,
+      findings: [
+        finding('Go', 'golang.org/x/crypto', '0.43.0', 'GO-2026-5005', 'critical', 'Invoking key constraints not enforced in golang.org/x/crypto/ssh/agent', '0.52.0'),
+        finding('Go', 'stdlib', '1.26.10', 'GO-2026-6859', 'unknown', 'HTTP/1 server crash due to MaxBytesReader header race in net/http', '1.26.11', ['osv-scanner']),
+      ],
+      unused: { reason: 'no commit, no change and no install for 94 days', command: 'rm -rf /home/e2e/repos/infra/.terraform' },
+    },
+    {
+      system: 'wsl-ubuntu',
+      kind: 'image',
+      label: 'registry:2',
+      path: 'sha256:26b2eb03618e749084668eaff68cff8f81dda12d06ac641be7a6398b82a6f25b',
+      bytes: 25_400_000,
+      packages: 0,
+      tools: ALL,
+      notes: ['alpine 3.18.12 is past its end of life, so its packages get no more fixes'],
+      findings: [finding('gobinary', 'golang.org/x/net', '0.33.0', 'CVE-2025-22872', 'medium', 'golang.org/x/net/html: Incorrect Neutralization of Input During Web Page Generation', '0.38.0', ['trivy', 'grype'])],
+      unused: { reason: 'no container uses it', command: 'docker image rm registry:2' },
+    },
+    {
+      system: 'wsl-ubuntu',
+      kind: 'cache',
+      label: '~/.nuget/packages',
+      path: '/home/e2e/.nuget/packages',
+      bytes: 9_100_000_000,
+      packages: 1140,
+      notes: [],
+      tools: ALL,
+      findings: [finding('NuGet', 'newtonsoft.json', '12.0.1', 'GHSA-5crp-9r3c-p9vr', 'high', 'Improper Handling of Exceptional Conditions in Newtonsoft.Json', '13.0.1')],
+      unused: { reason: 'the cache of NuGet, which a restore fills again', command: 'dotnet nuget locals global-packages --clear' },
+    },
+    {
+      system: 'windows',
+      kind: 'machine',
+      label: String.raw`%USERPROFILE%\AppData\Roaming\npm\node_modules`,
+      path: String.raw`C:\Users\e2e\AppData\Roaming\npm\node_modules`,
+      packages: 748,
+      notes: [],
+      tools: ['osv-scanner', 'trivy'],
+      findings: [finding('npm', 'tar', '7.5.10', 'GHSA-23hp-3jrh-7fpw', 'critical', 'node-tar: Decompression/parse DoS via unlimited input', '7.5.19')],
+    },
+  ],
+  tools: [
+    ...ALL.map((tool, index) => ({ system: 'wsl-ubuntu', part: 'packages' as const, tool, version: ['2.7.1', '0.76.2', '0.122.1'][index] })),
+    ...ALL.map((tool, index) => ({ system: 'wsl-ubuntu', part: 'images' as const, tool, version: ['2.7.1', '0.76.2', '0.122.1'][index] })),
+    { system: 'windows', part: 'packages', tool: 'osv-scanner', version: '2.7.0' },
+    { system: 'windows', part: 'packages', tool: 'trivy', version: '0.76.2' },
+    { system: 'windows', part: 'packages', tool: 'grype', problem: 'not installed' },
+  ],
+  skipped: [],
+}
 const options = {
   version: '0.0.0',
   machine: 'E2E-PC',
   roots: async () => roots,
   store: async () => store,
   report,
+  // A scan run from the page is the same scan, made now, after the moment a real one takes.
+  scan: {
+    read: async () => scanned,
+    run: async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300))
+      return { ...scanned, date: new Date().toISOString() }
+    },
+  },
   istarci: async () => ({ url: istarciUrl, token: 'e2e-istarci' }),
   run,
 }
