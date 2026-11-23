@@ -121,7 +121,7 @@ test('a report of a Linux machine measures every source, and hints where it is w
   assert.match(text, /journalctl --vacuum-size=500M/)
   assert.match(text, /sudo microk8s stop/)
   assert.match(text, /~\/\.npm\s+1\.0 kB/)
-  assert.match(text, /docs\/cleanup\.md#journal/)
+  assert.match(text, /^ {4}How to: chade ui, Docs, System clean-up, #journal$/m)
   // A cache under the threshold is measured, and gets no hint.
   assert.doesNotMatch(text, /npm cache clean/)
 })

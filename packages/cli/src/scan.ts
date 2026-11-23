@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, posix, win32 } from 'node:path'
 import { countsOf, findRepositories, SEVERITIES, type Finding, type Place, type Root, type Scan, type Skipped, type ToolUse } from '@chade/daemon'
 import type { Config } from './config.js'
+import { docsPointer } from './docs.js'
 import type { Run } from './exec.js'
 import { GRYPE_OFFLINE, grypeListArgs, readGrype } from './grype.js'
 import { scanImages } from './images.js'
@@ -15,8 +16,6 @@ import { findTool, SCANNERS, type Scanner, type Tool } from './tools.js'
 import { readTrivy, trivyDatabaseArgs, trivyFolderArgs, trivyListArgs } from './trivy.js'
 
 export { countsOf, type Scan }
-
-export const SCAN_GUIDE = 'https://github.com/devpro/chade/blob/main/docs/scan.md'
 
 export interface ScanOptions {
   packages: boolean
@@ -72,7 +71,7 @@ async function scannersOf(host: Host, side: Side, part: ToolUse['part'], uses: T
 }
 
 function noScanner(side: Side, part: string): Skipped {
-  return { system: side.system.id, part, reason: `none of ${SCANNERS.join(', ')} is installed on ${side.windows ? 'Windows' : 'Linux'}, ${SCAN_GUIDE}#tools` }
+  return { system: side.system.id, part, reason: `none of ${SCANNERS.join(', ')} is installed on ${side.windows ? 'Windows' : 'Linux'}`, guide: 'installing-the-scanners' }
 }
 
 // What a scan gathers, each part adding to it.
@@ -397,7 +396,10 @@ export function renderScan(value: Scan): string {
   const { places } = value
   const counts = countsOf(value)
   const notes = places.flatMap((place) => place.notes.map((note) => `  ${place.label} (${place.system}): ${note}`))
-  const skipped = value.skipped.map((skip) => `  ${skip.system} ${skip.part}: ${skip.reason}`)
+  const skipped = value.skipped.flatMap((skip) => {
+    const line = `  ${skip.system} ${skip.part}: ${skip.reason}`
+    return skip.guide ? [line, `    ${docsPointer('scan', skip.guide)}`] : [line]
+  })
   return [
     `${value.machine}, ${value.date.slice(0, 16).replace('T', ' ')} UTC`,
     `${places.length} place(s), ${counts.malicious} malicious package(s), ${levelsOf(places.flatMap((place) => place.findings)) || 'no known vulnerability'}`,

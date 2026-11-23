@@ -151,7 +151,7 @@ function parseSystem(raw: unknown, kind: Kind): SystemConfig | undefined {
 
 // A section for each system the run captures, in the order of the systems.
 export function initialConfig(store: string, kinds: Kind[]): string {
-  const lines = ['# chade configuration, documented at https://github.com/devpro/chade#configuration', `store: ${store}`]
+  const lines = ['# chade configuration, documented on the Docs page of chade ui', `store: ${store}`]
   for (const kind of (['linux', 'windows'] as const).filter((known) => kinds.includes(known))) {
     lines.push(
       `${kind}:`,

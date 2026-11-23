@@ -37,6 +37,7 @@ export class SecurityPage {
   readonly empty: Locator
   readonly skipped: Locator
   readonly scanners: Locator
+  readonly guide: Locator
 
   constructor(readonly page: Page) {
     this.state = page.locator('#security-state')
@@ -50,6 +51,7 @@ export class SecurityPage {
     this.empty = page.locator('#security-content .empty')
     this.skipped = page.locator('#security .skipped li')
     this.scanners = page.locator('#security .scanners li')
+    this.guide = page.locator('#security .skipped .guide')
   }
 
   async signIn(url: string): Promise<void> {

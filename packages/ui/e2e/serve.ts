@@ -379,7 +379,7 @@ const scanned: Scan = {
     { system: 'windows', part: 'packages', tool: 'trivy', version: '0.76.2' },
     { system: 'windows', part: 'packages', tool: 'grype', problem: 'not installed' },
   ],
-  skipped: [],
+  skipped: [{ system: 'windows', part: 'images', reason: 'none of osv-scanner, trivy, grype is installed on Windows', guide: 'installing-the-scanners' }],
 }
 const options = {
   version: '0.0.0',

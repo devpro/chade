@@ -374,6 +374,9 @@ test('with no scanner, a part is skipped, and the images are still listed for wh
       ['images', 'the images are listed without their vulnerabilities'],
     ],
   )
+  const text = renderScan(result)
+  assert.match(text, /^ {4}How to: chade ui, Docs, Packages and images, #installing-the-scanners$/m)
+  assert.ok(!text.includes('github.com'))
   assert.equal(result.places.filter((place) => place.kind === 'image' && place.unused).length, 1)
   const noDocker = fakeTools({ docker: false })
   const without = await scan(undefined, { ...host, run: noDocker.run }, { packages: false, images: true, offline: true, unusedDays: 30 })
