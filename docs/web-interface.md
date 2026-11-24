@@ -8,7 +8,7 @@ The interface opens in the browser, the one of Windows on WSL, and the command r
 Its server runs in the background, on `http://127.0.0.1:7843`: the first `chade ui` starts it, and the next ones find it running.
 `--no-open` prints the address without opening it, and `--port <number>` starts the server on another port.
 
-The top of every page names the machine and links to the seven pages: Repositories, Store, Report, Security, Updates, Inventory and Docs.
+The top of every page names the machine and links to the eight pages: Repositories, Store, Report, Security, Updates, Inventory, Logs and Docs.
 
 ## Server
 
@@ -225,12 +225,19 @@ The page updates nothing.
 Inventory lists the technologies of the repositories, in alphabetical order, with the number of repositories that have each one.
 A link opens the list of the repositories, with only those that have the technology.
 
+## Logs
+
+Logs shows what the scan, the inventory and the report do, from a terminal and from the server, the newest line first.
+A scan gives each image with its position, its size and the time of each scanner, so a long scan shows where it is.
+A chip keeps one job, and the page reads the new lines every 3 seconds while it is looked at.
+The log is `activity.log`, beside the configuration, which keeps about the last 2,000 lines once it reaches 1 MB.
+
 ## Daily runs
 
 While the server runs, it scans the disk, makes the inventory and measures the report once a day, so the pages open on what the day found.
 It looks every hour, the first time a minute after it starts, and runs each one whose last run is a day old, a day the server was stopped being caught up at its next start.
 A run asked from a page while the daily one goes is that same run.
-The output of each run goes to `daemon.log`, beside the configuration.
+The steps of each run show on [Logs](#logs), and its start and its end go to `daemon.log`, beside the configuration.
 `daily: false` in the [configuration](configuration.md) stops them, from the next start of the server.
 
 ## Docs

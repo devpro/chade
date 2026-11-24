@@ -4,6 +4,7 @@ import { ago } from './format.js'
 import { docs } from './docs.js'
 import { inventoryPage } from './inventory.js'
 import { list } from './list.js'
+import { logsPage } from './logs.js'
 import { reportPage } from './report.js'
 import { repository } from './repository.js'
 import { securityPage } from './security.js'
@@ -33,7 +34,7 @@ interface View {
   title: (params: URLSearchParams) => string
 }
 
-const views: View[] = [list, repository, store, reportPage, securityPage, updatesPage, inventoryPage, docs]
+const views: View[] = [list, repository, store, reportPage, securityPage, updatesPage, inventoryPage, logsPage, docs]
 // The link of the top of the page each view is reached by, a repository being one of the repositories.
 const links = new Map<View, string>([
   [list, 'repositories'],
@@ -43,6 +44,7 @@ const links = new Map<View, string>([
   [securityPage, 'security'],
   [updatesPage, 'updates'],
   [inventoryPage, 'inventory'],
+  [logsPage, 'logs'],
   [docs, 'docs'],
 ])
 
@@ -54,6 +56,7 @@ function current(): View {
   if (page === 'security') return securityPage
   if (page === 'updates') return updatesPage
   if (page === 'inventory') return inventoryPage
+  if (page === 'logs') return logsPage
   if (page === 'docs') return docs
   return route().has('path') ? repository : list
 }

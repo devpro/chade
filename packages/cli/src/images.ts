@@ -1,11 +1,12 @@
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Finding, Place } from '@chade/daemon'
+import { seconds, type Progress } from './activity.js'
 import { NOT_FOUND, type Run } from './exec.js'
 import { GRYPE_OFFLINE, grypeImageArgs, readGrype } from './grype.js'
 import { mergeFindings } from './merge.js'
 import { OSV_FOUND, osvImageArgs, readOsvOutput } from './osv.js'
-import { parseSize } from './report.js'
+import { formatBytes, parseSize } from './report.js'
 import type { Tool } from './tools.js'
 import { readTrivy, trivyDatabaseArgs, trivyImageArgs } from './trivy.js'
 
@@ -41,6 +42,7 @@ async function usedImages(run: Run): Promise<Set<string> | undefined> {
 }
 
 export interface ImageOptions {
+  log?: Progress
   system: string
   offline: boolean
   // The scanners of the system, each reading every image.
@@ -95,25 +97,31 @@ export async function scanImages(run: Run, options: ImageOptions): Promise<Image
   const trivy = options.tools.find((tool) => tool.name === 'trivy')
   if (trivy && !options.offline) await run(trivy.command, trivyDatabaseArgs(), { cwd: trivy.cwd, timeoutMs: 90_000 })
   const places: Place[] = []
-  for (const image of images) {
+  for (const [index, image] of images.entries()) {
     const place = imagePlace(image, options.system, used)
+    const step = `image ${index + 1} of ${images.length}`
     const previous = options.previous(image.id)
     if (previous?.tools.toSorted((a, b) => a.localeCompare(b)).join() === names.join()) {
       places.push({ ...place, findings: previous.findings, notes: previous.notes, tools: previous.tools, packages: previous.packages })
+      options.log?.(`${step}: ${place.label}, kept from the last scan`)
       continue
     }
-    await readPlace(run, place, image, options)
+    options.log?.(`${step}: ${place.label}, ${formatBytes(image.bytes)}`)
+    await readPlace(run, place, image, options, (line) => options.log?.(`${step}: ${line}`))
     places.push(place)
   }
   return { places }
 }
 
 // Reads an image with each scanner and puts the results in its place.
-async function readPlace(run: Run, place: Place, image: DockerImage, options: ImageOptions): Promise<void> {
+async function readPlace(run: Run, place: Place, image: DockerImage, options: ImageOptions, log: Progress): Promise<void> {
   const findings: Finding[] = []
   const packages = new Set<string>()
   for (const tool of options.tools) {
+    const start = Date.now()
     const read = await readImage(run, tool, image, options.offline)
+    const outcome = typeof read === 'string' ? `failed, ${read}` : 'done'
+    log(`${tool.name} ${outcome}, ${seconds(start)}`)
     if (typeof read === 'string') {
       place.notes.push(`${tool.name} could not read it: ${read}`)
       continue

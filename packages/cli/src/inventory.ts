@@ -223,9 +223,12 @@ export async function inventory(config: Config | undefined, host: Host, options:
   await readTools(config, host, options, registries, result)
   const jobs = config ? await allJobs(config, host, registries, result.problems) : []
   options.log?.(`asking the registries for ${jobs.length} dependencies`)
+  let asked = 0
   const read = new Array<Awaited<ReturnType<typeof readDependency>>>(jobs.length)
   await pool([...jobs.entries()], CONCURRENCY, async ([index, job]) => {
     read[index] = await readDependency(job, host, registries, options.scan)
+    asked++
+    if (asked % 100 === 0) options.log?.(`${asked} of ${jobs.length} dependencies`)
   })
   result.dependencies.push(...read.flatMap(({ dependency }) => dependency ?? []))
   result.problems.push(...read.flatMap(({ problem }) => problem ?? []))

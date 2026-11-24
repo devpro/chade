@@ -26,6 +26,11 @@ What is left to do, in the order agreed.
 - A Node.js of nvm for Windows is never called unused, as the one in use is a link whose target is not read yet.
 - A Docker of Windows with an engine of its own, not shared with WSL, is not read from WSL.
 - The images of podman, which trivy reads with `--image-src podman`, grype as `podman:<image>`, and `podman images --format json` lists.
+- A faster scan of the images, which must still match each image against the newest CVEs every day.
+  The list of the packages of an image does not change while its ID is the same, so it can be kept, and only the list matched each day.
+  Each scanner must give the same findings from the list as from the image, the notes on the end of life of its system included.
+  osv-scanner takes most of the time, up to 3 minutes for one image, and can update its databases once for each scan instead of once for each image.
+  Two or three images can be read at the same time, with a limit on the memory, as osv-scanner can use 2 GB for one image.
 - More scanners as layers, each one optional: Docker Scout for images, and a reader of jars without Maven.
 
 ## Inventory

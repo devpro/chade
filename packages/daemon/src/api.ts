@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs'
 import { pathKey, readChecks, readRepositories, type IstarciServer, type RepositoryCheck } from './istarci.js'
 import { findRepositories, findRepository, listRepositories, repositoryPath, type Root, type Run } from './repositories.js'
 import { updateCounts, type Inventory } from './inventory.js'
+import type { LogLine } from './log.js'
 import type { Report } from './report.js'
 import type { Scan } from './scan.js'
 import { RequestError, type ServerOptions } from './server.js'
@@ -25,6 +26,8 @@ export interface ApiOptions {
   scan?: { read: () => Promise<Scan | undefined>; run: () => Promise<Scan> }
   // The last inventory saved, and a new one, which asks the registries.
   inventory?: { read: () => Promise<Inventory | undefined>; run: () => Promise<Inventory> }
+  // The last lines of the log of the jobs.
+  logs?: () => Promise<LogLine[]>
   // Where IstarCI answers on this machine, asked at each call, and absent when it is not set up.
   istarci?: () => Promise<IstarciServer | undefined>
   run: Run
@@ -166,6 +169,7 @@ export function createApi(options: ApiOptions): ServerOptions['api'] {
       const inventory = await options.inventory?.read()
       return { version: options.version, machine: options.machine, ...(inventory ? { inventory } : {}) }
     },
+    logs: async () => ({ version: options.version, machine: options.machine, scannedAt: new Date().toISOString(), lines: (await options.logs?.()) ?? [] }),
     // The counts alone, as the list reads them twice a minute.
     updates: async () => ({ updates: updateCounts((await options.inventory?.read())?.dependencies ?? []) }),
     // The saved report unless asked to measure again, a page opening on what the day measured.

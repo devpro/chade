@@ -90,7 +90,7 @@ export class RepositoriesPage {
   }
 
   // A link of the top of the page, which every page shows: Repositories, Store, Report or Docs.
-  menu(name: 'Repositories' | 'Store' | 'Report' | 'Security' | 'Updates' | 'Inventory' | 'Docs'): Locator {
+  menu(name: 'Repositories' | 'Store' | 'Report' | 'Security' | 'Updates' | 'Inventory' | 'Logs' | 'Docs'): Locator {
     return this.page.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name, exact: true })
   }
 

@@ -1,6 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, posix, win32 } from 'node:path'
 import { countsOf, findRepositories, SEVERITIES, type Finding, type Place, type Root, type Scan, type Skipped, type ToolUse } from '@chade/daemon'
+import { seconds, type Progress } from './activity.js'
 import type { Config } from './config.js'
 import { docsPointer } from './docs.js'
 import type { Run } from './exec.js'
@@ -104,7 +105,7 @@ async function scanPackages(host: Host, side: Side, roots: Root[], options: Scan
     targets.push(...(await repositoryTargets(side, root, relatives, { unusedDays: options.unusedDays, now, run: host.run })))
   }
   options.log?.(`${side.system.id}: reading ${targets.length} place(s) with ${tools.map((tool) => tool.name).join(', ')}`)
-  const problems = await readTargets(host.run, tools, side, targets, options.offline)
+  const problems = await readTargets(host.run, tools, side, targets, options.offline, (line) => options.log?.(`${side.system.id}: ${line}`))
   for (const [name, problem] of problems) {
     const use = gathered.tools.find((one) => one.system === side.system.id && one.part === 'packages' && one.tool === name)
     if (use) use.problem = problem
@@ -120,6 +121,7 @@ async function scanDocker(host: Host, side: Side, options: ScanOptions, now: num
     system: side.system.id,
     offline: options.offline,
     tools,
+    log: options.log,
     previous: (id) => fresh?.places.find((place) => place.kind === 'image' && place.path === id),
   })
   gathered.places.push(...result.places)
@@ -142,6 +144,7 @@ export async function scan(config: Config | undefined, host: Host, options: Scan
   // Thus, only one system reads the images: Linux if it is available.
   const docker = sides.find((one) => !one.windows) ?? sides[0]
   if (options.images && docker) await scanDocker(host, docker, options, now, gathered)
+  options.log?.('measuring what nothing uses')
   await measureUnused(host, sides, gathered.places)
   return { machine: host.machine, date: new Date(now).toISOString(), ...gathered }
 }
@@ -175,7 +178,7 @@ const lastLine = (text: string): string =>
     .findLast((line) => !/^(Scanned|Scanning|Starting|End status|Loaded)/.test(line)) ?? ''
 
 // Every place read by each scanner of the system, the problems of a scanner returned by its name.
-async function readTargets(run: Run, tools: Tool[], side: Side, targets: Target[], offline: boolean): Promise<Map<Scanner, string>> {
+async function readTargets(run: Run, tools: Tool[], side: Side, targets: Target[], offline: boolean, log: Progress): Promise<Map<Scanner, string>> {
   const problems = new Map<Scanner, string>()
   // The packages of a list are known before any scanner reads them, so grype matches them even alone.
   const readings = new Map<Target, Reading>(targets.map((one) => [one, { packages: new Set((one.list ?? []).map((pkg) => packageKey(purlOf(pkg), '', '', ''))), findings: [], tools: new Set() }]))
@@ -191,13 +194,17 @@ async function readTargets(run: Run, tools: Tool[], side: Side, targets: Target[
       lists.set(systemPath(`${index}.cdx.json`), one)
     }
     for (const tool of tools.filter((one) => one.name !== 'grype')) {
+      const start = Date.now()
       const problem = tool.name === 'osv-scanner' ? await readWithOsv(run, tool, side, targets, lists, readings, offline) : await readWithTrivy(run, tool, targets, lists, readings, offline)
+      log(`packages, ${tool.name} ${problem ?? 'done'}, ${seconds(start)}`)
       if (problem) problems.set(tool.name, problem)
     }
     // grype matches what the others read against a database of its own, all the packages of the system in one list.
     const grype = tools.find((one) => one.name === 'grype')
     if (grype) {
+      const start = Date.now()
       const problem = await matchWithGrype(run, grype, readings, join(folder, 'all.cdx.json'), systemPath('all.cdx.json'), offline)
+      log(`packages, grype ${problem ?? 'done'}, ${seconds(start)}`)
       if (problem) problems.set('grype', problem)
     }
   } finally {

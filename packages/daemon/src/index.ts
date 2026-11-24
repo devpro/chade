@@ -39,6 +39,7 @@ export {
   type Update,
   type UpdateCount,
 } from './inventory.js'
+export { parseLog, type LogLine } from './log.js'
 export { trimTrailing } from './text.js'
 export { RequestError, startServer, type Server, type ServerOptions } from './server.js'
 export {

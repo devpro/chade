@@ -2259,3 +2259,41 @@ a.tab {
 .technology-name {
   font-weight: 600;
 }
+
+/* The logs: the newest line first, the start and the end of a job in full colour. */
+#logs-jobs {
+  margin-bottom: 12px;
+}
+
+.log {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  font: 12.5px var(--mono);
+}
+
+.log tbody tr {
+  cursor: auto;
+}
+
+.log td {
+  padding: 4px 12px;
+  border: 0;
+  color: var(--muted);
+}
+
+.log .log-text {
+  width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.log tr.mark .log-text {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.log tr.bad .log-text {
+  color: var(--bad);
+}

@@ -30,6 +30,7 @@ Every finding is in `chade scan --json`, and on the Security page of the [web in
 
 The scan is saved to `scan.json`, beside the [configuration](configuration.md), where `chade report` and the web interface read it.
 The server of the web interface runs it [once a day](web-interface.md#daily-runs).
+The terminal shows each step with its time, and the [Logs](web-interface.md#logs) page shows the same.
 A part left out keeps what the last scan found of it.
 `chade scan` exits with 1 when a malicious package is on the disk, so a script running it does not miss one.
 

@@ -7,6 +7,7 @@ import { createInterface } from 'node:readline/promises'
 import { fileURLToPath } from 'node:url'
 import { createActions, createApi, startServer, type Inventory } from '@chade/daemon'
 import { Command } from 'commander'
+import { activityFile, logged, readActivity, type Progress } from './activity.js'
 import { planCleanup, renderPlan, runCleanup } from './clean.js'
 import { DEFAULT_PORT, removeState, runningDaemon, signInUrl, startDaemon, stopDaemon, writeState, type DaemonState } from './daemon.js'
 import { configPath, DEFAULT_SCAN, initialConfig, parseConfig, type Config } from './config.js'
@@ -148,6 +149,10 @@ program
 
 // Measures the report and saves it, for the interface to show the last one at once.
 async function measureReport(config: Config | undefined, host: Host): Promise<Report> {
+  return logged(activityFile(configFile()), 'report', () => saveReport(config, host))
+}
+
+async function saveReport(config: Config | undefined, host: Host): Promise<Report> {
   const result = await report(config, host, await readScan(scanFile(configFile())))
   const file = reportFile(configFile())
   await mkdir(dirname(file), { recursive: true })
@@ -163,7 +168,11 @@ interface ScanFlags {
 }
 
 // Scans the disk and saves what it found, for chade report and the interface to read.
-async function scanMachine(config: Config | undefined, host: Host, flags: ScanFlags, progress?: (line: string) => void): Promise<Scan> {
+async function scanMachine(config: Config | undefined, host: Host, flags: ScanFlags, terminal?: Progress): Promise<Scan> {
+  return logged(activityFile(configFile()), 'scan', (progress) => scanAndSave(config, host, flags, progress), terminal)
+}
+
+async function scanAndSave(config: Config | undefined, host: Host, flags: ScanFlags, progress: Progress): Promise<Scan> {
   const settings = config?.scan ?? DEFAULT_SCAN
   // Naming a part reads that part alone, whatever the configuration skips.
   const named = flags.packages || flags.images
@@ -191,14 +200,18 @@ program
     // The scan needs no store, so it also runs before chade init.
     const config = existsSync(configFile()) ? await loadConfig() : undefined
     const host = await detectHost({ machine: config?.machine })
-    const result = await scanMachine(config, host, options, options.json ? undefined : (line) => console.error(line))
+    const result = await scanMachine(config, host, options, options.json ? undefined : (line) => console.error(`${new Date().toLocaleTimeString()} ${line}`))
     log.info(options.json ? JSON.stringify(result, null, 2) : renderScan(result))
     // A malicious package may have run at its install already, which a script running the scan must not miss.
     if (countsOf(result).malicious > 0) process.exitCode = 1
   })
 
 // Makes the inventory and saves it, for the interface to show it.
-async function makeInventory(config: Config | undefined, host: Host, progress?: (line: string) => void): Promise<Inventory> {
+async function makeInventory(config: Config | undefined, host: Host, terminal?: Progress): Promise<Inventory> {
+  return logged(activityFile(configFile()), 'inventory', (progress) => listAndSave(config, host, progress), terminal)
+}
+
+async function listAndSave(config: Config | undefined, host: Host, progress: Progress): Promise<Inventory> {
   const result = await inventory(config, host, { scan: await readScan(scanFile(configFile())), log: progress })
   const file = inventoryFile(configFile())
   await mkdir(dirname(file), { recursive: true })
@@ -213,7 +226,7 @@ program
   .action(async (options: { json?: boolean }) => {
     const config = existsSync(configFile()) ? await loadConfig() : undefined
     const host = await detectHost({ machine: config?.machine })
-    const result = await makeInventory(config, host, options.json ? undefined : (line) => console.error(line))
+    const result = await makeInventory(config, host, options.json ? undefined : (line) => console.error(`${new Date().toLocaleTimeString()} ${line}`))
     log.info(options.json ? JSON.stringify(result, null, 2) : renderInventory(result))
   })
 
@@ -274,6 +287,7 @@ function routes(host: Host, runs: ReturnType<typeof work>): { api: ReturnType<ty
       read: async () => readInventory(inventoryFile(configFile())),
       run: runs.inventory,
     },
+    logs: async () => readActivity(activityFile(configFile())),
     istarci: async () => istarciServer(homedir()),
     run,
   }

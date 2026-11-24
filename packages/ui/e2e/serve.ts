@@ -460,6 +460,12 @@ const options = {
       return { ...listed, date: new Date().toISOString() }
     },
   },
+  logs: async () => [
+    { date: '2026-11-24T15:00:00.000Z', job: 'inventory', text: 'started' },
+    { date: '2026-11-24T15:01:00.000Z', job: 'inventory', text: 'failed after 1 min 0 s: no registry answered' },
+    { date: '2026-11-24T15:17:49.000Z', job: 'scan', text: 'started' },
+    { date: '2026-11-24T15:26:00.000Z', job: 'scan', text: 'image 1 of 58: node:24, 1.1 GB' },
+  ],
   istarci: async () => ({ url: istarciUrl, token: 'e2e-istarci' }),
   run,
 }
