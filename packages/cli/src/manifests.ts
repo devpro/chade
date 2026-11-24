@@ -90,30 +90,50 @@ async function lockOf(folder: string, tracked: Set<string>, read: ReadText, know
   return undefined
 }
 
+// A folder as the lock file above it writes it.
+const underLock = (lock: Lock, folder: string): string => (lock.folder === '' ? folder : folder.slice(lock.folder.length + 1))
+
+// npm puts a package in the folder that needs it, or in a folder above.
+function npmLocked(lock: Lock, own: string, name: string): unknown {
+  const packages = field(lock.content, 'packages')
+  const entry = ancestors(own)
+    .map((at) => field(packages, inFolder(at, `node_modules/${name}`)))
+    .find((one) => one.link === true || one.version !== undefined)
+  return entry?.link === true ? undefined : entry?.version
+}
+
+function pnpmLocked(lock: Lock, own: string, name: string): unknown {
+  const importer = field(field(lock.content, 'importers'), own === '' ? '.' : own)
+  const version = GROUPS.map((group) => field(field(importer, group), name).version).find((one) => one !== undefined)
+  // The peers of the package follow its version, between parentheses.
+  return typeof version === 'string' ? version.split('(')[0] : undefined
+}
+
 // The version that the lock file gives to a dependency of a folder.
 function lockedVersion(lock: Lock, folder: string, name: string): string | undefined {
-  const own = lock.folder === '' ? folder : folder.slice(lock.folder.length + 1)
-  let version: unknown
-  if (lock.kind === 'npm') {
-    const packages = field(lock.content, 'packages')
-    for (const at of ancestors(own)) {
-      const entry = field(packages, inFolder(at, `node_modules/${name}`))
-      if (entry.link === true) return undefined
-      if ((version = entry.version) !== undefined) break
-    }
-  } else if (lock.kind === 'pnpm') {
-    const importer = field(field(lock.content, 'importers'), own === '' ? '.' : own)
-    version = GROUPS.map((group) => field(field(importer, group), name).version).find((one) => one !== undefined)
-    if (typeof version === 'string') version = version.split('(')[0]
-  }
+  if (lock.kind === 'yarn') return undefined
+  const own = underLock(lock, folder)
+  const version = lock.kind === 'npm' ? npmLocked(lock, own, name) : pnpmLocked(lock, own, name)
   return typeof version === 'string' && EXACT.test(version) ? version : undefined
 }
 
 function npmCommand(lock: Lock | undefined, folder: string, name: string): Declared['command'] {
-  if (lock === undefined || lock.kind !== 'npm') return undefined
-  const own = lock.folder === '' ? folder : folder.slice(lock.folder.length + 1)
+  if (lock?.kind !== 'npm') return undefined
+  const own = underLock(lock, folder)
   if (own !== '' && !PLAIN.test(own)) return undefined
-  return (latest) => `npm install ${name}@${latest}${own === '' ? '' : ` --workspace=${own}`}`
+  const workspace = own === '' ? '' : ` --workspace=${own}`
+  return (latest) => `npm install ${name}@${latest}${workspace}`
+}
+
+// One dependency of a package.json, absent when it is not a version of a registry.
+function npmDependency(file: string, name: string, range: unknown, lock: Lock | undefined): Declared | undefined {
+  if (typeof range !== 'string') return undefined
+  const folder = folderOf(file)
+  // workspace:, file:, git and an address are not a version of a registry.
+  const locked = lock && !/[:/]/.test(range) ? lockedVersion(lock, folder, name) : undefined
+  const current = locked ?? RANGE.exec(range)?.[1]
+  if (current === undefined) return undefined
+  return { kind: 'npm', file, name, current, ...(locked === undefined ? { range } : {}), command: npmCommand(lock, folder, name) }
 }
 
 async function npmDependencies(files: string[], tracked: Set<string>, read: ReadText): Promise<Declared[]> {
@@ -124,17 +144,9 @@ async function npmDependencies(files: string[], tracked: Set<string>, read: Read
   const locks = new Map<string, Lock>()
   const found: Declared[] = []
   for (const [file, manifest] of manifests) {
-    const folder = folderOf(file)
-    const lock = await lockOf(folder, tracked, read, locks)
-    for (const [name, range] of GROUPS.flatMap((group) => Object.entries(field(manifest, group)))) {
-      const lowest = typeof range === 'string' ? RANGE.exec(range)?.[1] : undefined
-      if (own.has(name) || typeof range !== 'string') continue
-      // workspace:, file:, git and an address are not a version of a registry.
-      const locked = lock && !/[:/]/.test(range) ? lockedVersion(lock, folder, name) : undefined
-      const current = locked ?? lowest
-      if (current === undefined) continue
-      found.push({ kind: 'npm', file, name, current, ...(locked === undefined ? { range } : {}), command: npmCommand(lock, folder, name) })
-    }
+    const lock = await lockOf(folderOf(file), tracked, read, locks)
+    const named = GROUPS.flatMap((group) => Object.entries(field(manifest, group))).filter(([name]) => !own.has(name))
+    found.push(...named.flatMap(([name, range]) => npmDependency(file, name, range, lock) ?? []))
   }
   return found
 }
@@ -162,7 +174,7 @@ export function npmRegistries(text: string): Map<string, string> {
 // ─── NuGet ─────────────────────────────────────────────────────────────────
 
 function attribute(tag: string, name: string): string | undefined {
-  return new RegExp(`\\s${name}\\s*=\\s*["']([^"']*)["']`, 'i').exec(tag)?.[1]
+  return new RegExp(String.raw`\s${name}\s*=\s*["']([^"']*)["']`, 'i').exec(tag)?.[1]
 }
 
 // A package element with its version, as an attribute or as a child.

@@ -161,7 +161,8 @@ const show = async (): Promise<void> => {
 element('refresh').addEventListener('click', () => void reload(true))
 // A report measured or a scan run behind the page says so when it is done.
 document.addEventListener('chade-measured', (event) => {
-  if (![reportPage, securityPage, updatesPage].some((view) => view === current())) return
+  const measured: View[] = [reportPage, securityPage, updatesPage]
+  if (!measured.includes(current())) return
   const { read, error } = (event as CustomEvent<{ read?: Read; error?: unknown }>).detail
   if (error === undefined) loaded(read)
   else fail(error)

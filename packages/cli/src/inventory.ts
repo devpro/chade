@@ -193,9 +193,7 @@ async function readDependency(job: Job, host: Host, registries: Registries, scan
   return { dependency }
 }
 
-export async function inventory(config: Config | undefined, host: Host, options: InventoryOptions = {}): Promise<Inventory> {
-  const registries = new Registries(host, options.fetch)
-  const result: Inventory = { machine: host.machine, date: new Date(options.now ?? Date.now()).toISOString(), tools: [], dependencies: [], apt: [], problems: [] }
+async function readTools(config: Config | undefined, host: Host, options: InventoryOptions, registries: Registries, result: Inventory): Promise<void> {
   const extra: ExtraTools = Object.fromEntries((config?.inventory?.tools ?? []).map((tool) => [tool.name, { github: tool.github }]))
   for (const system of host.systems) {
     options.log?.(`${system.id}: reading the tools`)
@@ -204,24 +202,33 @@ export async function inventory(config: Config | undefined, host: Host, options:
     result.problems.push(...found.problems)
     if (found.apt) result.apt.push(found.apt)
   }
-  const skipped = (config?.inventory?.skip ?? []).map((path) => trimmed(expandHome(path, host.home)))
+}
+
+// The dependencies of each repository that the configuration does not leave out.
+async function allJobs(config: Config, host: Host, registries: Registries, problems: Problem[]): Promise<Job[]> {
+  const skipped = (config.inventory?.skip ?? []).map((path) => trimmed(expandHome(path, host.home)))
+  const isSkipped = (path: string, separator: string): boolean => skipped.some((one) => path === one || path.startsWith(one + separator))
   const jobs: Job[] = []
-  for (const root of config ? await repositoryRoots(config, host) : []) {
+  for (const root of await repositoryRoots(config, host)) {
     for (const relative of await findRepositories(root.folder)) {
-      const path = repositoryPath(root, relative)
-      if (skipped.some((one) => path === one || path.startsWith(`${one}${root.separator}`))) continue
-      jobs.push(...(await repositoryJobs(root, relative, host, registries, result.problems)))
+      if (!isSkipped(repositoryPath(root, relative), root.separator)) jobs.push(...(await repositoryJobs(root, relative, host, registries, problems)))
     }
   }
+  return jobs
+}
+
+export async function inventory(config: Config | undefined, host: Host, options: InventoryOptions = {}): Promise<Inventory> {
+  const registries = new Registries(host, options.fetch)
+  const result: Inventory = { machine: host.machine, date: new Date(options.now ?? Date.now()).toISOString(), tools: [], dependencies: [], apt: [], problems: [] }
+  await readTools(config, host, options, registries, result)
+  const jobs = config ? await allJobs(config, host, registries, result.problems) : []
   options.log?.(`asking the registries for ${jobs.length} dependencies`)
   const read = new Array<Awaited<ReturnType<typeof readDependency>>>(jobs.length)
   await pool([...jobs.entries()], CONCURRENCY, async ([index, job]) => {
     read[index] = await readDependency(job, host, registries, options.scan)
   })
-  for (const { dependency, problem } of read) {
-    if (dependency) result.dependencies.push(dependency)
-    if (problem) result.problems.push(problem)
-  }
+  result.dependencies.push(...read.flatMap(({ dependency }) => dependency ?? []))
+  result.problems.push(...read.flatMap(({ problem }) => problem ?? []))
   // Without a network, the last inventory saved stays.
   if (jobs.length > 0 && result.dependencies.every((dependency) => dependency.latest === undefined)) throw new Error(`no registry answered: ${result.problems.at(-1)?.reason ?? 'no version was given'}`)
   return result

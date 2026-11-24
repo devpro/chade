@@ -1,4 +1,5 @@
 import { isNewer, preRelease } from '@chade/daemon'
+import type { Result } from './exec.js'
 import type { Host } from './system.js'
 import { isNativeWindows } from './system.js'
 
@@ -75,7 +76,7 @@ export function newestTag(current: string, tags: string[]): string | undefined {
   let best = { tag: current, ...own }
   for (const tag of tags) {
     const other = parseTag(tag)
-    if (!other || other.prefix !== own.prefix || other.shape !== own.shape) continue
+    if (other?.prefix !== own.prefix || other.shape !== own.shape) continue
     const numbers = other.numbers.split('.')
     // A tag such as 20260101 is a date and not the next version of 24.
     if (numbers.length !== parts.length || numbers[0].length > parts[0].length + 1) continue
@@ -126,30 +127,37 @@ export class Registries {
   }
 
   // The address of the newest release redirects to its tag, and has no limit for each hour, as the API has.
+  // Absent when the newest release is of another part of the repository, a Helm chart for instance.
+  private async redirectedRelease(repository: string, prefix?: string): Promise<Latest | undefined> {
+    let url = `https://github.com/${repository}/releases/latest`
+    // A repository that moved redirects to its new address first.
+    for (let hop = 0; hop < 3; hop++) {
+      const response = await this.request(url, { method: 'HEAD', redirect: 'manual' })
+      const target = new URL(response.headers.get('location') ?? url, url)
+      if (target.href === url || target.host !== 'github.com') return undefined
+      const tag = /\/releases\/tag\/(.+)$/.exec(target.pathname)?.[1]
+      if (tag !== undefined) {
+        const version = releaseVersion(decodeURIComponent(tag), prefix)
+        return version === undefined ? undefined : { version, url: target.href }
+      }
+      url = target.href
+    }
+    return undefined
+  }
+
+  private async listedRelease(repository: string, prefix?: string): Promise<Latest> {
+    const releases = await this.json<{ tag_name: string; html_url: string; published_at: string; prerelease: boolean; draft: boolean }[]>(`https://api.github.com/repos/${repository}/releases?per_page=50`)
+    for (const release of releases.filter((one) => !one.prerelease && !one.draft)) {
+      const version = releaseVersion(release.tag_name, prefix)
+      if (version !== undefined) return { version, url: release.html_url, date: release.published_at }
+    }
+    throw new Error(`GitHub gives no release of ${repository}`)
+  }
+
   github(repository: string, prefix?: string): Promise<Latest> {
     return this.once(`github ${repository}`, async () => {
       if (!REPOSITORY.test(repository)) throw new Error(`${repository} is not a repository of GitHub`)
-      let url = `https://github.com/${repository}/releases/latest`
-      // A repository that moved redirects to its new address first.
-      for (let hop = 0; hop < 3; hop++) {
-        const response = await this.request(url, { method: 'HEAD', redirect: 'manual' })
-        const location = response.headers.get('location')
-        if (!location) break
-        const target = new URL(location, url)
-        if (target.host !== 'github.com') break
-        const tag = /\/releases\/tag\/(.+)$/.exec(target.pathname)?.[1]
-        const version = tag === undefined ? undefined : releaseVersion(decodeURIComponent(tag), prefix)
-        if (version !== undefined) return { version, url: target.href }
-        if (tag !== undefined) break
-        url = target.href
-      }
-      // The newest release is of another part of the repository, a Helm chart for instance.
-      const releases = await this.json<{ tag_name: string; html_url: string; published_at: string; prerelease: boolean; draft: boolean }[]>(`https://api.github.com/repos/${repository}/releases?per_page=50`)
-      for (const release of releases) {
-        const version = release.prerelease || release.draft ? undefined : releaseVersion(release.tag_name, prefix)
-        if (version !== undefined) return { version, url: release.html_url, date: release.published_at }
-      }
-      throw new Error(`GitHub gives no release of ${repository}`)
+      return (await this.redirectedRelease(repository, prefix)) ?? this.listedRelease(repository, prefix)
     })
   }
 
@@ -190,7 +198,7 @@ export class Registries {
     return this.once(`npm ${name}`, async () => {
       if (!NPM_NAME.test(name)) throw new Error(`${name} is not a name of npm`)
       const result = await this.npmRun(['view', name, 'version', 'time', '--json'])
-      if (result.code !== 0) throw new Error(`npm view failed: ${/"code": *"(\w+)"/.exec(result.stdout)?.[1] ?? (result.stderr.trim().split('\n')[0] || `exit code ${result.code}`)}`)
+      if (result.code !== 0) throw new Error(`npm view failed: ${npmReason(result)}`)
       const parsed = JSON.parse(result.stdout) as NpmView | NpmView[]
       const { version, time } = Array.isArray(parsed) ? parsed[0] : parsed
       if (typeof version !== 'string' || !VERSION.test(version)) throw new Error('npm view gave no version')
@@ -257,6 +265,12 @@ export class Registries {
       return response.headers.get('docker-content-digest') ?? undefined
     })
   }
+}
+
+// npm writes the code of its error as JSON, and the text of it apart.
+function npmReason(result: Result): string {
+  const code = /"code": *"(\w+)"/.exec(result.stdout)?.[1]
+  return code ?? (result.stderr.trim().split('\n')[0] || `exit code ${result.code}`)
 }
 
 interface NpmView {
