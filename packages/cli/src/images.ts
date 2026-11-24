@@ -198,7 +198,8 @@ async function readWithGrype(work: Work, tool: Tool): Promise<void> {
 
 // An old database misses the newest CVEs, so the scan says it.
 function notUpdated(work: Work, tool: Tool, result: Result): void {
-  const problem = `its database was not updated: ${lastLine(result.stderr || result.stdout) || `exited with ${result.code}`}`
+  const reason = lastLine(result.stderr || result.stdout) || `exited with ${result.code}`
+  const problem = `its database was not updated: ${reason}`
   work.problems.set(tool.name, problem)
   work.options.log?.(`${tool.name}: ${problem}`)
 }
@@ -377,7 +378,9 @@ async function readAllInFull(work: Work, tool: Tool, jobs: Job[], lists: Map<Job
     for (const name of names ?? []) updated.add(name)
     job.reads.set(tool.name, result)
   }
-  const keep = async (job: Job): Promise<void> => void job.reads.set(tool.name, await read(job, false))
+  const keep = async (job: Job): Promise<void> => {
+    job.reads.set(tool.name, await read(job, false))
+  }
   // The database of Ubuntu takes more than 2 GB for each image, and an image without a list may need it.
   const heavy = later.filter((job) => namesOf(job)?.includes('Ubuntu') ?? true)
   await all(work, later.filter((job) => !heavy.includes(job)), keep)
@@ -398,8 +401,8 @@ async function imageLists(work: Work, tool: Tool): Promise<Map<Job, OsvListed[]>
     }
     const start = Date.now()
     const listing = await listPackages(work, tool, job.image)
-    const failure = typeof listing === 'string' ? listing : undefined
-    work.options.log?.(`${job.step}: ${job.place.label}, ${formatBytes(job.image.bytes)}: osv-scanner list ${failure ? `failed, ${failure}` : 'done'}, ${seconds(start)}`)
+    const outcome = typeof listing === 'string' ? `failed, ${listing}` : 'done'
+    work.options.log?.(`${job.step}: ${job.place.label}, ${formatBytes(job.image.bytes)}: osv-scanner list ${outcome}, ${seconds(start)}`)
     if (typeof listing === 'string') {
       if (listing === RENAMED) job.reads.set(tool.name, listing)
       return
