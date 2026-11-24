@@ -21,7 +21,7 @@ import { openBrowser } from './open.js'
 import { expandHome } from './paths.js'
 import { diskUsage, formatBytes, readReport, renderReport, report, reportFile, type Report } from './report.js'
 import { repositoryRoots } from './roots.js'
-import { countsOf, readScan, renderScan, saveScan, scan, scanFile, type Scan } from './scan.js'
+import { countsOf, imageListsFolder, readScan, renderScan, saveScan, scan, scanFile, type Scan } from './scan.js'
 import { snapshot, type Logger } from './snapshot.js'
 import { git, repositoryRoot } from './store.js'
 import { detectHost, systemKinds, type Host } from './system.js'
@@ -180,7 +180,7 @@ async function scanAndSave(config: Config | undefined, host: Host, flags: ScanFl
   const previous = await readScan(file)
   const packages = named ? Boolean(flags.packages) : !settings.skip.includes('packages')
   const images = named ? Boolean(flags.images) : !settings.skip.includes('images')
-  const result = await scan(config, host, { packages, images, offline: Boolean(flags.offline), unusedDays: settings.unusedDays, previous, log: progress })
+  const result = await scan(config, host, { packages, images, offline: Boolean(flags.offline), unusedDays: settings.unusedDays, lists: imageListsFolder(file), log: progress })
   // A part left out keeps what the last scan found of it.
   const kept = (previous?.places ?? []).filter((place) => (place.kind === 'image' ? !images : !packages))
   result.places.push(...kept)
