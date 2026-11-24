@@ -1,11 +1,12 @@
 import type { Branch, Check, Commit, Detail, Diff, FileChange, LastCommit, Tag } from '@chade/daemon'
+import { aboutSection, readUpdates } from './about.js'
 import { address, get, post } from './api.js'
 import { parseDiff } from './diff.js'
 import { copyHash, element, node, svg } from './dom.js'
 import { counts, diffLines, fileHead, fileOf, label, resizable, resizableSide, statusOf } from './files.js'
 import { ago, changes, checkOf, sync } from './format.js'
 import { layout, type GraphRow } from './graph.js'
-import { badges, list } from './list.js'
+import { badges, list, listAddress } from './list.js'
 import { CHANGED_EVENT, notify, reason, refused, RUNNING } from './notice.js'
 
 type Loaded = Detail & { machine: string; version: string; scannedAt: string }
@@ -388,6 +389,7 @@ function renderBranches(current: Loaded): void {
       current.branches.filter((branch) => branch.remote),
     ),
     ...tagGroup(current.tags),
+    aboutSection(current.repository),
   )
 }
 
@@ -742,6 +744,7 @@ export const repository = {
     detail = undefined
   },
   async show(params: URLSearchParams): Promise<{ machine: string; version: string; scannedAt: string } | void> {
+    element<HTMLAnchorElement>('back').href = listAddress()
     const asked = `${params.get('system')}\n${params.get('path')}`
     target = params.get('commit') ?? undefined
     const file = params.get('file')
@@ -779,6 +782,12 @@ export const repository = {
     }
     render(detail)
     void loadChecks(system, path)
+    void readUpdates()
+      .then(() => {
+        if (detail === loaded) renderBranches(loaded)
+      })
+      // The page shows without the updates when their read fails.
+      .catch(() => undefined)
     return detail
   },
 }

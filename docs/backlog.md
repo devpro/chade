@@ -28,6 +28,17 @@ What is left to do, in the order agreed.
 - The images of podman, which trivy reads with `--image-src podman`, grype as `podman:<image>`, and `podman images --format json` lists.
 - More scanners as layers, each one optional: Docker Scout for images, and a reader of jars without Maven.
 
+## Inventory
+
+- More dependencies: Helm charts, GitHub Actions, GitLab CI, Azure Pipelines, Go, Python and Java.
+- The modules of Terraform, and the providers without a lock file.
+- The images of the Kubernetes manifests and of the Helm values.
+- The arguments of a Dockerfile with a default value, and the properties of MSBuild.
+- Private registries, with the sign-in that their tool has.
+- The tools of dotnet, pipx, uv, snap and Homebrew.
+- The versions of the technologies, with the end of their support.
+- A proxy for the requests that chade makes itself.
+
 ## Restore
 
 - Restore scripts generated from a snapshot, `winget import` and `code --install-extension` for instance.

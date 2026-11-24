@@ -1,4 +1,4 @@
-import { node } from './dom.js'
+import { copyButton, node } from './dom.js'
 
 // Where a link of a page goes: an address, or null when the target is not in the interface, and its text is left unlinked.
 export type Linker = (target: string) => string | null
@@ -83,7 +83,8 @@ function fence(lines: string[], index: number): Parsed | undefined {
   const code: string[] = []
   let next = index + 1
   for (; next < lines.length && !lines[next].startsWith('```'); next++) code.push(lines[next])
-  return { block: wrap('pre', [node('code', code.join('\n'))]), next: next + 1 }
+  const text = code.join('\n')
+  return { block: wrap('div', [wrap('pre', [node('code', text)]), copyButton(text, 'Copy the block')], 'code-block'), next: next + 1 }
 }
 
 function heading(lines: string[], index: number, link: Linker): Parsed | undefined {

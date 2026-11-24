@@ -8,7 +8,7 @@ The interface opens in the browser, the one of Windows on WSL, and the command r
 Its server runs in the background, on `http://127.0.0.1:7843`: the first `chade ui` starts it, and the next ones find it running.
 `--no-open` prints the address without opening it, and `--port <number>` starts the server on another port.
 
-The top of every page names the machine and links to the five pages: Repositories, Store, Report, Security and Docs.
+The top of every page names the machine and links to the seven pages: Repositories, Store, Report, Security, Updates, Inventory and Docs.
 
 ## Server
 
@@ -47,6 +47,10 @@ Pull shows beside a branch behind its upstream, and Push beside a branch ahead a
 They run the Pull and Push of the page of the repository, one at a time, the button turning and a notice in the corner saying what git answered.
 The filter keeps the repositories whose name, path or branch holds every word typed, and the checkbox keeps those with something to commit, push, pull or fix.
 
+The technologies come from the names of the files that git tracks, `package.json` for Node.js for instance.
+A chip for each technology keeps the repositories that have it, and several chips keep those that have all of them.
+The address holds the technologies chosen, so a reload or a copied address shows the same list.
+
 The list reads again every 30 seconds while it is looked at, when its tab comes back to the front, and at Refresh.
 It fetches nothing, so a count behind is the one of the last fetch.
 
@@ -60,6 +64,7 @@ Branches | Local and remote branches, the one checked out marked, each with what
 History  | Commits of every branch and tag from the newest, drawn as a graph, each with the branches and tags pointing at it
 Changes  | Message, author and date of the commit chosen, and the list of the files it changed
 
+- Under the tags come the technologies of the repository, and the link to its [updates](#updates), amber when one fixes a known vulnerability.
 - A branch or a tag chooses the commit it points at, and scrolls the history to it, reading older commits when it is not among those listed.
 - The tags start closed under their heading, which gives their count, and once opened show the 20 newest, then all of them on demand.
 - `⊘` beside a branch hides it: the history leaves out the commits no other branch, tag or HEAD reaches, the branch stays listed and marked hidden, and `◉` shows it again.
@@ -160,6 +165,7 @@ A tab shows each system measured, Windows and the distribution on WSL, with the 
 The tab chosen is the same on Report and Repositories.
 A card with something to clean gives the command or the setting, and a link to its step of the [system clean-up](cleanup.md).
 The page opens on the last report saved, by `chade report` or the [daily run](#daily-runs), and measures one when none is saved.
+Each command has a button that copies it.
 Refresh measures again, which can take a minute.
 The page cleans nothing: `chade clean` does, in a terminal.
 
@@ -168,7 +174,7 @@ The page cleans nothing: `chade clean` does, in a terminal.
 Security shows the last scan `chade scan` saved, which [packages and images](scan.md) describes, with a tab for each kind of place.
 
 Tab          | Content
--------------|------------------------------------------------------------------------------
+-------------|-----------------------------------------------------------------------------
 Repositories | The folders installed in a repository, `node_modules`, `.terraform`, `.venv`
 Installed    | What is installed for the user, global packages, each Node.js of nvm, tools
 Caches       | The npx, NuGet and Terraform caches
@@ -184,7 +190,7 @@ A place nothing uses is marked unused, with its size.
 Opened, it says why and gives the command that removes it, with a button that copies it, which ends every finding in it at once.
 
 Filter      | Effect
-------------|--------------------------------------------------------------------------------------------------------------
+------------|-----------------------------------------------------------------------------------------------------------------
 System      | The places of one system, shown when the machine has several
 Level       | The first level chosen shows it alone, the next ones add to it, and the last one taken away shows them all again
 Unused      | Only the places nothing uses, a critical package nothing uses showing with the command that removes it
@@ -195,9 +201,33 @@ The [report](#report) gives the largest places nothing uses, vulnerable or not.
 Scan runs a new scan behind the page, which takes minutes, and Refresh reads the one a terminal saved since.
 The page removes nothing: the commands run in a terminal.
 
+## Updates
+
+Updates shows what has a newer version in the last [inventory](inventory.md), for one system at a time.
+
+Tab      | Content
+---------|-------------------------------------------------------------------------------------
+Packages | The packages of npm and NuGet, and the providers of Terraform
+Images   | The container images with a newer tag, or with a new image under the same tag
+Tools    | The tools of the machine, and the number of packages that apt can upgrade
+Unknown  | The packages and images whose newest version is unknown and why, when there are some
+
+An update that fixes a known vulnerability comes first, then patch, minor and major versions.
+A chip keeps one size of change, or the updates that fix a vulnerability.
+Opened, an update lists each file that uses it, with the version in use and the command or the text that updates it.
+Tools shows the tools with a newer version, and Also up to date adds the others.
+The address holds the tab, the system and the chip chosen.
+Check asks the registries again behind the page, and Refresh reads the inventory that a terminal saved since.
+The page updates nothing.
+
+## Inventory
+
+Inventory lists the technologies of the repositories, in alphabetical order, with the number of repositories that have each one.
+A link opens the list of the repositories, with only those that have the technology.
+
 ## Daily runs
 
-While the server runs, it scans the disk and measures the report once a day, so the pages open on what the day found.
+While the server runs, it scans the disk, makes the inventory and measures the report once a day, so the pages open on what the day found.
 It looks every hour, the first time a minute after it starts, and runs each one whose last run is a day old, a day the server was stopped being caught up at its next start.
 A run asked from a page while the daily one goes is that same run.
 The output of each run goes to `daemon.log`, beside the configuration.
@@ -205,8 +235,9 @@ The output of each run goes to `daemon.log`, beside the configuration.
 
 ## Docs
 
-Docs shows the [user guide](../README.md), this page, the [configuration](configuration.md), the [system clean-up](cleanup.md) and the [contributor guide](../CONTRIBUTING.md).
+Docs shows the [user guide](../README.md), this page, the [configuration](configuration.md), the [system clean-up](cleanup.md), the [inventory](inventory.md) and the [contributor guide](../CONTRIBUTING.md).
 The pages are bundled with the interface, so they match the version installed and read without a network.
+Each block of code has a button that copies it.
 An image is not shown, as the interface loads nothing from another site.
 
 ## Access

@@ -14,12 +14,12 @@ chade scan
 
 Each system of the machine is read by its own tools, Windows and the distribution both on WSL.
 
-Place                     | What is read                                                                                                                      | Unused when
---------------------------|-----------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------
-Installed for the user    | Global npm and pnpm packages, each Node.js of nvm, pipx, dotnet tools, Go binaries                                                | A Node.js of nvm on Linux is neither the default nor the one running chade
-Installed in a repository | `node_modules`, `.terraform`, `.venv`, and `obj/project.assets.json` of a restored .NET project, under the `repos` of each system | Nothing happened in the repository for 30 days, see below
-Cache                     | The npx cache, the NuGet cache, the Terraform plugin cache                                                                        | Always for npx and NuGet, which their tool fills again
-Container image           | Every image Docker holds                                                                                                          | No container, running or stopped, was created from it
+Place                     | What is read                                                                                                                              | Unused when
+--------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------
+Installed for the user    | Global npm and pnpm packages, each Node.js of nvm, pipx, dotnet tools, Go binaries, those of `/usr/local/bin` and `~/.local/bin` included | A Node.js of nvm on Linux is neither the default nor the one running chade
+Installed in a repository | `node_modules`, `.terraform`, `.venv`, and `obj/project.assets.json` of a restored .NET project, under the `repos` of each system         | Nothing happened in the repository for 30 days, see below
+Cache                     | The npx cache, the NuGet cache, the Terraform plugin cache                                                                                | Always for npx and NuGet, which their tool fills again
+Container image           | Every image Docker holds                                                                                                                  | No container, running or stopped, was created from it
 
 Every place is read by each scanner installed on its system, as each one misses what another finds, and a missing one only takes its layer away.
 What several scanners report of one advisory is one finding, which names them all, as [Scanners](#scanners) says.
@@ -110,7 +110,10 @@ A WSL started before an install does not see the new `PATH` of Windows, so chade
 
 ## Vulnerability databases
 
-The list of the packages never leaves the machine: each scanner downloads its database, and matches the packages on the machine.
+The scan does not send the list of the packages: each scanner downloads its database, and matches the packages on the machine.
+The [inventory](inventory.md) is different: it sends names of packages, images and tools to their registries to know the newest versions.
+The same names go to the same registries when the user runs `npm outdated` or `docker pull`.
+[Shared data](inventory.md#shared-data) lists what each registry receives.
 
 Scanner     | Database                                                                          | Updated
 ------------|-----------------------------------------------------------------------------------|---------------------------------

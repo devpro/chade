@@ -1,5 +1,5 @@
 import { mainRemote, webAddress } from './remote.js'
-import { GIT_TIMEOUT_MS, readRepository, repositoryPath, type Repository, type Root, type Run } from './repositories.js'
+import { GIT_TIMEOUT_MS, readRepository, readTechnologies, repositoryPath, type Repository, type Root, type Run } from './repositories.js'
 import { RequestError } from './server.js'
 
 export interface Commit {
@@ -189,6 +189,7 @@ export async function repositoryDetail(root: Root, relative: string[], run: Run,
   const commits = parseCommits(log.stdout)
   const detail: Detail = { repository, branches, tags: parseTags(tags.stdout), commits: commits.slice(0, count), more: commits.length > count, changes: parseChanges(status.stdout) }
   if (repository.head) detail.last = { message: message.stdout.trim(), pushed: unpushed.stdout.trim() === '' }
+  repository.technologies = await readTechnologies(root, relative, run, repository.head)
   const web = await readWeb(git, repository.branch)
   if (web) detail.web = web
   return detail

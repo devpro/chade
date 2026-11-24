@@ -32,6 +32,13 @@ tasks:
     cmds:
       - npm run dev --workspace=packages/cli -- {{.CLI_ARGS}}
 
+  reload:
+    desc: Build, then restart the server of the web interface and open it, to see a change
+    cmds:
+      - task: build
+      - npm run dev --workspace=packages/cli -- daemon stop
+      - npm run dev --workspace=packages/cli -- ui {{.CLI_ARGS}}
+
   link:
     desc: Put the chade command of this working tree on the PATH, from a fresh build
     deps: [build]

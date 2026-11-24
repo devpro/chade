@@ -14,25 +14,27 @@ Command                     | Effect
 `chade report`              | Measures disk and memory and suggests what to clean, without changing anything, see [system clean-up](cleanup.md)
 `chade clean`               | Runs the `cleanup` steps of the configuration after a confirmation
 `chade scan`                | Reads the packages and container images on the disk for vulnerabilities, malicious packages and what nothing uses, without changing anything, see [packages and images](scan.md)
+`chade inventory`           | Lists the tools and the dependencies of the repositories with their newest versions, without changing anything, see [inventory](inventory.md)
 
 ## Options
 
-Command          | Option             | Effect
------------------|--------------------|--------------------------------------------------------------------
-`chade init`     | `--force`          | Overwrites an existing configuration
-`chade snapshot` | `--dry-run`        | Lists what would be written, without writing or committing
-`chade snapshot` | `--push`           | Pushes the repository of the store after the commit
-`chade snapshot` | `--no-secret-scan` | Commits without the gitleaks scan
-`chade diff`     | `--since <date>`   | Compares with the last snapshot before that date
-`chade diff`     | `--stat`           | Lists the files only
-`chade diff`     | `--machine <name>` | Reads another machine folder
-`chade ui`       | `--no-open`        | Prints the address without opening it
-`chade ui`       | `--port <number>`  | Chooses the port of a server it starts
-`chade daemon`   | `--port <number>`  | Chooses the port of `start`
-`chade report`   | `--json`           | Prints the report as JSON
-`chade clean`    | `--dry-run`        | Shows the steps without running them
-`chade clean`    | `--yes`            | Runs the steps without asking, for a timer or a script
-`chade scan`     | `--json`           | Prints the scan as JSON
-`chade scan`     | `--packages`       | Reads the packages only
-`chade scan`     | `--images`         | Reads the container images only
-`chade scan`     | `--offline`        | Downloads no vulnerability database, and reads those on the machine
+Command           | Option             | Effect
+------------------|--------------------|--------------------------------------------------------------------
+`chade init`      | `--force`          | Overwrites an existing configuration
+`chade snapshot`  | `--dry-run`        | Lists what would be written, without writing or committing
+`chade snapshot`  | `--push`           | Pushes the repository of the store after the commit
+`chade snapshot`  | `--no-secret-scan` | Commits without the gitleaks scan
+`chade diff`      | `--since <date>`   | Compares with the last snapshot before that date
+`chade diff`      | `--stat`           | Lists the files only
+`chade diff`      | `--machine <name>` | Reads another machine folder
+`chade ui`        | `--no-open`        | Prints the address without opening it
+`chade ui`        | `--port <number>`  | Chooses the port of a server it starts
+`chade daemon`    | `--port <number>`  | Chooses the port of `start`
+`chade report`    | `--json`           | Prints the report as JSON
+`chade clean`     | `--dry-run`        | Shows the steps without running them
+`chade clean`     | `--yes`            | Runs the steps without asking, for a timer or a script
+`chade scan`      | `--json`           | Prints the scan as JSON
+`chade scan`      | `--packages`       | Reads the packages only
+`chade scan`      | `--images`         | Reads the container images only
+`chade scan`      | `--offline`        | Downloads no vulnerability database, and reads those on the machine
+`chade inventory` | `--json`           | Prints the inventory as JSON

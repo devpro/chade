@@ -1,4 +1,4 @@
-// The scan and the report run once a day while the server of the web interface runs, each when its last run is a day old.
+// The scan, the inventory and the report run once a day while the server of the web interface runs, each when its last run is a day old.
 // The server is what stays up in the background, so nothing is installed in the system to schedule them,
 // and a day the server was stopped is caught up at its next start.
 

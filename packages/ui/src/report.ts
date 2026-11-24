@@ -1,7 +1,7 @@
 import type { Measure, Report, Section } from '@chade/daemon'
 import { get } from './api.js'
 import { docsAddress } from './docs.js'
-import { element, node } from './dom.js'
+import { copyButton, element, node } from './dom.js'
 import { bytes } from './format.js'
 import { chosenSystem, systemTabs } from './systems.js'
 
@@ -44,7 +44,10 @@ function hintNodes(hints: string[]): HTMLElement[] {
       commands = node('div', '', 'commands')
       created.push(commands)
     }
-    commands.append(node('div', hint.trimStart()))
+    const command = hint.trimStart()
+    const line = node('div')
+    line.append(node('code', command), copyButton(command))
+    commands.append(line)
   }
   return created
 }

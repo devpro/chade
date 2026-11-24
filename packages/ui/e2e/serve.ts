@@ -7,7 +7,7 @@ import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createActions, createApi, startServer, type Report, type Root, type Run, type Scan } from '@chade/daemon'
+import { createActions, createApi, startServer, type Inventory, type Report, type Root, type Run, type Scan } from '@chade/daemon'
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 const stateFile = process.env.E2E_STATE
@@ -65,6 +65,10 @@ function knownAs(folder: string, remote: string, url: string): void {
 
 // More tags than the list of a repository shows at first.
 const clean = repository('wsl-ubuntu', 'clean')
+writeFileSync(join(clean, 'package.json'), '{}\n')
+writeFileSync(join(clean, 'Dockerfile'), 'FROM node:24-alpine\n')
+commit(clean, 'main.tf', '', 'Start clean')
+git(clean, 'push', '--quiet')
 for (let index = 1; index <= 25; index++) git(clean, 'tag', `v0.${index}`)
 
 const ahead = repository('wsl-ubuntu', 'ahead')
@@ -404,6 +408,37 @@ const scanned: Scan = {
   ],
   skipped: [{ system: 'windows', part: 'images', reason: 'none of osv-scanner, trivy, grype is installed on Windows', guide: 'installing-the-scanners' }],
 }
+const use = (repository: string, kind: 'npm' | 'image', name: string, current: string, latest: string | undefined, more = {}) => ({
+  system: 'wsl-ubuntu',
+  repository: join(root, 'wsl-ubuntu', repository),
+  repositoryName: repository,
+  file: kind === 'npm' ? 'package.json' : 'Dockerfile',
+  kind,
+  name,
+  current,
+  ...(latest ? { latest } : {}),
+  ...more,
+})
+// An inventory with what the page tells apart: a fix, each kind of change, a rebuilt image, and tools from several sources.
+const listed: Inventory = {
+  machine: 'E2E-PC',
+  date: new Date(Date.now() - 3600_000).toISOString(),
+  tools: [
+    { system: 'wsl-ubuntu', name: 'flux', version: '2.9.2', latest: '2.10.1', source: 'direct', path: '/usr/local/bin/flux', url: 'https://github.com/fluxcd/flux2/releases/tag/v2.10.1' },
+    { system: 'wsl-ubuntu', name: 'terraform', version: '1.17.2-1', latest: '1.17.2-1', source: 'apt', package: 'terraform' },
+    { system: 'wsl-ubuntu', name: 'trivy', version: '0.75.0', latest: '0.76.2', source: 'apt', package: 'trivy', command: 'sudo apt update && sudo apt install --only-upgrade trivy' },
+    { system: 'windows', name: 'Git', version: '2.51.0', latest: '2.52.0', source: 'winget', package: 'Git.Git', command: 'winget upgrade --id Git.Git --exact' },
+  ],
+  dependencies: [
+    use('clean', 'npm', 'typescript', '6.0.3', '7.0.2', { command: 'npm install typescript@7.0.2' }),
+    use('clean', 'npm', 'lodash', '4.17.15', '4.17.21', { fixes: 2, command: 'npm install lodash@4.17.21', url: 'https://www.npmjs.com/package/lodash' }),
+    use('history', 'npm', 'lodash', '4.17.20', '4.17.21', { command: 'npm install lodash@4.17.21' }),
+    use('clean', 'npm', 'tsx', '4.23.15', '4.23.15'),
+    use('clean', 'image', 'node', '24-alpine', '24-alpine', { rebuilt: true, command: 'docker pull node:24-alpine' }),
+  ],
+  apt: [{ system: 'wsl-ubuntu', upgradable: 8, date: new Date().toISOString() }],
+  problems: [{ system: 'wsl-ubuntu', subject: 'private/app:1.0 in history', reason: 'docker.io answered 401' }],
+}
 const options = {
   version: '0.0.0',
   machine: 'E2E-PC',
@@ -416,6 +451,13 @@ const options = {
     run: async () => {
       await new Promise((resolve) => setTimeout(resolve, 300))
       return { ...scanned, date: new Date().toISOString() }
+    },
+  },
+  inventory: {
+    read: async () => listed,
+    run: async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300))
+      return { ...listed, date: new Date().toISOString() }
     },
   },
   istarci: async () => ({ url: istarciUrl, token: 'e2e-istarci' }),

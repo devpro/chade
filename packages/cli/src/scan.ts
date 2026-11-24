@@ -160,7 +160,7 @@ function keyOf(side: Side, path: string): string {
   return side.windows ? path.replaceAll('\\', '/').toLowerCase() : path
 }
 
-async function pool<T>(items: T[], size: number, work: (item: T) => Promise<void>): Promise<void> {
+export async function pool<T>(items: T[], size: number, work: (item: T) => Promise<void>): Promise<void> {
   let next = 0
   const worker = async (): Promise<void> => {
     while (next < items.length) await work(items[next++])

@@ -55,6 +55,14 @@ test('the report shows each thing measured with its sizes, and what to clean wit
   await shot(report.page, testInfo, 'report')
 })
 
+test('each command of the report has a button that copies it', async ({ page, report, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  const disk = report.card('Windows disk')
+  await disk.card.getByRole('button', { name: 'Copy sudo fstrim -av' }).click()
+  await expect(disk.card.getByRole('button', { name: 'Copied' })).toBeVisible()
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('sudo fstrim -av')
+})
+
 test('the report and the repositories open on the system chosen last on either page', async ({ page, report }) => {
   const repositories = new RepositoriesPage(page)
   await report.showSystem('wsl-ubuntu')

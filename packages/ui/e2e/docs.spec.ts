@@ -3,7 +3,7 @@ import { DocsPage } from './pages/DocsPage.js'
 import { shot } from './shot.js'
 
 test('the documentation shows the pages of the repository, with tables, code and the headings of the page @layout', async ({ page, docs }, testInfo) => {
-  await expect(docs.pages).toHaveText(['User guide', 'Commands', 'Configuration', 'Web interface', 'System clean-up', 'Packages and images', 'Contributor guide'])
+  await expect(docs.pages).toHaveText(['User guide', 'Commands', 'Configuration', 'Web interface', 'System clean-up', 'Packages and images', 'Inventory', 'Contributor guide'])
   await expect(docs.title).toHaveText('Chade')
   await expect(page.locator('#machine')).toHaveText('E2E-PC')
   await expect(docs.headings.first()).toHaveText('Requirements')

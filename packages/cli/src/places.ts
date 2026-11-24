@@ -144,6 +144,8 @@ async function addLinux(side: Side, add: Add): Promise<void> {
   for (const lib of [join(home, '.npm-global'), join(home, '.local'), prefix, '/usr/local', '/usr']) {
     if (lib) await add('machine', join(lib, 'lib', 'node_modules'), folder)
   }
+  // The binaries that the user installed without a package manager.
+  for (const bin of ['/usr/local/bin', join(home, '.local', 'bin')]) await add('machine', bin, folder)
   const npx = join(home, '.npm', '_npx')
   await add('cache', npx, folder, { reason: 'the packages npx fetched, which it fetches again when asked', command: removeCommand(side, npx) })
   const pnpmHome = await side.env('PNPM_HOME')

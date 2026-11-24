@@ -5,7 +5,7 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 import { fileURLToPath } from 'node:url'
-import { createActions, createApi, startServer } from '@chade/daemon'
+import { createActions, createApi, startServer, type Inventory } from '@chade/daemon'
 import { Command } from 'commander'
 import { planCleanup, renderPlan, runCleanup } from './clean.js'
 import { DEFAULT_PORT, removeState, runningDaemon, signInUrl, startDaemon, stopDaemon, writeState, type DaemonState } from './daemon.js'
@@ -14,6 +14,7 @@ import { single, startDaily } from './daily.js'
 import { diff } from './diff.js'
 import { discover } from './discover.js'
 import { run, runInherit } from './exec.js'
+import { inventory, inventoryFile, readInventory, renderInventory, saveInventory } from './inventory.js'
 import { istarciServer } from './istarci.js'
 import { openBrowser } from './open.js'
 import { expandHome } from './paths.js'
@@ -196,6 +197,26 @@ program
     if (countsOf(result).malicious > 0) process.exitCode = 1
   })
 
+// Makes the inventory and saves it, for the interface to show it.
+async function makeInventory(config: Config | undefined, host: Host, progress?: (line: string) => void): Promise<Inventory> {
+  const result = await inventory(config, host, { scan: await readScan(scanFile(configFile())), log: progress })
+  const file = inventoryFile(configFile())
+  await mkdir(dirname(file), { recursive: true })
+  await saveInventory(file, result)
+  return result
+}
+
+program
+  .command('inventory')
+  .description('List the tools of the machine and the dependencies of the repositories, and ask the registries for their newest versions, without changing anything')
+  .option('--json', 'print the inventory as JSON')
+  .action(async (options: { json?: boolean }) => {
+    const config = existsSync(configFile()) ? await loadConfig() : undefined
+    const host = await detectHost({ machine: config?.machine })
+    const result = await makeInventory(config, host, options.json ? undefined : (line) => console.error(line))
+    log.info(options.json ? JSON.stringify(result, null, 2) : renderInventory(result))
+  })
+
 program
   .command('clean')
   .description('Run the clean-up steps the configuration lists, after showing them and a confirmation')
@@ -227,11 +248,12 @@ program
     if (result.failed.length > 0) process.exitCode = 1
   })
 
-// The report and the scan of the server, one run of each at a time, which the page and the daily run share.
-function work(host: Host): { report: () => Promise<Report>; scan: () => Promise<Scan> } {
+// The report, the scan and the inventory of the server, one run of each at a time, which the page and the daily run share.
+function work(host: Host): { report: () => Promise<Report>; scan: () => Promise<Scan>; inventory: () => Promise<Inventory> } {
   return {
     report: single(async () => measureReport(await loadConfig(), host)),
     scan: single(async () => scanMachine(await loadConfig(), host, {})),
+    inventory: single(async () => makeInventory(await loadConfig(), host)),
   }
 }
 
@@ -247,6 +269,10 @@ function routes(host: Host, runs: ReturnType<typeof work>): { api: ReturnType<ty
     scan: {
       read: async () => readScan(scanFile(configFile())),
       run: runs.scan,
+    },
+    inventory: {
+      read: async () => readInventory(inventoryFile(configFile())),
+      run: runs.inventory,
     },
     istarci: async () => istarciServer(homedir()),
     run,
@@ -345,6 +371,8 @@ daemon
       startDaily(
         [
           { name: 'scan', last: async () => (await readScan(scanFile(file)))?.date, run: runs.scan },
+          // After the scan, as it uses what the scan found.
+          { name: 'inventory', last: async () => (await readInventory(inventoryFile(file)))?.date, run: runs.inventory },
           { name: 'report', last: async () => (await readReport(reportFile(file)))?.date, run: runs.report },
         ],
         (line) => log.info(`${new Date().toISOString()} ${line}`),

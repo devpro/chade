@@ -15,6 +15,10 @@ export function chosenSystem(systems: string[]): string | undefined {
   return chosen !== null && systems.includes(chosen) ? chosen : systems[0]
 }
 
+export function chooseSystem(system: string): void {
+  sessionStorage.setItem(TAB_KEY, system)
+}
+
 export function systemTabs(tabs: SystemTab[], shown: string | undefined, chosen: () => void): HTMLElement[] {
   return tabs.map(({ system, count, todo }) => {
     const tab = node('button', '', 'tab')
@@ -27,7 +31,7 @@ export function systemTabs(tabs: SystemTab[], shown: string | undefined, chosen:
       tab.append(mark)
     }
     tab.addEventListener('click', () => {
-      sessionStorage.setItem(TAB_KEY, system)
+      chooseSystem(system)
       chosen()
     })
     return tab
