@@ -4,8 +4,6 @@ runner:
     "markup-lint*": ghcr.io/devpro/ubuntu-node:latest
     "build-test__*": ghcr.io/devpro/ubuntu-node-playwright:latest
   docker: ["image-scan*"]
-  # SonarCloud uses this profile.
-  # The default profile of the local SonarQube, Sonar way core, has only half of its TypeScript rules.
   sonarqube:
     gate: true
     profile: Sonar way comprehensive
