@@ -152,6 +152,14 @@ const steps = Array.from({ length: 320 }, (_, index) => {
 })
 execFileSync('git', ['-C', long, 'fast-import', '--quiet'], { env, input: steps.join('') })
 git(long, 'reset', '--quiet', '--hard')
+// Changes too large to show at once: many files, many lines, and a line of more than 2 MB.
+for (let index = 1; index <= 510; index++) writeFileSync(join(long, `file-${String(index).padStart(3, '0')}.txt`), 'one\n')
+writeFileSync(join(long, 'lines.txt'), 'line\n'.repeat(25_000))
+writeFileSync(join(long, 'app.min.js'), `${'x'.repeat(2_500_000)}\n`)
+git(long, 'switch', '--quiet', '--create', 'large')
+git(long, 'add', '--all')
+git(long, 'commit', '--quiet', '--message', `Add many files\n\nSession: https://example.test/${'a'.repeat(200)}`)
+git(long, 'switch', '--quiet', 'main')
 git(long, 'push', '--quiet')
 
 const portal = repository('windows', 'portal')
@@ -199,7 +207,7 @@ const roots: Root[] = ['windows', 'wsl-ubuntu', 'sandbox', 'missing'].map((syste
 
 const run: Run = async (command, args, options = {}) => {
   try {
-    return { code: 0, stdout: execFileSync(command, args, { cwd: options.cwd, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }), stderr: '' }
+    return { code: 0, stdout: execFileSync(command, args, { cwd: options.cwd, env, maxBuffer: 256 * 1024 * 1024, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }), stderr: '' }
   } catch (error) {
     const failure = error as { status?: number; stdout?: string; stderr?: string }
     return { code: failure.status ?? 1, stdout: failure.stdout ?? '', stderr: failure.stderr ?? '' }

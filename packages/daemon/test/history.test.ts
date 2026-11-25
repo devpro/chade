@@ -4,13 +4,13 @@ import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { before, test } from 'node:test'
-import { createApi, parseBranches, parseChanges, parseCommits, parseTags, RequestError, webAddress, type Detail, type Diff, type Root, type Run } from '../src/index.js'
+import { createApi, parseBranches, parseChangedFiles, parseChanges, parseCommits, parseTags, RequestError, webAddress, type Detail, type Diff, type FilePatch, type Root, type Run } from '../src/index.js'
 
 const env = { ...process.env, GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null', GIT_CONFIG_NOSYSTEM: '1' }
 
 const run: Run = (command, args, options = {}) =>
   new Promise((resolve) => {
-    execFile(command, args, { cwd: options.cwd, env }, (error, stdout, stderr) => {
+    execFile(command, args, { cwd: options.cwd, env, maxBuffer: 64 * 1024 * 1024 }, (error, stdout, stderr) => {
       resolve({ code: error ? (typeof error.code === 'number' ? error.code : 1) : 0, stdout, stderr })
     })
   })
@@ -184,36 +184,91 @@ test('a history longer than asked says there is more', async () => {
   assert.equal(detail.more, true)
 })
 
-test('the diff of a commit gives its message and its patch, a merge against its first parent', async () => {
+const filePatch = async (path: string, target: string, file: string): Promise<FilePatch> => (await api.diff(query({ system: 'linux', path, target, file }))) as FilePatch
+
+test('changed files read with their counts, a renamed one with its earlier path, one in conflict left out', () => {
+  const text =
+    ':100644 100644 aaa bbb M\0a.txt\0:100644 100644 aaa bbb R086\0old.txt\0new.txt\0:000000 100644 000 bbb A\0logo.png\0:000000 100644 000 000 U\0c.txt\0:100644 100644 aaa 000 M\0c.txt\0' +
+    '3\t2\ta.txt\x001\t0\t\0old.txt\0new.txt\0-\t-\tlogo.png\x000\t0\tc.txt\x004\t0\tc.txt\0'
+  assert.deepEqual(parseChangedFiles(text), [
+    { path: 'a.txt', status: 'M', binary: false, additions: 3, deletions: 2 },
+    { path: 'new.txt', from: 'old.txt', status: 'R', binary: false, additions: 1, deletions: 0 },
+    { path: 'logo.png', status: 'A', binary: true },
+  ])
+  assert.deepEqual(parseChangedFiles(''), [])
+})
+
+test('the diff of a commit gives its message and its files, a merge against its first parent', async () => {
   const detail = (await api.repository(query({ system: 'linux', path: work }))) as Detail
-  const change = detail.commits.find((commit) => commit.subject.startsWith('Change a'))
-  const diff = (await api.diff(query({ system: 'linux', path: work, target: change?.hash ?? '' }))) as Diff
+  const change = detail.commits.find((commit) => commit.subject.startsWith('Change a'))?.hash ?? ''
+  const diff = (await api.diff(query({ system: 'linux', path: work, target: change }))) as Diff
   assert.equal(diff.commit?.message, 'Change a, and remove a file\n\nWith a body.')
   assert.equal(diff.commit?.email, 'ada@example.test')
-  assert.match(diff.patch, /^diff --git a\/a\.txt b\/a\.txt/m)
-  assert.match(diff.patch, /^-two$/m)
-  assert.match(diff.patch, /^\+2$/m)
-  assert.match(diff.patch, /^deleted file mode/m)
-  assert.equal(diff.truncated, false)
+  assert.deepEqual(diff.files, [
+    { path: 'a.txt', status: 'M', binary: false, additions: 1, deletions: 1 },
+    { path: 'gone.txt', status: 'D', binary: false, additions: 0, deletions: 1 },
+  ])
+  const changed = await filePatch(work, change, 'a.txt')
+  assert.deepEqual(changed.file, diff.files[0])
+  assert.match(changed.patch, /^-two$/m)
+  assert.match(changed.patch, /^\+2$/m)
+  assert.doesNotMatch(changed.patch, /gone/)
+  assert.match((await filePatch(work, change, 'gone.txt')).patch, /^deleted file mode/m)
   const merge = (await api.diff(query({ system: 'linux', path: work, target: detail.commits[0].hash }))) as Diff
-  assert.match(merge.patch, /^\+feature$/m)
+  assert.deepEqual(
+    merge.files.map((file) => file.path),
+    ['b.txt'],
+  )
+  assert.match((await filePatch(work, detail.commits[0].hash, 'b.txt')).patch, /^\+feature$/m)
 })
 
 test('the diff of the working tree is what is staged, or what is changed and not staged', async () => {
-  const staged = (await api.diff(query({ system: 'linux', path: work, target: 'staged' }))) as Diff
-  assert.equal(staged.commit, undefined)
-  assert.match(staged.patch, /^rename from b\.txt$/m)
-  assert.doesNotMatch(staged.patch, /three/)
-  const unstaged = (await api.diff(query({ system: 'linux', path: work, target: 'unstaged' }))) as Diff
-  assert.match(unstaged.patch, /^\+three$/m)
-  assert.doesNotMatch(unstaged.patch, /rename/)
+  const files = async (target: string) => ((await api.diff(query({ system: 'linux', path: work, target }))) as Diff).files
+  assert.deepEqual(await files('staged'), [{ path: 'c.txt', from: 'b.txt', status: 'R', binary: false, additions: 0, deletions: 0 }])
+  assert.match((await filePatch(work, 'staged', 'c.txt')).patch, /^rename from b\.txt$/m)
+  assert.deepEqual(await files('unstaged'), [{ path: 'a.txt', status: 'M', binary: false, additions: 1, deletions: 0 }])
+  assert.match((await filePatch(work, 'unstaged', 'a.txt')).patch, /^\+three$/m)
   // A file not tracked yet reads as a new file, with its every line added.
-  const untracked = (await api.diff(query({ system: 'linux', path: work, target: 'untracked' }))) as Diff
-  assert.match(untracked.patch, /^diff --git a\/new\.txt b\/new\.txt$/m)
+  assert.deepEqual(await files('untracked'), [{ path: 'new.txt', status: 'A', binary: false, additions: 1, deletions: 0 }])
+  const untracked = await filePatch(work, 'untracked', 'new.txt')
   assert.match(untracked.patch, /^new file mode/m)
   assert.match(untracked.patch, /^\+new$/m)
-  assert.doesNotMatch(untracked.patch, /three/)
-  assert.equal(untracked.truncated, false)
+})
+
+test('a large commit lists its every file, and gives the changes of each one whole', async () => {
+  const large = join(root.folder, 'large')
+  await mkdir(large)
+  await git(large, 'init', '--quiet', '--initial-branch=main')
+  const content = `${'x'.repeat(3 * 1024 * 1024)}\n`
+  await writeFile(join(large, 'a.min.js'), content)
+  await writeFile(join(large, 'b.txt'), 'after the large one\n')
+  // A name that is a pattern, which names that file alone.
+  await writeFile(join(large, '[b].txt'), 'brackets\n')
+  await git(large, 'add', '.')
+  await git(large, 'commit', '--quiet', '-m', 'Large')
+  const target = await git(large, 'rev-parse', 'HEAD')
+  const { files } = (await api.diff(query({ system: 'linux', path: large, target }))) as Diff
+  assert.deepEqual(files.map((file) => file.path).sort(), ['[b].txt', 'a.min.js', 'b.txt'])
+  assert.ok((await filePatch(large, target, 'a.min.js')).patch.includes(`+${content}`))
+  const brackets = await filePatch(large, target, '[b].txt')
+  assert.match(brackets.patch, /^\+brackets$/m)
+  assert.doesNotMatch(brackets.patch, /after/)
+})
+
+test('every untracked file is listed, a repository inside of the repository with no line', async () => {
+  const many = join(root.folder, 'many')
+  await mkdir(join(many, 'nested'), { recursive: true })
+  await git(many, 'init', '--quiet', '--initial-branch=main')
+  await git(join(many, 'nested'), 'init', '--quiet', '--initial-branch=main')
+  await git(join(many, 'nested'), 'commit', '--quiet', '--allow-empty', '-m', 'Start')
+  for (let index = 100; index < 305; index++) await writeFile(join(many, `f${index}.txt`), 'line\n')
+  const { files } = (await api.diff(query({ system: 'linux', path: many, target: 'untracked' }))) as Diff
+  assert.equal(files.length, 206)
+  assert.equal(files[0].additions, 1)
+  // Past the files counted, a file is listed and opens all the same.
+  assert.equal(files[204].additions, undefined)
+  assert.match((await filePatch(many, 'untracked', 'f304.txt')).patch, /^\+line$/m)
+  assert.equal((await filePatch(many, 'untracked', 'nested/')).patch, '')
 })
 
 test('a request reaches only a repository under the repos folders, and only a commit by its full hash', async () => {
@@ -232,6 +287,14 @@ test('a request reaches only a repository under the repos folders, and only a co
   assert.equal(await status(api.diff(query({ system: 'linux', path: '/etc', target: 'staged' }))), 404)
   for (const target of ['', 'HEAD', 'main', '--output=/tmp/x', 'abc123', '-p']) {
     assert.equal(await status(api.diff(query({ system: 'linux', path: work, target }))), 400, target)
+  }
+  for (const [target, file] of [
+    ['staged', 'a.txt'],
+    ['unstaged', '*'],
+    ['untracked', '../../etc/passwd'],
+    ['untracked', 'a.txt'],
+  ]) {
+    assert.equal(await status(api.diff(query({ system: 'linux', path: work, target, file }))), 404, file)
   }
   // A full hash that names no commit is an error of git, not a refused request.
   assert.equal(await status(api.diff(query({ system: 'linux', path: work, target: '0'.repeat(40) }))), 500)

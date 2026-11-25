@@ -1,27 +1,48 @@
-import { parseDiff, type DiffFile } from './diff.js'
+import type { ChangedFile, FilePatch } from '@chade/daemon'
+import { parseDiff } from './diff.js'
 import { element, node } from './dom.js'
 
-// A file of more lines than this is cut, as a page of that length no longer scrolls.
-export const MAX_LINES = 10_000
+// What is longer than this is shown in steps, on demand, as a page with all of it at once is slow to draw and to scroll.
+const FILES_SHOWN = 500
+const LINES_SHOWN = 10_000
+// A minified file has lines of megabytes.
+const CHARACTERS_SHOWN = 2000
 
-const STATUS: Record<DiffFile['status'], string> = { added: 'A', deleted: 'D', renamed: 'R', modified: 'M' }
+const STATUS: Record<string, string> = { A: 'added', C: 'added', D: 'deleted', R: 'renamed' }
+
+// The lists of files asked in full, which stay so when the page draws them again.
+const expanded = new Set<string>()
+
+// The files in a list, the first ones, then all of them on demand.
+export function fileItems<T>(id: string, files: T[], item: (file: T) => HTMLElement): HTMLElement[] {
+  const list = node('ul', '', 'files index')
+  const first = expanded.has(id) ? files.length : FILES_SHOWN
+  list.append(...files.slice(0, first).map(item))
+  if (files.length <= first) return [list]
+  const more = node('button', `Show all ${files.length} files`, 'more')
+  more.addEventListener('click', () => {
+    expanded.add(id)
+    list.append(...files.slice(first).map(item))
+    more.remove()
+  })
+  return [list, more]
+}
 
 export const label = (file: { path: string; from?: string }): string => (file.from ? `${file.from} → ${file.path}` : file.path)
 
-export function statusOf(status: DiffFile['status']): HTMLElement {
-  const created = node('span', STATUS[status], `status ${status}`)
+export function statusOf(letter: string): HTMLElement {
+  const status = STATUS[letter] ?? 'modified'
+  const created = node('span', status[0].toUpperCase(), `status ${status}`)
   created.title = status
   return created
 }
 
-export function counts(file: DiffFile): HTMLElement[] {
+export function counts(file: ChangedFile): HTMLElement[] {
   const created: HTMLElement[] = []
-  if (file.additions > 0) created.push(node('span', `+${file.additions}`, 'additions'))
-  if (file.deletions > 0) created.push(node('span', `−${file.deletions}`, 'deletions'))
+  if (file.additions) created.push(node('span', `+${file.additions}`, 'additions'))
+  if (file.deletions) created.push(node('span', `−${file.deletions}`, 'deletions'))
   return created
 }
-
-export const fileOf = (patch: string, path: string): DiffFile | undefined => parseDiff(patch).find((candidate) => candidate.path === path)
 
 // The title of the file shown in place of a history, with the button that brings the history back.
 export function fileHead(close: () => void, ...content: HTMLElement[]): HTMLElement {
@@ -33,34 +54,66 @@ export function fileHead(close: () => void, ...content: HTMLElement[]): HTMLElem
   return head
 }
 
-function numbered(lines: { kind: string; text: string; before?: number; after?: number }[], what: string): HTMLElement[] {
+interface NumberedLine {
+  kind: string
+  text: string
+  before?: number
+  after?: number
+}
+
+// The text of a line, its start only when it is very long, then the rest on demand.
+function lineText(text: string): HTMLElement {
+  const created = node('span', text.slice(0, CHARACTERS_SHOWN), 'text')
+  const left = text.length - CHARACTERS_SHOWN
+  if (left <= 0) return created
+  const more = node('button', `Show ${left.toLocaleString('en')} more characters`, 'line-rest')
+  more.addEventListener('click', () => (created.textContent = text))
+  created.append(more)
+  return created
+}
+
+function lineOf(line: NumberedLine): HTMLElement {
+  const created = node('div', '', `line ${line.kind}`)
+  // A file read as it is has one number per line, and a comparison the number before and the one after.
+  if (line.kind !== 'content') created.append(node('span', line.before === undefined ? '' : String(line.before), 'number'))
+  created.append(node('span', line.after === undefined ? '' : String(line.after), 'number'))
+  created.append(lineText(line.kind === 'note' ? String.raw`\ ${line.text}` : line.text))
+  return created
+}
+
+function numbered(lines: NumberedLine[]): HTMLElement[] {
   const block = node('div', '', 'lines')
-  for (const line of lines.slice(0, MAX_LINES)) {
-    const created = node('div', '', `line ${line.kind}`)
-    // A file read as it is has one number per line, and a comparison the number before and the one after.
-    if (line.kind !== 'content') created.append(node('span', line.before === undefined ? '' : String(line.before), 'number'))
-    created.append(node('span', line.after === undefined ? '' : String(line.after), 'number'))
-    created.append(node('span', line.kind === 'note' ? String.raw`\ ${line.text}` : line.text, 'text'))
-    block.append(created)
+  const more = node('button', '', 'more')
+  let shown = 0
+  const next = (): void => {
+    for (const line of lines.slice(shown, shown + LINES_SHOWN)) block.append(lineOf(line))
+    shown = Math.min(shown + LINES_SHOWN, lines.length)
+    const left = lines.length - shown
+    if (left === 0) more.remove()
+    else more.textContent = left > LINES_SHOWN ? `Show ${LINES_SHOWN.toLocaleString('en')} more lines of the ${left.toLocaleString('en')} left` : `Show the last ${left.toLocaleString('en')} lines`
   }
-  return lines.length > MAX_LINES ? [block, node('p', `The first ${MAX_LINES} lines of ${what} are shown.`, 'empty')] : [block]
+  more.addEventListener('click', next)
+  next()
+  return shown < lines.length ? [block, more] : [block]
 }
 
 // The changes of one file, line by line, or the reason there is no line to show.
-export function diffLines(file: DiffFile): HTMLElement[] {
+export function diffLines({ file, patch }: FilePatch): HTMLElement[] {
   if (file.binary) return [node('p', 'Binary file, not shown.', 'empty')]
-  if (file.lines.length === 0) return [node('p', file.status === 'renamed' ? 'Renamed, with no change of content.' : 'No change of content.', 'empty')]
-  return numbered(file.lines, 'the changes')
+  const parsed = parseDiff(patch)
+  // A folder that takes the place of a file brings its own files under the path, and a file that becomes a link comes in two parts.
+  // Git quotes a path that holds special characters, and then no path reads as the one asked.
+  const own = parsed.filter((candidate) => candidate.path === file.path)
+  const lines = (own.length > 0 ? own : parsed).flatMap((part) => part.lines)
+  if (lines.length === 0) return [node('p', file.status === 'R' ? 'Renamed, with no change of content.' : 'No change of content.', 'empty')]
+  return numbered(lines)
 }
 
 // The content of one file, each line with its number.
 export function contentLines(content: string): HTMLElement[] {
   if (content === '') return [node('p', 'Empty file.', 'empty')]
   const lines = content.replace(/\n$/, '').split('\n')
-  return numbered(
-    lines.map((text, index) => ({ kind: 'content', text, after: index + 1 })),
-    'the file',
-  )
+  return numbered(lines.map((text, index) => ({ kind: 'content', text, after: index + 1 })))
 }
 
 const WIDTH_KEY = 'chade-history-width'

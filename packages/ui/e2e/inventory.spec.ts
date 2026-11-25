@@ -8,6 +8,8 @@ test('the inventory counts the repositories of each technology, with a link to t
   await shot(page, testInfo, 'inventory')
   await page.getByRole('link', { name: 'Show the Terraform repositories' }).click()
   await expect(page.locator('#content .name')).toHaveText(['clean'])
+  await expect(repositories.technology('Terraform')).toHaveText('Terraform')
+  await shot(page, testInfo, 'repositories-technology')
   await expect(repositories.technology('Terraform')).toHaveAttribute('aria-pressed', 'true')
   // The address follows the filter: another chip, a reload, a repository and back, then none.
   await expect(page).toHaveURL(/#system=wsl-ubuntu&technology=terraform$/)

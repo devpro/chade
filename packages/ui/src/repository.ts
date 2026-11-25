@@ -1,9 +1,8 @@
-import type { Branch, Check, Commit, Detail, Diff, FileChange, LastCommit, Tag } from '@chade/daemon'
+import type { Branch, Check, Commit, Detail, Diff, FileChange, FilePatch, LastCommit, Tag } from '@chade/daemon'
 import { aboutSection, readUpdates } from './about.js'
 import { address, get, post } from './api.js'
-import { parseDiff } from './diff.js'
 import { copyHash, element, node, svg } from './dom.js'
-import { counts, diffLines, fileHead, fileOf, label, resizable, resizableSide, statusOf } from './files.js'
+import { counts, diffLines, fileHead, fileItems, label, resizable, resizableSide, statusOf } from './files.js'
 import { ago, changes, checkOf, sync } from './format.js'
 import { layout, type GraphRow } from './graph.js'
 import { badges, list, listAddress } from './list.js'
@@ -23,8 +22,10 @@ let limit = PAGE
 let target: string | undefined
 // The file whose changes take the place of the history, and the commit or the part of the working tree they are read from.
 let shownFile: { path: string; from: string } | undefined
-// The patch of a commit never changes, so it is asked once.
-const patches = new Map<string, Diff>()
+// The file the view holds, or waits for.
+let renderedFile: string | undefined
+// The files of a commit never change, so they are asked once.
+const diffs = new Map<string, Diff>()
 const rows = new Map<string, HTMLElement>()
 // What IstarCI did with each commit, read after the history so the history never waits for it.
 let checks: Record<string, Check> = {}
@@ -456,10 +457,9 @@ interface FileAction {
   action: 'stage' | 'unstage'
 }
 
-// The files of a patch by name, each one opening its changes in place of the history.
+// The files changed by name, each one opening its changes in place of the history.
 function fileIndex(diff: Diff, from: string, change?: FileAction): HTMLElement[] {
-  const index = node('ul', '', 'files index')
-  for (const file of parseDiff(diff.patch)) {
+  return fileItems(`${key}\n${from}`, diff.files, (file) => {
     const entry = node('button', '', 'file-link')
     entry.append(statusOf(file.status), node('span', label(file), 'file-path'), ...counts(file))
     entry.classList.toggle('selected', shownFile?.path === file.path && shownFile.from === from)
@@ -472,11 +472,8 @@ function fileIndex(diff: Diff, from: string, change?: FileAction): HTMLElement[]
       button.setAttribute('aria-label', `${change.title} ${file.path}`)
       item.append(button)
     }
-    index.append(item)
-  }
-  const created = [index]
-  if (diff.truncated) created.push(node('p', 'The changes are too large to list in full, and stop here.', 'empty'))
-  return created
+    return item
+  })
 }
 
 function fileList(title: string, files: FileChange[], letter: string): HTMLElement[] {
@@ -490,32 +487,47 @@ function fileList(title: string, files: FileChange[], letter: string): HTMLEleme
   return [node('h3', `${title} (${files.length})`), list]
 }
 
-async function patch(current: Loaded, of: string): Promise<Diff> {
-  const cached = patches.get(of)
+async function filesOf(current: Loaded, of: string): Promise<Diff> {
+  const cached = diffs.get(of)
   if (cached) return cached
   const diff = await get<Diff>('diff', { system: current.repository.system, path: current.repository.path, target: of })
   // What is staged changes with the working tree, and is asked again at each read.
-  if (diff.commit) patches.set(of, diff)
+  if (diff.commit) diffs.set(of, diff)
   return diff
 }
+
+const fileId = (): string | undefined => shownFile && `${key}\n${shownFile.from}\n${shownFile.path}`
 
 // The changes of the file chosen, in place of the history, until closed.
 async function renderFile(current: Loaded): Promise<void> {
   const view = element('diff')
   const shown = shownFile
+  const id = fileId()
   element('history').hidden = shown !== undefined
   view.hidden = shown === undefined
-  if (!shown) return view.replaceChildren()
+  if (!shown) {
+    renderedFile = undefined
+    return view.replaceChildren()
+  }
+  const same = renderedFile === id
+  // The changes of a commit stay as they are, with the lines asked and the place scrolled to.
+  if (same && /^[0-9a-f]{40}$/.test(shown.from)) return
+  renderedFile = id
   const close = (): void => open(shown.from, undefined)
+  const head = (): HTMLElement => fileHead(close, node('span', shown.path, 'file-path'))
+  if (!same) view.replaceChildren(head(), node('p', 'Reading the changes…', 'empty'))
   try {
-    const file = fileOf((await patch(current, shown.from)).patch, shown.path)
-    if (shown !== shownFile) return
-    if (!file) return view.replaceChildren(fileHead(close, node('span', shown.path, 'file-path')), node('p', 'This file is no longer among the changes.', 'empty'))
-    view.replaceChildren(fileHead(close, statusOf(file.status), node('span', label(file), 'file-path'), ...counts(file)), ...diffLines(file))
+    const { system, path } = current.repository
+    const answer = await get<FilePatch>('diff', { system, path, target: shown.from, file: shown.path })
+    // The answer for a file left meanwhile is dropped.
+    if (id !== fileId()) return
+    const { file } = answer
+    view.replaceChildren(fileHead(close, statusOf(file.status), node('span', label(file), 'file-path'), ...counts(file)), ...diffLines(answer))
     view.scrollTop = 0
   } catch (error) {
-    if (shown !== shownFile) return
-    view.replaceChildren(fileHead(close, node('span', shown.path, 'file-path')), node('p', error instanceof Error ? error.message : String(error), 'error'))
+    if (id !== fileId()) return
+    renderedFile = undefined
+    view.replaceChildren(head(), node('p', error instanceof Error ? error.message : String(error), 'error'))
   }
 }
 
@@ -542,25 +554,25 @@ async function workingTreeBlocks(current: Loaded): Promise<HTMLElement[]> {
   created.push(commitForm)
   if (staged.length > 0) {
     const all = actionButton('Unstage all', 'Take every file out of the index', (button) => void act({ action: 'unstage' }, 'Unstaged every file', button))
-    created.push(title(`Staged (${staged.length})`, all), ...fileIndex(await patch(current, 'staged'), 'staged', { text: '−', title: 'Unstage', action: 'unstage' }))
+    created.push(title(`Staged (${staged.length})`, all), ...fileIndex(await filesOf(current, 'staged'), 'staged', { text: '−', title: 'Unstage', action: 'unstage' }))
   }
   if (unstaged.length + conflicts.length > 0) {
     const all = unstaged.length > 0 ? actionButton('Stage all', 'Stage every changed file', (button) => void act({ action: 'stage', files: paths(unstaged) }, 'Staged the changed files', button)) : undefined
     // The two Stage all buttons of the panel are told apart by what they stage.
     all?.setAttribute('aria-label', 'Stage all changed files')
-    created.push(title(`Not staged (${unstaged.length + conflicts.length})`, all), ...fileIndex(await patch(current, 'unstaged'), 'unstaged', stage))
+    created.push(title(`Not staged (${unstaged.length + conflicts.length})`, all), ...fileIndex(await filesOf(current, 'unstaged'), 'unstaged', stage))
   }
   if (untracked.length > 0) {
     const all = actionButton('Stage all', 'Stage every file not tracked', (button) => void act({ action: 'stage', files: paths(untracked) }, 'Staged the new files', button))
     all.setAttribute('aria-label', 'Stage all new files')
-    created.push(title(`Untracked (${untracked.length})`, all), ...fileIndex(await patch(current, 'untracked'), 'untracked', stage))
+    created.push(title(`Untracked (${untracked.length})`, all), ...fileIndex(await filesOf(current, 'untracked'), 'untracked', stage))
   }
   return created
 }
 
 async function commitBlocks(current: Loaded, shown: string): Promise<HTMLElement[]> {
   const created: HTMLElement[] = []
-  const diff = await patch(current, shown)
+  const diff = await filesOf(current, shown)
   const [subject, ...body] = (diff.commit?.message ?? '').split('\n')
   created.push(node('h2', subject))
   if (body.join('\n').trim()) created.push(node('pre', body.join('\n').trim(), 'body'))
@@ -572,7 +584,7 @@ async function commitBlocks(current: Loaded, shown: string): Promise<HTMLElement
   fact.dataset.hash = shown
   paintFact(fact, shown)
   created.push(fact)
-  if (diff.patch === '') created.push(node('p', 'This commit changes no file.', 'empty'))
+  if (diff.files.length === 0) created.push(node('p', 'This commit changes no file.', 'empty'))
   else created.push(node('h3', 'Files'), ...fileIndex(diff, shown))
   return created
 }
@@ -755,7 +767,8 @@ export const repository = {
     key = asked
     limit = PAGE
     detail = undefined
-    patches.clear()
+    diffs.clear()
+    renderedFile = undefined
     checks = {}
     hidden = readHidden()
     allTags = false

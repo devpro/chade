@@ -1,5 +1,6 @@
 export { ACTIONS, runAction, type ActionRequest } from './actions.js'
 export { createActions, createApi, type ApiOptions } from './api.js'
+export { parseChangedFiles, type ChangedFile, type FilePatch } from './changes.js'
 export {
   parseBranches,
   parseChanges,
@@ -7,6 +8,7 @@ export {
   parseTags,
   repositoryDetail,
   repositoryDiff,
+  repositoryFilePatch,
   type Branch,
   type Commit,
   type Detail,
@@ -44,15 +46,14 @@ export { trimTrailing } from './text.js'
 export { RequestError, startServer, type Server, type ServerOptions } from './server.js'
 export {
   parseSnapshots,
-  parseStoredChanges,
   readSnapshot,
   readSnapshotFile,
   readSnapshotFiles,
+  readSnapshotPatch,
   readStore,
   type Machine,
   type Snapshot,
   type SnapshotDetail,
   type Store,
-  type StoredChange,
   type StoredFile,
 } from './store.js'

@@ -853,6 +853,7 @@ td.ci {
   margin: 12px 0 6px;
   font-size: 15px;
   line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .pane-detail h3 {
@@ -864,6 +865,7 @@ td.ci {
   color: var(--muted);
   font: 13px/1.5 system-ui, sans-serif;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .facts {
@@ -973,6 +975,18 @@ td.ci {
 .line .text {
   padding-left: 8px;
   white-space: pre;
+}
+
+/* It stays in view at the edge, as the end of the text shown can be far to the right. */
+.line-rest {
+  position: sticky;
+  right: 0;
+  padding: 0 8px;
+  border: 0;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
 }
 
 .line.add {

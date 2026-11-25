@@ -85,7 +85,8 @@ Changes  | Message, author and date of the commit chosen, and the list of the fi
 - A merge shows what it brought to its first parent, the branch it was merged into.
 - With changes in the working tree, a first line, Uncommitted changes, lists what is staged, not staged and not tracked.
 - The history lists 300 commits, and a button at its end shows 300 older ones.
-- The changes of a file stop after 10,000 lines, and a patch of more than 2 MB is cut.
+- Every file of a commit is listed, whatever the size of its changes, and the changes of a file are read when it opens.
+- What is long is shown in steps, the rest on demand: 500 files of a list, 10,000 lines of a file, 2,000 characters of a line.
 - The bar between the history and the changes is dragged to share the room, and a double click resets it.
 - The bar between the branches and the history is dragged to widen the branches, and a double click resets it.
 - The address names the repository, the commit and the file, so the back button of the browser works.
@@ -165,6 +166,7 @@ Snapshot  | Message, author and date of the snapshot chosen, then its changes or
 - The page opens on the machine the server runs on, and on its last snapshot.
 - Changes lists what the snapshot changed since the one before on the same machine, the first snapshot adding every file.
 - Files lists every file the machine had at the snapshot, and a file opens its content.
+- What is long is shown in steps, as on the page of a repository.
 - When the repository of the store is under `repos`, a link opens its page, where a snapshot is pushed from.
 - The 300 last snapshots of a machine are listed, and a button at their end shows 300 older ones.
 
@@ -268,6 +270,7 @@ An image is not shown, as the interface loads nothing from another site.
   The page keeps the token for the tab, and takes it out of the address bar and of the history.
 - A request named after another host, or sent by another site, is refused, so another web page can neither read the interface nor act through it.
 - An action is a JSON request with the token, which a form of another site cannot send.
+- A read of changes names a file among those git lists for the commit or the working tree.
 - An action names a repository among those under `repos`, a branch among those git lists, and a file among the changes git lists, so it reaches nothing else of the machine.
 - A read of the store names a machine among its folders, a snapshot among its commits, and a file among those of that snapshot, so it reaches nothing else.
 - IstarCI is asked on `127.0.0.1` alone, and its token stays in the server, never sent to the page.

@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { runAction, type ActionRequest } from './actions.js'
-import { branchLoss, repositoryDetail, repositoryDiff } from './history.js'
+import { branchLoss, repositoryDetail, repositoryDiff, repositoryFilePatch } from './history.js'
 import { existsSync } from 'node:fs'
 import { pathKey, readChecks, readRepositories, type IstarciServer, type RepositoryCheck } from './istarci.js'
 import { findRepositories, findRepository, listRepositories, repositoryPath, type Root, type Run } from './repositories.js'
@@ -9,7 +9,7 @@ import type { LogLine } from './log.js'
 import type { Report } from './report.js'
 import type { Scan } from './scan.js'
 import { RequestError, type ServerOptions } from './server.js'
-import { readSnapshot, readSnapshotFile, readSnapshotFiles, readStore, storeRepository } from './store.js'
+import { readSnapshot, readSnapshotFile, readSnapshotFiles, readSnapshotPatch, readStore, storeRepository } from './store.js'
 
 export interface ApiOptions {
   version: string
@@ -143,7 +143,8 @@ export function createApi(options: ApiOptions): ServerOptions['api'] {
       const { root, relative } = await repository(query)
       const target = query.get('target') ?? ''
       if (!/^(staged|unstaged|untracked|[0-9a-f]{40})$/.test(target)) throw new RequestError(400, 'the target of a diff is staged, unstaged, untracked or the full hash of a commit')
-      return repositoryDiff(root, relative, options.run, target)
+      const path = query.get('file')
+      return path ? repositoryFilePatch(root, relative, options.run, target, path) : repositoryDiff(root, relative, options.run, target)
     },
     store: async (query) => {
       const folder = await options.store()
@@ -153,6 +154,8 @@ export function createApi(options: ApiOptions): ServerOptions['api'] {
     },
     snapshot: async (query) => {
       const { machine, commit } = snapshot(query)
+      const path = query.get('path')
+      if (path) return readSnapshotPatch(await options.store(), options.run, machine, commit, path)
       return readSnapshot(await options.store(), options.run, machine, commit)
     },
     'snapshot-files': async (query) => {

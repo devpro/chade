@@ -121,14 +121,12 @@ function addressValues(): Record<string, string | undefined> {
 // The chips of the technologies that the repositories of the system have.
 // A repository shows when it has each technology that is pressed.
 function renderTechnologies(repositories: Repository[]): void {
-  const counts = new Map<string, number>()
-  for (const id of repositories.flatMap((repository) => repository.technologies ?? [])) counts.set(id, (counts.get(id) ?? 0) + 1)
-  wanted = new Set([...wanted].filter((id) => counts.has(id)))
-  const chips = TECHNOLOGIES.filter(({ id }) => counts.has(id)).map(({ id, name }) => {
+  const found = new Set(repositories.flatMap((repository) => repository.technologies ?? []))
+  wanted = new Set([...wanted].filter((id) => found.has(id)))
+  const chips = TECHNOLOGIES.filter(({ id }) => found.has(id)).map(({ id, name }) => {
     const chip = node('button', name, 'chip quiet') as HTMLButtonElement
     chip.type = 'button'
     chip.setAttribute('aria-pressed', String(wanted.has(id)))
-    chip.append(node('span', String(counts.get(id)), 'chip-count'))
     chip.addEventListener('click', () => {
       if (!wanted.delete(id)) wanted.add(id)
       render()

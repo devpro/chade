@@ -1,15 +1,13 @@
-import type { Machine, SnapshotDetail, Store, StoredFile } from '@chade/daemon'
+import type { FilePatch, Machine, SnapshotDetail, Store, StoredFile } from '@chade/daemon'
 import { address, get } from './api.js'
-import { parseDiff, type DiffFile } from './diff.js'
 import { copyHash, element, node, svg } from './dom.js'
-import { contentLines, counts, diffLines, fileHead, label, resizable, resizableSide, statusOf } from './files.js'
+import { contentLines, counts, diffLines, fileHead, fileItems, label, resizable, resizableSide, statusOf } from './files.js'
 import { ago } from './format.js'
 
 type Loaded = Store & { machine: string; version: string; scannedAt: string }
 
 const PAGE = 300
 const ROW = 28
-const STATUSES: Record<string, DiffFile['status']> = { A: 'added', D: 'deleted', R: 'renamed', C: 'added', M: 'modified', T: 'modified' }
 
 let loaded: Loaded | undefined
 let limit = PAGE
@@ -18,6 +16,7 @@ let asked: { machine?: string; commit?: string; files: boolean; file?: string } 
 // A snapshot is a commit, which never changes, so what is read of one is asked once.
 const details = new Map<string, SnapshotDetail>()
 const trees = new Map<string, string[]>()
+const patches = new Map<string, FilePatch>()
 const contents = new Map<string, StoredFile>()
 
 function cached<T>(cache: Map<string, T>, key: string, read: () => Promise<T>): Promise<T> {
@@ -100,17 +99,16 @@ function grouped<T extends { path: string }>(machine: string, files: T[]): Map<s
 function fileLists<T extends { path: string }>(machine: string, files: T[], entry: (file: T, name: string) => HTMLElement[], open: (path: string) => void): HTMLElement[] {
   const created: HTMLElement[] = []
   for (const [system, members] of grouped(machine, files)) {
-    const list = node('ul', '', 'files index')
-    for (const { file, name } of members) {
+    const list = fileItems(`${machine}\n${asked.commit}\n${asked.files}\n${system}`, members, ({ file, name }) => {
       const link = node('button', '', `file-link${asked.file === file.path ? ' selected' : ''}`)
       link.append(...entry(file, name))
       link.title = file.path
       link.addEventListener('click', () => open(file.path))
       const item = node('li')
       item.append(link)
-      list.append(item)
-    }
-    created.push(node('h3', `${system || 'Machine'} (${members.length})`), list)
+      return item
+    })
+    created.push(node('h3', `${system || 'Machine'} (${members.length})`), ...list)
   }
   return created
 }
@@ -123,21 +121,15 @@ const place = (): string => JSON.stringify(asked)
 // A file as the snapshot holds it, in the Files view.
 async function fileContent(machine: string, commit: string, path: string, close: () => void, name: HTMLElement): Promise<HTMLElement[]> {
   const file = await cached(contents, `${commit}\n${path}`, () => get<StoredFile>('snapshot-file', { ...snapshotQuery(machine, commit), path }))
-  const created = [fileHead(close, name), ...(file.binary ? [node('p', 'Binary file, not shown.', 'empty')] : contentLines(file.content))]
-  if (file.truncated) created.push(node('p', 'The file is too large to show in full, and stops here.', 'empty'))
-  return created
+  return [fileHead(close, name), ...(file.binary ? [node('p', 'Binary file, not shown.', 'empty')] : contentLines(file.content))]
 }
 
 // What the snapshot changed of a file, in the Changes view.
 async function fileChanges(machine: string, commit: string, path: string, close: () => void, name: HTMLElement): Promise<HTMLElement[]> {
-  const detail = await cached(details, commit, () => get<SnapshotDetail>('snapshot', snapshotQuery(machine, commit)))
-  const file = parseDiff(detail.patch).find((candidate) => candidate.path === path)
-  if (file) {
-    name.textContent = label({ path: file.path.slice(machine.length + 1), from: file.from?.slice(machine.length + 1) })
-    return [fileHead(close, statusOf(file.status), name, ...counts(file)), ...diffLines(file)]
-  }
-  const known = detail.changes.some((change) => change.path === path)
-  return [fileHead(close, name), node('p', known ? 'The changes of this snapshot are too large to show those of this file. Files shows its content.' : 'This snapshot did not change this file.', 'empty')]
+  const answer = await cached(patches, `${commit}\n${path}`, () => get<FilePatch>('snapshot', { ...snapshotQuery(machine, commit), path }))
+  const { file } = answer
+  name.textContent = label({ path: file.path.slice(machine.length + 1), from: file.from?.slice(machine.length + 1) })
+  return [fileHead(close, statusOf(file.status), name, ...counts(file)), ...diffLines(answer)]
 }
 
 async function renderFile(machine: string, commit: string): Promise<void> {
@@ -171,22 +163,19 @@ function snapshotFiles(machine: string, commit: string, detail: SnapshotDetail, 
         (path) => go({ machine, commit, files: true, file: path }),
       ),
     )
-  } else if (detail.changes.length === 0) created.push(node('p', 'This snapshot changed no file of the machine.', 'empty'))
+  } else if (detail.files.length === 0) created.push(node('p', 'This snapshot changed no file of the machine.', 'empty'))
   else {
-    const patched = new Map(parseDiff(detail.patch).map((file) => [file.path, file]))
     created.push(
       ...fileLists(
         machine,
-        detail.changes,
+        detail.files,
         (change, name) => {
-          const file = patched.get(change.path)
           const from = change.from?.split('/').slice(2).join('/')
-          return [statusOf(STATUSES[change.status] ?? 'modified'), node('span', label({ path: name, from }), 'file-path'), ...(file ? counts(file) : [])]
+          return [statusOf(change.status), node('span', label({ path: name, from }), 'file-path'), ...counts(change)]
         },
         (path) => go({ machine, commit, file: path }),
       ),
     )
-    if (detail.truncated) created.push(node('p', 'The changes are too large to show in full: the last files open without their lines.', 'empty'))
   }
   return created
 }
@@ -227,7 +216,7 @@ async function renderDetail(current: Loaded, machine: Machine | undefined, commi
       tab.addEventListener('click', () => go({ machine: machine.name, commit, files }))
       return tab
     }
-    views.append(view('Changes', 'What the snapshot changed since the one before', false, detail.changes.length), view('Files', 'Every file the machine had at the snapshot', true, tree?.length))
+    views.append(view('Changes', 'What the snapshot changed since the one before', false, detail.files.length), view('Files', 'Every file the machine had at the snapshot', true, tree?.length))
     created.push(views, ...snapshotFiles(machine.name, commit, detail, tree))
     panel.replaceChildren(...created)
   } catch (error) {

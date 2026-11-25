@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { before, test } from 'node:test'
-import { createApi, parseSnapshots, parseStoredChanges, RequestError, type Report, type Root, type Run, type SnapshotDetail, type Store, type StoredFile } from '../src/index.js'
+import { createApi, parseSnapshots, RequestError, type FilePatch, type Report, type Root, type Run, type SnapshotDetail, type Store, type StoredFile } from '../src/index.js'
 
 const env = { ...process.env, GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null', GIT_CONFIG_NOSYSTEM: '1' }
 
@@ -27,15 +27,6 @@ test('snapshots read from the log, a subject kept whole', () => {
     { hash: 'c2', author: 'Ada', date: '2026-11-10T18:12:00+01:00', subject: 'PC-A: snapshot of linux, 2026-11-10 18:12' },
     { hash: 'c1', author: 'Ada', date: '2026-11-09T10:00:00+01:00', subject: 'First' },
   ])
-})
-
-test('the files a snapshot changed read with their letter, a renamed one with its earlier path', () => {
-  assert.deepEqual(parseStoredChanges('M\0PC-A/linux/a.txt\0R100\0PC-A/linux/old.txt\0PC-A/linux/new.txt\0D\0PC-A/linux/gone.txt\0'), [
-    { path: 'PC-A/linux/a.txt', status: 'M' },
-    { path: 'PC-A/linux/new.txt', from: 'PC-A/linux/old.txt', status: 'R' },
-    { path: 'PC-A/linux/gone.txt', status: 'D' },
-  ])
-  assert.deepEqual(parseStoredChanges(''), [])
 })
 
 let folder: string
@@ -132,26 +123,27 @@ test('a snapshot gives what it changed since the one before on the same machine,
   // The commits in between, of another machine and of the notes, are not what it is compared with.
   assert.equal(detail.previous, hashes.first)
   assert.equal(detail.commit?.message, 'PC-A: snapshot of linux, windows, 2026-11-10 18:12')
-  assert.deepEqual(detail.changes, [
+  assert.deepEqual(detail.files.map(({ path, from, status }) => ({ path, ...(from ? { from } : {}), status })), [
     { path: 'PC-A/linux/inventories/apt-manual.txt', status: 'M' },
     { path: 'PC-A/linux/inventories/new name.txt', from: 'PC-A/linux/inventories/old name.txt', status: 'R' },
     { path: 'PC-A/windows/files/C/Users/ada/.wslconfig', status: 'D' },
     { path: 'PC-A/windows/inventories/winget.json', status: 'A' },
   ])
-  assert.match(detail.patch, /^diff --git a\/PC-A\/linux\/inventories\/apt-manual\.txt b\/PC-A\/linux\/inventories\/apt-manual\.txt$/m)
-  assert.match(detail.patch, /^\+curl$/m)
-  assert.doesNotMatch(detail.patch, /README|PC-B|systems\//)
-  assert.equal(detail.truncated, false)
+  const { patch } = (await api.snapshot(query({ machine: 'PC-A', commit: hashes.second, path: 'PC-A/linux/inventories/apt-manual.txt' }))) as FilePatch
+  assert.match(patch, /^diff --git a\/PC-A\/linux\/inventories\/apt-manual\.txt b\/PC-A\/linux\/inventories\/apt-manual\.txt$/m)
+  assert.match(patch, /^\+curl$/m)
+  assert.doesNotMatch(patch, /README|PC-B|systems\/|winget/)
 })
 
 test('the first snapshot of a machine is compared with nothing, so every file is added', async () => {
   const detail = (await api.snapshot(query({ machine: 'PC-B', commit: hashes.other }))) as SnapshotDetail
   assert.equal(detail.previous, undefined)
-  assert.deepEqual(detail.changes, [
+  assert.deepEqual(detail.files.map(({ path, from, status }) => ({ path, ...(from ? { from } : {}), status })), [
     { path: 'PC-B/linux/files/etc/hostname', status: 'A' },
     { path: 'PC-B/linux/files/icon.bin', status: 'A' },
   ])
-  assert.match(detail.patch, /^\+pc-b$/m)
+  const { patch } = (await api.snapshot(query({ machine: 'PC-B', commit: hashes.other, path: 'PC-B/linux/files/etc/hostname' }))) as FilePatch
+  assert.match(patch, /^\+pc-b$/m)
 })
 
 test('a snapshot lists every file the machine had then, and gives the content of one', async () => {
@@ -163,14 +155,14 @@ test('a snapshot lists every file the machine had then, and gives the content of
     'PC-A/windows/files/C/Users/ada/.wslconfig',
   ])
   const then = (await api['snapshot-file'](query({ machine: 'PC-A', commit: hashes.first, path: 'PC-A/linux/files/etc/wsl.conf' }))) as StoredFile
-  assert.deepEqual(then, { path: 'PC-A/linux/files/etc/wsl.conf', content: '[boot]\nsystemd=true\n', truncated: false, binary: false })
+  assert.deepEqual(then, { path: 'PC-A/linux/files/etc/wsl.conf', content: '[boot]\nsystemd=true\n', binary: false })
   const now = (await api['snapshot-file'](query({ machine: 'PC-A', commit: hashes.third, path: 'PC-A/linux/files/etc/wsl.conf' }))) as StoredFile
   assert.equal(now.content, '[boot]\nsystemd=false\n')
 })
 
 test('a file that is not text is said so, without its bytes', async () => {
   const file = (await api['snapshot-file'](query({ machine: 'PC-B', commit: hashes.other, path: 'PC-B/linux/files/icon.bin' }))) as StoredFile
-  assert.deepEqual(file, { path: 'PC-B/linux/files/icon.bin', content: '', truncated: false, binary: true })
+  assert.deepEqual(file, { path: 'PC-B/linux/files/icon.bin', content: '', binary: true })
 })
 
 test('a request reaches a machine, a snapshot and a file only among those git lists', async () => {
@@ -188,6 +180,9 @@ test('a request reaches a machine, a snapshot and a file only among those git li
   await refused('snapshot', { machine: 'PC-A', commit: '--all' }, 400)
   // A commit of the repository, and of the store, that is not one of that machine.
   await refused('snapshot', { machine: 'PC-A', commit: hashes.other }, 404)
+  // A file the snapshot did not change, and one of another machine.
+  await refused('snapshot', { machine: 'PC-A', commit: hashes.third, path: 'PC-A/linux/inventories/apt-manual.txt' }, 404)
+  await refused('snapshot', { machine: 'PC-A', commit: hashes.third, path: 'PC-B/linux/files/etc/hostname' }, 404)
   await refused('snapshot-files', { machine: 'PC-B', commit: hashes.third }, 404)
   await refused('snapshot-file', { machine: 'PC-A', commit: hashes.third }, 400)
   await refused('snapshot-file', { machine: 'PC-A', commit: hashes.third, path: '../README.md' }, 404)
