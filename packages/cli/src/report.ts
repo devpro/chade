@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { lstat, readdir, readFile, stat, statfs } from 'node:fs/promises'
+import { readdir, readFile, stat, statfs } from 'node:fs/promises'
 import { freemem, totalmem } from 'node:os'
 import { dirname, join } from 'node:path'
 import { countsOf, findRepositories, SEVERITIES, trimTrailing, type Measure, type Report, type Scan, type Section } from '@chade/daemon'

@@ -102,7 +102,7 @@ export function createApi(options: ApiOptions): ServerOptions['api'] {
   // A report asked while one is measured is that one, as two would measure the same machine twice at once.
   let measuring: Promise<Report> | undefined
   return {
-    ping: async () => ({ version: options.version, machine: options.machine }),
+    ping: () => Promise.resolve({ version: options.version, machine: options.machine }),
     state: async () => ({
       version: options.version,
       machine: options.machine,

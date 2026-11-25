@@ -14,7 +14,10 @@ The README stays short, and the reference lives in `docs/`, bundled as the Docs 
 
 A change of the interface is checked with `task ui:screenshots`, and by looking at the screenshots it saves.
 
-A change is finished when the IstarCI run of its commit passes, `istarci wait`, the Sonar quality gate included.
+A change is finished when the IstarCI run of its commit passes, `istarci wait`, the Sonar quality gate included, and `task sonar` finds no open finding.
+
+Every Sonar finding is investigated, local or on SonarCloud, old or new, whatever change caused it.
+It is then fixed, or accepted in `sonar-project.properties` with its reason.
 
 CONTRIBUTING.md lists the tasks, `task check` runs what CI runs.
 

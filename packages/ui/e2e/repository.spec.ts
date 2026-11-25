@@ -1,4 +1,6 @@
+import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import type { Locator } from '@playwright/test'
 import { expect, test } from './fixtures.js'
 import { RepositoryPage } from './pages/RepositoryPage.js'
 import { shot } from './shot.js'
@@ -312,4 +314,42 @@ test('a large commit lists its every file and shows its every line, in steps', a
   await shot(page, testInfo, 'large-lines')
   await page.getByRole('button', { name: 'Show the last 5,001 lines' }).click()
   await expect(long.comparison.added).toHaveCount(25_000)
+})
+
+test('the list of uncommitted changes and the file shown keep their scroll positions when a file is chosen and when the page is read again', async ({ page, server }) => {
+  const folder = join(server.root, 'sandbox', 'long')
+  const names = Array.from({ length: 80 }, (_, index) => `new-${String(index).padStart(2, '0')}.txt`)
+  const top = (view: Locator): Promise<number> => view.evaluate((shown) => shown.scrollTop)
+  const refresh = async (): Promise<void> => {
+    const answer = page.waitForResponse((response) => response.url().includes('/api/diff') && response.url().includes('file='))
+    await page.getByRole('button', { name: 'Refresh' }).click()
+    await answer
+    await expect(page.getByRole('button', { name: 'Refresh' })).toBeEnabled()
+    await page.waitForTimeout(300)
+  }
+  for (const name of names) writeFileSync(join(folder, name), 'line\n'.repeat(400))
+  try {
+    const long = new RepositoryPage(page)
+    await long.signIn(server.url, 'sandbox', folder)
+    await long.expectOpen('long')
+    await long.workingTree.click()
+    await expect(long.files).toHaveCount(80)
+    await long.changes.evaluate((panel) => (panel.scrollTop = 900))
+    for (const name of ['new-40.txt', 'new-42.txt', 'new-45.txt']) {
+      const before = await top(long.changes)
+      expect(before).toBe(900)
+      await long.openFile(name)
+      await expect(long.comparison.added).toHaveCount(400)
+      await page.waitForTimeout(300)
+      expect(await top(long.changes)).toBe(before)
+      // A file just chosen starts from its first line.
+      expect(await top(long.comparison.view)).toBe(0)
+      await long.comparison.view.evaluate((view) => (view.scrollTop = 600))
+    }
+    await refresh()
+    expect(await top(long.changes)).toBe(900)
+    expect(await top(long.comparison.view)).toBe(600)
+  } finally {
+    for (const name of names) rmSync(join(folder, name))
+  }
 })

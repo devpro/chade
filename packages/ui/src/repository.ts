@@ -522,8 +522,10 @@ async function renderFile(current: Loaded): Promise<void> {
     // The answer for a file left meanwhile is dropped.
     if (id !== fileId()) return
     const { file } = answer
+    const scrolled = same ? view.scrollTop : 0
     view.replaceChildren(fileHead(close, statusOf(file.status), node('span', label(file), 'file-path'), ...counts(file)), ...diffLines(answer))
-    view.scrollTop = 0
+    // A file read again keeps its scroll position.
+    view.scrollTop = scrolled
   } catch (error) {
     if (id !== fileId()) return
     renderedFile = undefined
@@ -605,9 +607,12 @@ async function renderDetail(current: Loaded): Promise<void> {
     if (shown !== target) return
     // A message being written keeps its place and its caret, which taking the box out of the page and back would lose.
     const writing = document.activeElement === message ? [message.selectionStart, message.selectionEnd] : undefined
+    // The commit form moves from the old content to the new one, and the browser then changes the scroll position.
+    const scrolled = panel.scrollTop
     panel.replaceChildren(...created)
+    panel.scrollTop = scrolled
     if (writing && message.isConnected) {
-      message.focus()
+      message.focus({ preventScroll: true })
       message.setSelectionRange(writing[0], writing[1])
     }
   } catch (error) {

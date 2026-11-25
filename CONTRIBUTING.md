@@ -84,6 +84,7 @@ Task                      | Effect
 `task ui:screenshots`     | Runs them on the two target screens and in the dark theme, and saves a screenshot of each state for review
 `task test:pkg`           | Runs the packaging smoke test
 `task check`              | Runs what CI runs: typecheck, build, unit tests, packaging smoke test, end to end tests
+`task sonar`              | Fails when the local Sonar analysis of the commit checked out has an open finding, old or new
 `task dev:bump`           | Bumps `chade` to the next patch version, in `packages/cli/package.json` and `package-lock.json`
 `task lab:lint`           | Checks the demo lab of `labs/demo` with the sidelab checkout beside this repository, see [labs](labs/README.md)
 `task lab:verify`         | Runs the blocks of the demo lab against a disposable sidelab launcher
@@ -209,6 +210,7 @@ The unit tests of a Linux host are skipped on Windows, and the smoke test config
 
 The Build & Test job analyzes the code on [SonarCloud](https://sonarcloud.io/dashboard?id=devpro_chade).
 `sonar-project.properties` gives the sources, the tests, the coverage report and the findings accepted by design, and the pipeline gives the rest from the repository settings.
+Every finding is investigated, old or new, then fixed or accepted.
 A finding is accepted there with its reason, never in the interface of Sonar, so it is reviewed with the code.
 
 Setting             | Kind     | Value
@@ -227,6 +229,9 @@ The modules that run only in Chromium, and the entry point of the CLI, are left 
 Its Sonar analysis runs against a SonarQube on the machine, and fails the run when the quality gate fails, where SonarCloud only reports it on the pull request.
 The local SonarQube uses the same quality profile as SonarCloud, `Sonar way comprehensive`.
 The default profile of SonarQube has only half of its TypeScript rules.
+The quality gate reads only the new code, and SonarQube Community does not analyze pull requests.
+A change that causes a finding on an old line passes the gate.
+`task sonar` reads every open finding of the analysis, so it runs after `istarci wait`.
 It skips the Windows job, which `scripts/run_on_windows.sh --check` runs on the Windows of a WSL machine.
 `istarci add` and `istarci install-hook` set it up for this repository.
 
