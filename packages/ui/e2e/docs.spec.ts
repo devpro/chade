@@ -42,7 +42,7 @@ test('what the report advises links to its step in the documentation', async ({ 
   // A slow server shows the page late, and the heading is reached once it is shown.
   await page.route('**/api/ping', async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 100))
-    await route.continue()
+    await route.fallback()
   })
   await report.card('Windows disk').guide.click()
   const docs = new DocsPage(page)

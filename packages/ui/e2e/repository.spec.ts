@@ -240,7 +240,7 @@ test('a hidden branch leaves the history, stays listed as hidden after a reload,
   // The history read again takes its time, so the turning ring is seen beside the buttons, on the line of the branch.
   await page.route('**/api/repository?**', async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 400))
-    await route.continue()
+    await route.fallback()
   })
   const line = page.locator('#branches .branch-line').filter({ has: page.locator('.branch-name', { hasText: /^theirs$/ }) })
   const height = (await line.boundingBox())?.height ?? 0

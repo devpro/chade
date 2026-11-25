@@ -191,7 +191,7 @@ test('while git works, the button that asked turns and the notice says what is r
   // A remote that takes its time, as a push over the network does.
   await page.route('**/api/action', async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 600))
-    await route.continue()
+    await route.fallback()
   })
   const fetch = page.getByRole('button', { name: 'Fetch', exact: true })
   await fetch.click()
@@ -223,7 +223,7 @@ test('the list pushes and pulls a repository in one click, the button turning un
   // A remote that takes its time, as a push over the network does.
   await page.route('**/api/action', async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 600))
-    await route.continue()
+    await route.fallback()
   })
   await row.sync('Push').click()
   await expect(work.notice).toHaveText('Pushing work…')
