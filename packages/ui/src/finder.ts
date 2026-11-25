@@ -48,7 +48,7 @@ function render(): void {
   if (!state) return
   const system = chosenSystem([...new Set(state.repositories.map((repository) => repository.system))])
   const found = find(state.repositories, input.value, system)
-  results.replaceChildren(...found.map(optionOf))
+  results.replaceChildren(...found.map((repository, index) => optionOf(repository, index)))
   input.setAttribute('aria-expanded', String(found.length > 0))
   note.textContent = found.length === 0 ? 'No repository matches.' : ''
   const shown = options()
