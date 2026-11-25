@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures.js'
+import { RepositoriesPage } from './pages/RepositoriesPage.js'
 import { ReportPage } from './pages/ReportPage.js'
 import { shot } from './shot.js'
 
@@ -6,7 +7,7 @@ test('the top of the page opens the report, which says it measures, then shows w
   await repositories.menu('Report').click()
   const report = new ReportPage(page)
   await expect(page).toHaveURL(/#report$/)
-  await expect(report.state).toHaveText('Measuring the machine, which takes a few seconds…')
+  await expect(report.state).toHaveText('Measuring the machine, which can take a minute…')
   await expect(report.age).toHaveText('Measuring…')
   await report.expectMeasured()
   await expect(report.age).toHaveText('Read just now')
@@ -20,7 +21,9 @@ test('the top of the page opens the report, which says it measures, then shows w
 })
 
 test('the report shows each thing measured with its sizes, and what to clean with its commands @layout', async ({ report }, testInfo) => {
-  await expect(report.titles).toHaveText(['Windows disk', 'Memory', 'Docker', 'Journal', 'Repositories'])
+  await expect(report.titles).toHaveText(['Windows disk', 'Memory', 'Caches'])
+  await expect(report.tabs).toHaveText(['windows32', 'wsl-ubuntu41'])
+  await expect(report.tab('windows')).toHaveAttribute('aria-selected', 'true')
   await expect(report.age).toHaveText('Read just now')
   await expect(report.summary).toHaveText('2 sections with something to clean')
   const disk = report.card('Windows disk')
@@ -33,6 +36,11 @@ test('the report shows each thing measured with its sizes, and what to clean wit
   // A command longer than its card goes on under itself, and the card never scrolls sideways.
   expect(await disk.card.evaluate((card) => card.scrollWidth <= card.clientWidth)).toBe(true)
   await expect(disk.guide).toHaveAttribute('href', '#docs?name=cleanup&at=disk-image-compaction')
+  await expect(report.card('Memory').measure('RAM')).toContainText('50.1 GB used of 68.1 GB')
+  await shot(report.page, testInfo, 'report-windows')
+  await report.showSystem('wsl-ubuntu')
+  await expect(report.titles).toHaveText(['Memory', 'Docker', 'Journal', 'Repositories'])
+  await expect(report.summary).toHaveText('1 section with something to clean')
   await expect(report.card('Docker').advice).toHaveText('31.0 GB of images are unused, and removed with:')
   await expect(report.card('Docker').commands).toHaveText(['docker image prune -a --filter until=168h -f'])
   const memory = report.card('Memory')
@@ -47,7 +55,26 @@ test('the report shows each thing measured with its sizes, and what to clean wit
   await shot(report.page, testInfo, 'report')
 })
 
+test('each command of the report has a button that copies it', async ({ page, report, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  const disk = report.card('Windows disk')
+  await disk.card.getByRole('button', { name: 'Copy sudo fstrim -av' }).click()
+  await expect(disk.card.getByRole('button', { name: 'Copied' })).toBeVisible()
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('sudo fstrim -av')
+})
+
+test('the report and the repositories open on the system chosen last on either page', async ({ page, report }) => {
+  const repositories = new RepositoriesPage(page)
+  await report.showSystem('wsl-ubuntu')
+  await report.back()
+  await expect(repositories.tab('wsl-ubuntu')).toHaveAttribute('aria-selected', 'true')
+  await repositories.showSystem('windows')
+  await repositories.menu('Report').click()
+  await expect(report.tab('windows')).toHaveAttribute('aria-selected', 'true')
+})
+
 test('Refresh measures again, and the page reading itself again does not', async ({ page, report }) => {
+  await report.showSystem('wsl-ubuntu')
   const ram = report.card('Memory').measure('RAM')
   const count = Number(/measured (\d+) time/.exec((await ram.textContent()) ?? '')?.[1])
   // A tab that comes back to the front reads the other pages again, and leaves the report as it was measured.
@@ -61,7 +88,7 @@ test('the report opened by its address names the machine at once, and without th
   const report = new ReportPage(page)
   await page.goto(server.url.replace('#', '#report?'))
   await expect(page.locator('#machine')).toHaveText('E2E-PC')
-  await expect(report.state).toHaveText('Measuring the machine, which takes a few seconds…')
+  await expect(report.state).toHaveText('Measuring the machine, which can take a minute…')
   await report.expectMeasured()
   await page.evaluate(() => sessionStorage.clear())
   await page.reload()

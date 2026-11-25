@@ -24,6 +24,20 @@ export const test = base.extend<{ server: Server; repositories: RepositoriesPage
     if (!file) throw new Error('E2E_STATE is set by the Playwright configuration')
     await use(JSON.parse(readFileSync(file, 'utf8')) as Server)
   },
+  // Chromium aborts its requests with ERR_NETWORK_CHANGED when a network interface of the machine changes.
+  // A container that starts or stops changes one, so a test failed at random while IstarCI ran.
+  // The sockets of Node.js stay open, so Node.js sends the requests in place of Chromium.
+  context: async ({ context }, use) => {
+    await context.route('**/*', async (route) => {
+      // A page that closes or goes elsewhere leaves requests without a reader.
+      await route
+        .fetch()
+        .then((response) => route.fulfill({ response }))
+        .catch(() => route.abort().catch(() => undefined))
+    })
+    await use(context)
+    await context.unrouteAll({ behavior: 'ignoreErrors' })
+  },
   // The page of the repositories, signed in the way chade ui signs in.
   repositories: async ({ page, server }, use) => {
     const repositories = new RepositoriesPage(page)

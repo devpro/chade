@@ -1,11 +1,13 @@
 import type { Repository, RepositoryCheck } from '@chade/daemon'
-import { address, get, post } from './api.js'
+import { TECHNOLOGIES } from '@chade/daemon/technologies'
+import { address, get, keepAddress, post, route } from './api.js'
 import { element, node } from './dom.js'
 import { forgeIcon } from './forge.js'
 import { ago, changes, checkOf, matches, needsAttention, summary, sync, tone, type Badge } from './format.js'
 import { CHANGED_EVENT, notify, reason, refused } from './notice.js'
+import { chooseSystem, chosenSystem, systemTabs } from './systems.js'
 
-interface State {
+export interface State {
   version: string
   machine: string
   scannedAt: string
@@ -13,11 +15,11 @@ interface State {
   warnings: string[]
 }
 
-const TAB_KEY = 'chade-system'
-
 let state: State | undefined
 // The latest check of IstarCI on each repository, by its system and its path, read after the list.
 let latest = new Map<string, RepositoryCheck>()
+// The technologies to show, none of them for all the repositories.
+let wanted = new Set<string>()
 const keyOf = (system: string, path: string): string => `${system}\n${path}`
 
 type Sync = 'pull' | 'push'
@@ -97,6 +99,44 @@ export function badges(list: Badge[], tag = 'td'): HTMLElement {
   return cell
 }
 
+// What the list read last, which the inventory shows without a wait.
+export const listState = (): State | undefined => state
+
+// Reads the repositories for any page, and leaves the list as it is drawn.
+export async function readState(): Promise<State> {
+  state = await get<State>('state')
+  return state
+}
+
+// The address of the list with its filter, which the page of a repository returns to.
+export function listAddress(): string {
+  return address(addressValues())
+}
+
+function addressValues(): Record<string, string | undefined> {
+  if (wanted.size === 0) return {}
+  return { system: state && chosenSystem(systems(state)), technology: [...wanted].join(',') }
+}
+
+// The chips of the technologies that the repositories of the system have.
+// A repository shows when it has each technology that is pressed.
+function renderTechnologies(repositories: Repository[]): void {
+  const found = new Set(repositories.flatMap((repository) => repository.technologies ?? []))
+  wanted = new Set([...wanted].filter((id) => found.has(id)))
+  const chips = TECHNOLOGIES.filter(({ id }) => found.has(id)).map(({ id, name }) => {
+    const chip = node('button', name, 'chip quiet') as HTMLButtonElement
+    chip.type = 'button'
+    chip.setAttribute('aria-pressed', String(wanted.has(id)))
+    chip.addEventListener('click', () => {
+      if (!wanted.delete(id)) wanted.add(id)
+      render()
+    })
+    return chip
+  })
+  element('technologies').replaceChildren(...chips)
+  element('technologies').hidden = chips.length === 0
+}
+
 function row(repository: Repository, now: number, withChecks: boolean): HTMLElement {
   const line = node('tr', '', tone(repository))
   const name = node('td', '', 'repository')
@@ -142,33 +182,12 @@ function systems(current: State): string[] {
   return [...new Set(current.repositories.map((repository) => repository.system))]
 }
 
-// The system shown, the one chosen last when the machine still has it.
-function selected(current: State): string | undefined {
-  const all = systems(current)
-  const chosen = sessionStorage.getItem(TAB_KEY)
-  return chosen !== null && all.includes(chosen) ? chosen : all[0]
-}
-
 function renderTabs(current: State, shown: string | undefined): void {
   const tabs = systems(current).map((system) => {
     const repositories = current.repositories.filter((repository) => repository.system === system)
-    const todo = repositories.filter(needsAttention).length
-    const tab = node('button', '', 'tab')
-    tab.setAttribute('role', 'tab')
-    tab.setAttribute('aria-selected', String(system === shown))
-    tab.append(node('span', system), node('span', String(repositories.length), 'count'))
-    if (todo > 0) {
-      const mark = node('span', String(todo), 'count todo')
-      mark.title = `${todo} with something to do`
-      tab.append(mark)
-    }
-    tab.addEventListener('click', () => {
-      sessionStorage.setItem(TAB_KEY, system)
-      render()
-    })
-    return tab
+    return { system, count: repositories.length, todo: repositories.filter(needsAttention).length }
   })
-  element('tabs').replaceChildren(...tabs)
+  element('tabs').replaceChildren(...systemTabs(tabs, shown, render))
 }
 
 function render(): void {
@@ -176,17 +195,20 @@ function render(): void {
   const filter = element<HTMLInputElement>('filter').value
   const attention = element<HTMLInputElement>('attention').checked
   const now = Date.now()
-  const shown = selected(state)
+  const shown = chosenSystem(systems(state))
   renderTabs(state, shown)
   element('warnings').replaceChildren(...state.warnings.map((warning) => node('li', warning)))
   const ofSystem = state.repositories.filter((repository) => repository.system === shown)
   element('summary').textContent = summary(ofSystem)
+  renderTechnologies(ofSystem)
+  // A read that ends after the list was left must not change the address of another page.
+  if (!route().has('page') && !route().has('path')) keepAddress(addressValues())
   const content = element('content')
   if (state.repositories.length === 0) {
     content.replaceChildren(node('p', 'No repository found. The repos list of each system, in the configuration, names the folders chade looks into.', 'empty'))
     return
   }
-  const listed = ofSystem.filter((repository) => matches(repository, filter) && (!attention || needsAttention(repository)))
+  const listed = ofSystem.filter((repository) => matches(repository, filter) && (!attention || needsAttention(repository)) && [...wanted].every((id) => repository.technologies?.includes(id)))
   if (listed.length === 0) {
     content.replaceChildren(node('p', 'No repository matches.', 'empty'))
     return
@@ -214,12 +236,16 @@ export const list = {
     state = undefined
   },
   // What was read before shows at once, and the page then reads again, as a repository left a moment ago may have changed.
-  async show(): Promise<{ machine: string; version: string; scannedAt: string } | void> {
+  async show(params: URLSearchParams): Promise<{ machine: string; version: string; scannedAt: string } | void> {
+    // The address gives the filter: none in the address is none on the page.
+    wanted = new Set(params.get('technology')?.split(',').filter(Boolean))
+    const system = params.get('system')
+    if (system) chooseSystem(system)
     if (!state) return this.reload()
     render()
   },
   async reload(): Promise<{ machine: string; version: string; scannedAt: string }> {
-    state = await get<State>('state')
+    const read = await readState()
     render()
     void get<{ checks: { system: string; path: string; check: RepositoryCheck }[] }>('latest-checks')
       .then(({ checks }) => {
@@ -228,6 +254,6 @@ export const list = {
       })
       // IstarCI is no part of the list, which a read of it that fails leaves as it was.
       .catch(() => undefined)
-    return state
+    return read
   },
 }

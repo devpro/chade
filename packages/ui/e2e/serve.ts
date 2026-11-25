@@ -7,7 +7,7 @@ import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createActions, createApi, startServer, type Report, type Root, type Run, type Scan } from '@chade/daemon'
+import { createActions, createApi, startServer, type Inventory, type Report, type Root, type Run, type Scan } from '@chade/daemon'
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 const stateFile = process.env.E2E_STATE
@@ -65,6 +65,10 @@ function knownAs(folder: string, remote: string, url: string): void {
 
 // More tags than the list of a repository shows at first.
 const clean = repository('wsl-ubuntu', 'clean')
+writeFileSync(join(clean, 'package.json'), '{}\n')
+writeFileSync(join(clean, 'Dockerfile'), 'FROM node:24-alpine\n')
+commit(clean, 'main.tf', '', 'Start clean')
+git(clean, 'push', '--quiet')
 for (let index = 1; index <= 25; index++) git(clean, 'tag', `v0.${index}`)
 
 const ahead = repository('wsl-ubuntu', 'ahead')
@@ -148,6 +152,14 @@ const steps = Array.from({ length: 320 }, (_, index) => {
 })
 execFileSync('git', ['-C', long, 'fast-import', '--quiet'], { env, input: steps.join('') })
 git(long, 'reset', '--quiet', '--hard')
+// Changes too large to show at once: many files, many lines, and a line of more than 2 MB.
+for (let index = 1; index <= 510; index++) writeFileSync(join(long, `file-${String(index).padStart(3, '0')}.txt`), 'one\n')
+writeFileSync(join(long, 'lines.txt'), 'line\n'.repeat(25_000))
+writeFileSync(join(long, 'app.min.js'), `${'x'.repeat(2_500_000)}\n`)
+git(long, 'switch', '--quiet', '--create', 'large')
+git(long, 'add', '--all')
+git(long, 'commit', '--quiet', '--message', `Add many files\n\nSession: https://example.test/${'a'.repeat(200)}`)
+git(long, 'switch', '--quiet', 'main')
 git(long, 'push', '--quiet')
 
 const portal = repository('windows', 'portal')
@@ -195,7 +207,7 @@ const roots: Root[] = ['windows', 'wsl-ubuntu', 'sandbox', 'missing'].map((syste
 
 const run: Run = async (command, args, options = {}) => {
   try {
-    return { code: 0, stdout: execFileSync(command, args, { cwd: options.cwd, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }), stderr: '' }
+    return { code: 0, stdout: execFileSync(command, args, { cwd: options.cwd, env, maxBuffer: 256 * 1024 * 1024, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }), stderr: '' }
   } catch (error) {
     const failure = error as { status?: number; stdout?: string; stderr?: string }
     return { code: failure.status ?? 1, stdout: failure.stdout ?? '', stderr: failure.stderr ?? '' }
@@ -213,6 +225,7 @@ const report = async (): Promise<Report> => {
     date: new Date().toISOString(),
     sections: [
       {
+        system: 'windows',
         title: 'Windows disk',
         measures: [
           { label: 'C:', detail: '615.8 GB used of 1.0 TB, 406.3 GB free' },
@@ -222,6 +235,26 @@ const report = async (): Promise<Report> => {
         guide: 'disk-image-compaction',
       },
       {
+        system: 'windows',
+        title: 'Memory',
+        measures: [
+          { label: 'RAM', detail: '50.1 GB used of 68.1 GB' },
+          { label: 'process Code.exe', bytes: 3_100_000_000 },
+        ],
+        hints: [],
+      },
+      {
+        system: 'windows',
+        title: 'Caches',
+        measures: [
+          { label: String.raw`%LOCALAPPDATA%\npm-cache`, bytes: 1_700_000_000 },
+          { label: String.raw`%USERPROFILE%\.nuget\packages`, bytes: 17_000_000_000 },
+        ],
+        hints: [String.raw`%USERPROFILE%\.nuget\packages holds 17.0 GB, cleared from a Windows prompt with:`, '  dotnet nuget locals all --clear'],
+        guide: 'caches',
+      },
+      {
+        system: 'wsl-ubuntu',
         title: 'Memory',
         measures: [
           { label: 'RAM', detail: `5.9 GB used of 44.2 GB, measured ${measured} time${measured === 1 ? '' : 's'}` },
@@ -232,6 +265,7 @@ const report = async (): Promise<Report> => {
         hints: [],
       },
       {
+        system: 'wsl-ubuntu',
         title: 'Docker',
         measures: [
           { label: 'Images', bytes: 48_200_000_000, detail: '31.0 GB unused' },
@@ -241,8 +275,9 @@ const report = async (): Promise<Report> => {
         hints: ['31.0 GB of images are unused, and removed with:', '  docker image prune -a --filter until=168h -f'],
         guide: 'docker',
       },
-      { title: 'Journal', measures: [{ label: 'systemd journal', bytes: 839_500_000 }], hints: [] },
+      { system: 'wsl-ubuntu', title: 'Journal', measures: [{ label: 'systemd journal', bytes: 839_500_000 }], hints: [] },
       {
+        system: 'wsl-ubuntu',
         title: 'Repositories',
         measures: [
           { label: '3 repositories', bytes: 5_400_000_000 },
@@ -381,6 +416,37 @@ const scanned: Scan = {
   ],
   skipped: [{ system: 'windows', part: 'images', reason: 'none of osv-scanner, trivy, grype is installed on Windows', guide: 'installing-the-scanners' }],
 }
+const use = (repository: string, kind: 'npm' | 'image', name: string, current: string, latest: string | undefined, more = {}) => ({
+  system: 'wsl-ubuntu',
+  repository: join(root, 'wsl-ubuntu', repository),
+  repositoryName: repository,
+  file: kind === 'npm' ? 'package.json' : 'Dockerfile',
+  kind,
+  name,
+  current,
+  ...(latest ? { latest } : {}),
+  ...more,
+})
+// An inventory with what the page tells apart: a fix, each kind of change, a rebuilt image, and tools from several sources.
+const listed: Inventory = {
+  machine: 'E2E-PC',
+  date: new Date(Date.now() - 3600_000).toISOString(),
+  tools: [
+    { system: 'wsl-ubuntu', name: 'flux', version: '2.9.2', latest: '2.10.1', source: 'direct', path: '/usr/local/bin/flux', url: 'https://github.com/fluxcd/flux2/releases/tag/v2.10.1' },
+    { system: 'wsl-ubuntu', name: 'terraform', version: '1.17.2-1', latest: '1.17.2-1', source: 'apt', package: 'terraform' },
+    { system: 'wsl-ubuntu', name: 'trivy', version: '0.75.0', latest: '0.76.2', source: 'apt', package: 'trivy', command: 'sudo apt update && sudo apt install --only-upgrade trivy' },
+    { system: 'windows', name: 'Git', version: '2.51.0', latest: '2.52.0', source: 'winget', package: 'Git.Git', command: 'winget upgrade --id Git.Git --exact' },
+  ],
+  dependencies: [
+    use('clean', 'npm', 'typescript', '6.0.3', '7.0.2', { command: 'npm install typescript@7.0.2' }),
+    use('clean', 'npm', 'lodash', '4.17.15', '4.17.21', { fixes: 2, command: 'npm install lodash@4.17.21', url: 'https://www.npmjs.com/package/lodash' }),
+    use('history', 'npm', 'lodash', '4.17.20', '4.17.21', { command: 'npm install lodash@4.17.21' }),
+    use('clean', 'npm', 'tsx', '4.23.15', '4.23.15'),
+    use('clean', 'image', 'node', '24-alpine', '24-alpine', { rebuilt: true, command: 'docker pull node:24-alpine' }),
+  ],
+  apt: [{ system: 'wsl-ubuntu', upgradable: 8, date: new Date().toISOString() }],
+  problems: [{ system: 'wsl-ubuntu', subject: 'private/app:1.0 in history', reason: 'docker.io answered 401' }],
+}
 const options = {
   version: '0.0.0',
   machine: 'E2E-PC',
@@ -395,6 +461,19 @@ const options = {
       return { ...scanned, date: new Date().toISOString() }
     },
   },
+  inventory: {
+    read: async () => listed,
+    run: async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300))
+      return { ...listed, date: new Date().toISOString() }
+    },
+  },
+  logs: async () => [
+    { date: '2026-11-24T15:00:00.000Z', job: 'inventory', text: 'started' },
+    { date: '2026-11-24T15:01:00.000Z', job: 'inventory', text: 'failed after 1 min 0 s: no registry answered' },
+    { date: '2026-11-24T15:17:49.000Z', job: 'scan', text: 'started' },
+    { date: '2026-11-24T15:26:00.000Z', job: 'scan', text: 'image 1 of 58: node:24, 1.1 GB' },
+  ],
   istarci: async () => ({ url: istarciUrl, token: 'e2e-istarci' }),
   run,
 }

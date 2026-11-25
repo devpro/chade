@@ -111,7 +111,7 @@ test('grype 0.104.4 matches a list against its own database, each finding with i
   assert.equal(newtonsoft?.finding.fixed, '13.0.1')
   assert.deepEqual(newtonsoft?.finding.tools, ['grype'])
   assert.deepEqual(grypeListArgs('/t/all.cdx.json').slice(0, 1), ['sbom:/t/all.cdx.json'])
-  assert.deepEqual(osvImageArgs('/t/a.tar', true, true), ['scan', 'image', '--format', 'json', '--offline-vulnerabilities', '--archive', '/t/a.tar'])
+  assert.deepEqual(osvImageArgs('/t/a.tar', true, true), ['scan', 'image', '--format', 'json', '--offline-vulnerabilities', '--x-disable-plugins', 'baseimage', '--archive', '/t/a.tar'])
 })
 
 test('one advisory reported by several scanners is one finding, named by all of them, at its most severe', () => {
@@ -285,6 +285,7 @@ function fakeTools(options: { osv?: boolean; trivy?: boolean; grype?: boolean; d
     }
     if (command === 'trivy' && args[0] === 'image' && args.includes('--format')) return { code: 0, stdout: await fixture('trivy-0.76.2.json'), stderr: '' }
     if (command === 'grype') return { code: 0, stdout: await fixture('grype-0.104.4.json'), stderr: '' }
+    if (command === 'docker' && args[1] === 'inspect') return { code: 0, stdout: args.at(-1) === 'old:1' ? 'sha256:aa\n' : 'sha256:bb\n', stderr: '' }
     if (command === 'docker' && args[0] === 'image') return { code: 0, stdout: '{"ID":"sha256:aa","Repository":"old","Tag":"1","Size":"1GB"}\n{"ID":"sha256:bb","Repository":"used","Tag":"2","Size":"2GB"}\n', stderr: '' }
     if (command === 'docker' && args[0] === 'ps') return { code: 0, stdout: 'c1\n', stderr: '' }
     if (command === 'docker' && args[0] === 'container') return { code: 0, stdout: 'sha256:bb\n', stderr: '' }
@@ -381,27 +382,6 @@ test('with no scanner, a part is skipped, and the images are still listed for wh
   const noDocker = fakeTools({ docker: false })
   const without = await scan(undefined, { ...host, run: noDocker.run }, { packages: false, images: true, offline: true, unusedDays: 30 })
   assert.deepEqual(without.skipped, [{ system: 'linux', part: 'images', reason: 'docker is not installed' }])
-})
-
-test('an image read less than a day ago by the same scanners is not read again', async () => {
-  const { home } = await machine()
-  const { run, calls } = fakeTools()
-  const host: Host = { machine: 'TEST-PC', home, run, systems: [{ kind: 'linux', id: 'linux' }] }
-  const read = (path: string, tools: string[]): Place => ({ system: 'linux', kind: 'image', label: path, path, packages: 0, findings: [], notes: ['read before'], tools })
-  const previous: Scan = {
-    machine: 'TEST-PC',
-    date: new Date(Date.now() - 3600_000).toISOString(),
-    skipped: [],
-    tools: [],
-    // The second was read before grype was installed.
-    places: [read('sha256:aa', ['osv-scanner', 'trivy', 'grype']), read('sha256:bb', ['trivy'])],
-  }
-  const result = await scan(undefined, host, { packages: false, images: true, offline: true, unusedDays: 30, previous })
-  assert.deepEqual(result.places.find((place) => place.path === 'sha256:aa')?.notes, ['read before'])
-  assert.deepEqual(
-    calls.filter((call) => call[0] === 'trivy' && call[1] === 'image' && call.includes('--format')).map((call) => call.at(-1)),
-    ['sha256:bb'],
-  )
 })
 
 test('a scan is saved and read back, and a missing or broken file is no scan', async () => {

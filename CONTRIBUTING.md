@@ -11,6 +11,7 @@
 │   ├── cleanup.md            report, clean, and the clean-up steps the report links to
 │   ├── commands.md           commands and their options
 │   ├── configuration.md      configuration, store, inventories and secrets
+│   ├── inventory.md          chade inventory, tools and dependencies
 │   ├── scan.md               chade scan, packages and images on the disk
 │   └── web-interface.md      chade ui
 ├── packages/
@@ -58,7 +59,7 @@
 
 `chade ui` serves the interface `task build` built, from a server that keeps running in the background.
 The build bundles `README.md`, the pages of `docs/` but the backlog, and this guide into the interface, as the pages of its documentation, so a change to one of them shows after `task build` as well.
-A change to `packages/ui` or to the server shows after `task build` and `task run -- daemon stop`, as the next `task run -- ui` starts a new server.
+A change to `packages/ui` or to the server shows after `task reload`.
 `task run -- daemon run` keeps the server in the terminal instead, with its output.
 
 > [!NOTE]
@@ -70,10 +71,11 @@ A change to `packages/ui` or to the server shows after `task build` and `task ru
 `task` alone lists every task.
 
 Task                      | Effect
---------------------------|-----------------------------------------------------------------------------------------------------------
+--------------------------|----------------------------------------------------------------------------------------------------------------
 `task install`            | Installs the npm workspaces
 `task build`              | Typechecks and bundles the CLI into `packages/cli/dist`, and the web interface into its `ui` folder
 `task run -- <arguments>` | Runs the CLI from its sources
+`task reload`             | Builds, restarts the server of the web interface and opens it
 `task link`               | Builds and links the `chade` command globally
 `task typecheck`          | Typechecks the sources and the tests of every package
 `task test`               | Runs the unit tests of every package
@@ -143,9 +145,7 @@ The screenshots are not compared with earlier ones, and are not committed.
 ### Manual test of the web interface
 
 ```bash
-task build
-task run -- daemon stop
-task run -- ui
+task reload
 ```
 
 The browser opens the list of the repositories under `repos` of `~/.chade/config.yml`.

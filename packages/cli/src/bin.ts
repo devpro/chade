@@ -5,8 +5,9 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 import { fileURLToPath } from 'node:url'
-import { createActions, createApi, startServer } from '@chade/daemon'
+import { createActions, createApi, startServer, type Inventory } from '@chade/daemon'
 import { Command } from 'commander'
+import { activityFile, logged, readActivity, type Progress } from './activity.js'
 import { planCleanup, renderPlan, runCleanup } from './clean.js'
 import { DEFAULT_PORT, removeState, runningDaemon, signInUrl, startDaemon, stopDaemon, writeState, type DaemonState } from './daemon.js'
 import { configPath, DEFAULT_SCAN, initialConfig, parseConfig, type Config } from './config.js'
@@ -14,12 +15,13 @@ import { single, startDaily } from './daily.js'
 import { diff } from './diff.js'
 import { discover } from './discover.js'
 import { run, runInherit } from './exec.js'
+import { inventory, inventoryFile, readInventory, renderInventory, saveInventory } from './inventory.js'
 import { istarciServer } from './istarci.js'
 import { openBrowser } from './open.js'
 import { expandHome } from './paths.js'
 import { diskUsage, formatBytes, readReport, renderReport, report, reportFile, type Report } from './report.js'
 import { repositoryRoots } from './roots.js'
-import { countsOf, readScan, renderScan, saveScan, scan, scanFile, type Scan } from './scan.js'
+import { countsOf, imageListsFolder, readScan, renderScan, saveScan, scan, scanFile, type Scan } from './scan.js'
 import { snapshot, type Logger } from './snapshot.js'
 import { git, repositoryRoot } from './store.js'
 import { detectHost, systemKinds, type Host } from './system.js'
@@ -147,6 +149,10 @@ program
 
 // Measures the report and saves it, for the interface to show the last one at once.
 async function measureReport(config: Config | undefined, host: Host): Promise<Report> {
+  return logged(activityFile(configFile()), 'report', () => saveReport(config, host))
+}
+
+async function saveReport(config: Config | undefined, host: Host): Promise<Report> {
   const result = await report(config, host, await readScan(scanFile(configFile())))
   const file = reportFile(configFile())
   await mkdir(dirname(file), { recursive: true })
@@ -162,7 +168,11 @@ interface ScanFlags {
 }
 
 // Scans the disk and saves what it found, for chade report and the interface to read.
-async function scanMachine(config: Config | undefined, host: Host, flags: ScanFlags, progress?: (line: string) => void): Promise<Scan> {
+async function scanMachine(config: Config | undefined, host: Host, flags: ScanFlags, terminal?: Progress): Promise<Scan> {
+  return logged(activityFile(configFile()), 'scan', (progress) => scanAndSave(config, host, flags, progress), terminal)
+}
+
+async function scanAndSave(config: Config | undefined, host: Host, flags: ScanFlags, progress: Progress): Promise<Scan> {
   const settings = config?.scan ?? DEFAULT_SCAN
   // Naming a part reads that part alone, whatever the configuration skips.
   const named = flags.packages || flags.images
@@ -170,7 +180,7 @@ async function scanMachine(config: Config | undefined, host: Host, flags: ScanFl
   const previous = await readScan(file)
   const packages = named ? Boolean(flags.packages) : !settings.skip.includes('packages')
   const images = named ? Boolean(flags.images) : !settings.skip.includes('images')
-  const result = await scan(config, host, { packages, images, offline: Boolean(flags.offline), unusedDays: settings.unusedDays, previous, log: progress })
+  const result = await scan(config, host, { packages, images, offline: Boolean(flags.offline), unusedDays: settings.unusedDays, lists: imageListsFolder(file), log: progress })
   // A part left out keeps what the last scan found of it.
   const kept = (previous?.places ?? []).filter((place) => (place.kind === 'image' ? !images : !packages))
   result.places.push(...kept)
@@ -190,10 +200,34 @@ program
     // The scan needs no store, so it also runs before chade init.
     const config = existsSync(configFile()) ? await loadConfig() : undefined
     const host = await detectHost({ machine: config?.machine })
-    const result = await scanMachine(config, host, options, options.json ? undefined : (line) => console.error(line))
+    const result = await scanMachine(config, host, options, options.json ? undefined : (line) => console.error(`${new Date().toLocaleTimeString()} ${line}`))
     log.info(options.json ? JSON.stringify(result, null, 2) : renderScan(result))
     // A malicious package may have run at its install already, which a script running the scan must not miss.
     if (countsOf(result).malicious > 0) process.exitCode = 1
+  })
+
+// Makes the inventory and saves it, for the interface to show it.
+async function makeInventory(config: Config | undefined, host: Host, terminal?: Progress): Promise<Inventory> {
+  return logged(activityFile(configFile()), 'inventory', (progress) => listAndSave(config, host, progress), terminal)
+}
+
+async function listAndSave(config: Config | undefined, host: Host, progress: Progress): Promise<Inventory> {
+  const result = await inventory(config, host, { scan: await readScan(scanFile(configFile())), log: progress })
+  const file = inventoryFile(configFile())
+  await mkdir(dirname(file), { recursive: true })
+  await saveInventory(file, result)
+  return result
+}
+
+program
+  .command('inventory')
+  .description('List the tools of the machine and the dependencies of the repositories, and ask the registries for their newest versions, without changing anything')
+  .option('--json', 'print the inventory as JSON')
+  .action(async (options: { json?: boolean }) => {
+    const config = existsSync(configFile()) ? await loadConfig() : undefined
+    const host = await detectHost({ machine: config?.machine })
+    const result = await makeInventory(config, host, options.json ? undefined : (line) => console.error(`${new Date().toLocaleTimeString()} ${line}`))
+    log.info(options.json ? JSON.stringify(result, null, 2) : renderInventory(result))
   })
 
 program
@@ -227,11 +261,12 @@ program
     if (result.failed.length > 0) process.exitCode = 1
   })
 
-// The report and the scan of the server, one run of each at a time, which the page and the daily run share.
-function work(host: Host): { report: () => Promise<Report>; scan: () => Promise<Scan> } {
+// The report, the scan and the inventory of the server, one run of each at a time, which the page and the daily run share.
+function work(host: Host): { report: () => Promise<Report>; scan: () => Promise<Scan>; inventory: () => Promise<Inventory> } {
   return {
     report: single(async () => measureReport(await loadConfig(), host)),
     scan: single(async () => scanMachine(await loadConfig(), host, {})),
+    inventory: single(async () => makeInventory(await loadConfig(), host)),
   }
 }
 
@@ -248,6 +283,11 @@ function routes(host: Host, runs: ReturnType<typeof work>): { api: ReturnType<ty
       read: async () => readScan(scanFile(configFile())),
       run: runs.scan,
     },
+    inventory: {
+      read: async () => readInventory(inventoryFile(configFile())),
+      run: runs.inventory,
+    },
+    logs: async () => readActivity(activityFile(configFile())),
     istarci: async () => istarciServer(homedir()),
     run,
   }
@@ -345,6 +385,8 @@ daemon
       startDaily(
         [
           { name: 'scan', last: async () => (await readScan(scanFile(file)))?.date, run: runs.scan },
+          // After the scan, as it uses what the scan found.
+          { name: 'inventory', last: async () => (await readInventory(inventoryFile(file)))?.date, run: runs.inventory },
           { name: 'report', last: async () => (await readReport(reportFile(file)))?.date, run: runs.report },
         ],
         (line) => log.info(`${new Date().toISOString()} ${line}`),

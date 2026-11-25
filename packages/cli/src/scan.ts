@@ -1,6 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, posix, win32 } from 'node:path'
 import { countsOf, findRepositories, SEVERITIES, type Finding, type Place, type Root, type Scan, type Skipped, type ToolUse } from '@chade/daemon'
+import { seconds, type Progress } from './activity.js'
 import type { Config } from './config.js'
 import { docsPointer } from './docs.js'
 import type { Run } from './exec.js'
@@ -22,12 +23,12 @@ export interface ScanOptions {
   images: boolean
   offline: boolean
   unusedDays: number
-  previous?: Scan
+  // The folder of the kept lists of the packages of the images.
+  lists?: string
   now?: number
   log?: (line: string) => void
 }
 
-const DAY_MS = 24 * 3600 * 1000
 // A command line of Windows holds 32,767 characters, so the folders go to osv-scanner a few dozen at a time.
 const FOLDERS_PER_CALL = 40
 const TOOL_TIMEOUT_MS = 30 * 60_000
@@ -37,6 +38,11 @@ const CONCURRENCY = 4
 // The last scan, saved beside the configuration, as a scan takes minutes and the report and the interface read it.
 export function scanFile(configFile: string): string {
   return join(dirname(configFile), 'scan.json')
+}
+
+// The lists of the packages of the images, beside the scan.
+export function imageListsFolder(configFile: string): string {
+  return join(dirname(configFile), 'image-lists')
 }
 
 export async function readScan(file: string): Promise<Scan | undefined> {
@@ -104,7 +110,7 @@ async function scanPackages(host: Host, side: Side, roots: Root[], options: Scan
     targets.push(...(await repositoryTargets(side, root, relatives, { unusedDays: options.unusedDays, now, run: host.run })))
   }
   options.log?.(`${side.system.id}: reading ${targets.length} place(s) with ${tools.map((tool) => tool.name).join(', ')}`)
-  const problems = await readTargets(host.run, tools, side, targets, options.offline)
+  const problems = await readTargets(host.run, tools, side, targets, options.offline, (line) => options.log?.(`${side.system.id}: ${line}`))
   for (const [name, problem] of problems) {
     const use = gathered.tools.find((one) => one.system === side.system.id && one.part === 'packages' && one.tool === name)
     if (use) use.problem = problem
@@ -112,16 +118,20 @@ async function scanPackages(host: Host, side: Side, roots: Root[], options: Scan
   gathered.places.push(...targets.map((one) => one.place).filter((place) => place.packages > 0 || place.findings.length > 0 || place.unused))
 }
 
-async function scanDocker(host: Host, side: Side, options: ScanOptions, now: number, gathered: Gathered): Promise<void> {
+async function scanDocker(host: Host, side: Side, options: ScanOptions, gathered: Gathered): Promise<void> {
   const tools = await scannersOf(host, side, 'images', gathered.tools)
   options.log?.(`${side.system.id}: reading the images of Docker with ${tools.map((tool) => tool.name).join(', ') || 'no scanner'}`)
-  const fresh = options.previous && now - Date.parse(options.previous.date) < DAY_MS ? options.previous : undefined
   const result = await scanImages(host.run, {
     system: side.system.id,
     offline: options.offline,
     tools,
-    previous: (id) => fresh?.places.find((place) => place.kind === 'image' && place.path === id),
+    log: options.log,
+    lists: options.lists,
   })
+  for (const [name, problem] of result.problems) {
+    const use = gathered.tools.find((one) => one.system === side.system.id && one.part === 'images' && one.tool === name)
+    if (use) use.problem = problem
+  }
   gathered.places.push(...result.places)
   if (result.skipped) gathered.skipped.push({ system: side.system.id, part: 'images', reason: result.skipped })
   else if (tools.length === 0) {
@@ -141,7 +151,8 @@ export async function scan(config: Config | undefined, host: Host, options: Scan
   // Windows and WSL use the same Docker Desktop engine.
   // Thus, only one system reads the images: Linux if it is available.
   const docker = sides.find((one) => !one.windows) ?? sides[0]
-  if (options.images && docker) await scanDocker(host, docker, options, now, gathered)
+  if (options.images && docker) await scanDocker(host, docker, options, gathered)
+  options.log?.('measuring what nothing uses')
   await measureUnused(host, sides, gathered.places)
   return { machine: host.machine, date: new Date(now).toISOString(), ...gathered }
 }
@@ -160,7 +171,7 @@ function keyOf(side: Side, path: string): string {
   return side.windows ? path.replaceAll('\\', '/').toLowerCase() : path
 }
 
-async function pool<T>(items: T[], size: number, work: (item: T) => Promise<void>): Promise<void> {
+export async function pool<T>(items: T[], size: number, work: (item: T) => Promise<void>): Promise<void> {
   let next = 0
   const worker = async (): Promise<void> => {
     while (next < items.length) await work(items[next++])
@@ -175,7 +186,7 @@ const lastLine = (text: string): string =>
     .findLast((line) => !/^(Scanned|Scanning|Starting|End status|Loaded)/.test(line)) ?? ''
 
 // Every place read by each scanner of the system, the problems of a scanner returned by its name.
-async function readTargets(run: Run, tools: Tool[], side: Side, targets: Target[], offline: boolean): Promise<Map<Scanner, string>> {
+async function readTargets(run: Run, tools: Tool[], side: Side, targets: Target[], offline: boolean, log: Progress): Promise<Map<Scanner, string>> {
   const problems = new Map<Scanner, string>()
   // The packages of a list are known before any scanner reads them, so grype matches them even alone.
   const readings = new Map<Target, Reading>(targets.map((one) => [one, { packages: new Set((one.list ?? []).map((pkg) => packageKey(purlOf(pkg), '', '', ''))), findings: [], tools: new Set() }]))
@@ -191,13 +202,17 @@ async function readTargets(run: Run, tools: Tool[], side: Side, targets: Target[
       lists.set(systemPath(`${index}.cdx.json`), one)
     }
     for (const tool of tools.filter((one) => one.name !== 'grype')) {
+      const start = Date.now()
       const problem = tool.name === 'osv-scanner' ? await readWithOsv(run, tool, side, targets, lists, readings, offline) : await readWithTrivy(run, tool, targets, lists, readings, offline)
+      log(`packages, ${tool.name} ${problem ?? 'done'}, ${seconds(start)}`)
       if (problem) problems.set(tool.name, problem)
     }
     // grype matches what the others read against a database of its own, all the packages of the system in one list.
     const grype = tools.find((one) => one.name === 'grype')
     if (grype) {
+      const start = Date.now()
       const problem = await matchWithGrype(run, grype, readings, join(folder, 'all.cdx.json'), systemPath('all.cdx.json'), offline)
+      log(`packages, grype ${problem ?? 'done'}, ${seconds(start)}`)
       if (problem) problems.set('grype', problem)
     }
   } finally {

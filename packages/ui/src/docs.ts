@@ -1,6 +1,7 @@
 import cleanup from '../../../docs/cleanup.md'
 import commands from '../../../docs/commands.md'
 import configuration from '../../../docs/configuration.md'
+import inventory from '../../../docs/inventory.md'
 import scan from '../../../docs/scan.md'
 import webInterface from '../../../docs/web-interface.md'
 import contributing from '../../../CONTRIBUTING.md'
@@ -25,6 +26,7 @@ const pages: Page[] = [
   { slug: 'web-interface', file: 'docs/web-interface.md', title: 'Web interface', source: webInterface },
   { slug: 'cleanup', file: 'docs/cleanup.md', title: 'System clean-up', source: cleanup },
   { slug: 'scan', file: 'docs/scan.md', title: 'Packages and images', source: scan },
+  { slug: 'inventory', file: 'docs/inventory.md', title: 'Inventory', source: inventory },
   { slug: 'contributing', file: 'CONTRIBUTING.md', title: 'Contributor guide', source: contributing },
 ]
 

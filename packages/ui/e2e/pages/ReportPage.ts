@@ -23,12 +23,14 @@ export class ReportCard {
 
 // The page of the report: what takes disk and memory on the machine, and what to clean.
 export class ReportPage {
+  readonly tabs: Locator
   readonly titles: Locator
   readonly summary: Locator
   readonly state: Locator
   readonly age: Locator
 
   constructor(readonly page: Page) {
+    this.tabs = page.locator('#report-tabs').getByRole('tab')
     this.titles = page.locator('#report .card h3')
     this.summary = page.locator('#report-summary')
     this.state = page.locator('#report-state')
@@ -48,6 +50,15 @@ export class ReportPage {
 
   card(title: string): ReportCard {
     return new ReportCard(this.page.locator('#report .card').filter({ has: this.page.locator('h3', { hasText: new RegExp(`^${title}$`) }) }))
+  }
+
+  tab(system: string): Locator {
+    return this.tabs.filter({ hasText: new RegExp(`^${system}`) })
+  }
+
+  async showSystem(system: string): Promise<void> {
+    await this.tab(system).click()
+    await expect(this.tab(system)).toHaveAttribute('aria-selected', 'true')
   }
 
   async measureAgain(): Promise<void> {

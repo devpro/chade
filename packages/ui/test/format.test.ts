@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { Repository } from '@chade/daemon'
-import { ago, bytes, changes, checkOf, duration, matches, needsAttention, summary, sync, tone } from '../src/format.js'
+import { ago, bytes, changes, checkOf, duration, find, matches, needsAttention, summary, sync, tone } from '../src/format.js'
 
 const clean: Repository = {
   system: 'linux',
@@ -91,4 +91,18 @@ test('a check of IstarCI reads as a mark and a sentence', () => {
   assert.equal(checkOf({ status: 'failure', durationMs: 5_000, url: '' }).text, 'Failed on IstarCI after 5 s')
   assert.equal(checkOf({ status: 'running', url: '' }).tone, 'info')
   assert.equal(checkOf({ status: 'not-run', reason: 'A newer commit replaced it in the queue', url: '' }).text, 'Not run by IstarCI: A newer commit replaced it in the queue')
+})
+
+test('a search puts the best match of the name first, then the system chosen', () => {
+  const named = (name: string, system = 'linux'): Repository => ({ ...clean, name, system, path: `/${system}/repos/${name}` })
+  const all = ['my-charts', 'archade', 'tools/chade', 'chade-ui', 'chade', 'other'].map((name) => named(name))
+  const names = (text: string): string[] => find(all, text).map(({ name }) => name)
+  assert.deepEqual(names(''), all.map(({ name }) => name))
+  assert.deepEqual(names('CHADE'), ['tools/chade', 'chade', 'chade-ui', 'archade'])
+  assert.deepEqual(names('ch'), ['tools/chade', 'chade-ui', 'chade', 'my-charts', 'archade'])
+  assert.deepEqual(names('ui chade'), ['chade-ui'])
+  assert.deepEqual(names('repos other'), ['other'])
+  assert.deepEqual(names('nothing'), [])
+  const both = [named('portal', 'windows'), named('portal')]
+  assert.deepEqual(find(both, 'portal', 'linux').map(({ system }) => system), ['linux', 'windows'])
 })

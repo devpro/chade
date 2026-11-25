@@ -82,7 +82,7 @@ test('each repository of a root is listed with its branch, its changes, its last
     ['empty', 'pushed'],
   )
   const [empty, repository] = listing.repositories
-  assert.deepEqual(empty, { system: 'linux', name: 'empty', path: join(work, 'empty'), branch: 'main', changed: 0, untracked: 0, conflicts: 0 })
+  assert.deepEqual(empty, { system: 'linux', name: 'empty', path: join(work, 'empty'), branch: 'main', changed: 0, untracked: 0, technologies: [], conflicts: 0 })
   assert.equal(repository.path, pushed)
   assert.equal(repository.branch, 'main')
   assert.equal(repository.upstream, 'origin/main')

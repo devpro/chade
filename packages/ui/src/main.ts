@@ -2,11 +2,15 @@ import { ApiError, route } from './api.js'
 import { element } from './dom.js'
 import { ago } from './format.js'
 import { docs } from './docs.js'
+import './finder.js'
+import { inventoryPage } from './inventory.js'
 import { list } from './list.js'
+import { logsPage } from './logs.js'
 import { reportPage } from './report.js'
 import { repository } from './repository.js'
 import { securityPage } from './security.js'
 import { store } from './store.js'
+import { updatesPage } from './updates.js'
 
 // A read costs a few git commands per repository, so the page reads again twice a minute, and only while it is looked at.
 const REFRESH_MS = 30_000
@@ -31,7 +35,7 @@ interface View {
   title: (params: URLSearchParams) => string
 }
 
-const views: View[] = [list, repository, store, reportPage, securityPage, docs]
+const views: View[] = [list, repository, store, reportPage, securityPage, updatesPage, inventoryPage, logsPage, docs]
 // The link of the top of the page each view is reached by, a repository being one of the repositories.
 const links = new Map<View, string>([
   [list, 'repositories'],
@@ -39,6 +43,9 @@ const links = new Map<View, string>([
   [store, 'store'],
   [reportPage, 'report'],
   [securityPage, 'security'],
+  [updatesPage, 'updates'],
+  [inventoryPage, 'inventory'],
+  [logsPage, 'logs'],
   [docs, 'docs'],
 ])
 
@@ -48,6 +55,9 @@ function current(): View {
   if (page === 'store') return store
   if (page === 'report') return reportPage
   if (page === 'security') return securityPage
+  if (page === 'updates') return updatesPage
+  if (page === 'inventory') return inventoryPage
+  if (page === 'logs') return logsPage
   if (page === 'docs') return docs
   return route().has('path') ? repository : list
 }
@@ -127,7 +137,7 @@ async function run(action: () => Promise<Read>): Promise<boolean> {
     read = result !== undefined
     element('message').hidden = true
     for (const each of views) each.section.hidden = each !== view
-    document.body.classList.toggle('wide', view === repository || view === store || view === reportPage || view === securityPage)
+    document.body.classList.toggle('wide', view === repository || view === store || view === reportPage || view === securityPage || view === updatesPage)
     loaded(result)
   } catch (error) {
     // A read that failed has said why, and is not tried again behind the message.
@@ -149,13 +159,14 @@ const reload = async (asked = false): Promise<void> => {
 // A list shown from what was read before is read again behind it, so a repository just left shows as it is now.
 const show = async (): Promise<void> => {
   const read = await run(() => current().show(route()))
-  if (!read && current() === list) await reload()
+  if (!read && (current() === list || current() === inventoryPage)) await reload()
 }
 
 element('refresh').addEventListener('click', () => void reload(true))
 // A report measured or a scan run behind the page says so when it is done.
 document.addEventListener('chade-measured', (event) => {
-  if (current() !== reportPage && current() !== securityPage) return
+  const measured: View[] = [reportPage, securityPage, updatesPage]
+  if (!measured.includes(current())) return
   const { read, error } = (event as CustomEvent<{ read?: Read; error?: unknown }>).detail
   if (error === undefined) loaded(read)
   else fail(error)

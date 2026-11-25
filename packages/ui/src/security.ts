@@ -2,7 +2,7 @@
 import { packagesOf, SEVERITIES, type Finding, type PackageFindings, type Place, type PlaceKind, type Scan, type Severity, type Skipped, type ToolUse } from '@chade/daemon/scan'
 import { get, post } from './api.js'
 import { docsAddress } from './docs.js'
-import { element, node } from './dom.js'
+import { commandLine, element, node } from './dom.js'
 import { bytes } from './format.js'
 
 interface Read {
@@ -41,27 +41,6 @@ const opened = new Set<string>()
 const levelOf = (finding: Finding): Level => (finding.malicious ? 'malicious' : finding.severity)
 const keyOf = (place: Place): string => `${place.system}\n${place.path}`
 const allLevels = (): boolean => levels.size === LEVELS.length
-
-// A command is what the page is for, so a click copies it whole.
-function copyButton(text: string): HTMLElement {
-  const button = node('button', 'Copy', 'copy') as HTMLButtonElement
-  button.type = 'button'
-  button.setAttribute('aria-label', `Copy ${text}`)
-  button.addEventListener('click', () => {
-    navigator.clipboard.writeText(text).then(
-      () => (button.textContent = 'Copied'),
-      () => (button.textContent = 'Copy failed'),
-    )
-    setTimeout(() => (button.textContent = 'Copy'), 1500)
-  })
-  return button
-}
-
-function commandLine(command: string): HTMLElement {
-  const line = node('span', '', 'command')
-  line.append(node('code', command), copyButton(command))
-  return line
-}
 
 function badge(text: string, tone: string, title = ''): HTMLElement {
   const created = node('span', text, `badge ${tone}`)

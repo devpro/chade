@@ -39,9 +39,84 @@ export function osvArgs(input: OsvInput): string[] {
   ]
 }
 
+// The baseimage plugin sends the identifiers of the layers to a server, to name the public image they come from, which chade does not use.
+const NO_BASE_IMAGE = ['--x-disable-plugins', 'baseimage']
+
+// osv-scanner exits with 128 on an image without a package, such as busybox.
+const OSV_NO_PACKAGE = 128
+
+export function osvFoundNoPackage(code: number, stderr: string): boolean {
+  return code === OSV_NO_PACKAGE && stderr.includes('No package sources found') && !stderr.includes('Error during extraction')
+}
+
 // An image Docker holds, read by its name, or from the archive docker save wrote of one without a name.
 export function osvImageArgs(image: string, archive: boolean, offline: boolean): string[] {
-  return ['scan', 'image', '--format', 'json', '--offline-vulnerabilities', ...(offline ? [] : ['--download-offline-databases']), ...(archive ? ['--archive'] : []), image]
+  return ['scan', 'image', '--format', 'json', '--offline-vulnerabilities', ...(offline ? [] : ['--download-offline-databases']), ...NO_BASE_IMAGE, ...(archive ? ['--archive'] : []), image]
+}
+
+// The packages of an image without their match, as the match of one Ubuntu image loads a database for minutes.
+// Checked with osv-scanner 2.7.1 on 2026-11-24.
+export function osvImageListArgs(image: string, archive: boolean): string[] {
+  return ['scan', 'image', '--format', 'json', '--offline-vulnerabilities', '--all-packages', ...NO_BASE_IMAGE, '--x-disable-plugins', 'vulnmatch/osvlocal', ...(archive ? ['--archive'] : []), image]
+}
+
+// A match of a list alone, the databases updated by the same call unless told not to.
+export function osvListArgs(list: string, update: boolean): string[] {
+  return ['scan', 'source', '--format', 'json', '--all-packages', '--allow-no-lockfiles', '--offline-vulnerabilities', ...(update ? ['--download-offline-databases'] : []), '--x-no-default-plugins', '--x-plugins', 'sbom', '-L', list]
+}
+
+// osv-scanner exits with the code of a found vulnerability even when a database is missing, so only its errors tell that an ecosystem was not matched.
+export function osvMissing(stderr: string): string[] {
+  return [...new Set([...stderr.matchAll(/could not load db for (.{1,40}?) ecosystem/g)].map((match) => match[1]))]
+}
+
+// The name of the database of an ecosystem, which Debian:12 and Debian:13 share.
+export function osvDatabase(ecosystem: string): string {
+  return ecosystem.split(':')[0]
+}
+
+// A package of an image, as osv-scanner names it, a system package by its source.
+export interface OsvListed {
+  ecosystem: string
+  name: string
+  version: string
+  purl?: string
+}
+
+export function readOsvListed(text: string): OsvListed[] {
+  const output = JSON.parse(text) as OsvOutput
+  return (output.results ?? []).flatMap((result) =>
+    (result.packages ?? []).map(({ package: { ecosystem, name, version, purl } }) => ({ ecosystem, name, version, ...(purl ? { purl } : {}) })),
+  )
+}
+
+// osv-scanner names Ubuntu:24.04 the system of an image, and Ubuntu:24.04:LTS the same system of a list.
+export function osvKey(pkg: OsvListed): string {
+  return JSON.stringify([pkg.ecosystem.replace(/:LTS$/, ''), pkg.name, pkg.version])
+}
+
+// The purl that a list names a package by, or undefined when a list cannot name it as an image does.
+// OSV names a package of Debian, Ubuntu and Alpine by its source, where the purl of the image names the binary.
+// An rpm of a list loses its system, and all its findings with it.
+export function osvListPurl(pkg: OsvListed): string | undefined {
+  if (!pkg.purl || pkg.purl.startsWith('pkg:rpm/')) return undefined
+  if (!/^pkg:(deb|apk)\//.test(pkg.purl)) return pkg.purl
+  const distro = /[?&](distro=[^&]+)/.exec(pkg.purl)?.[1]
+  if (!distro) return undefined
+  const version = encodeURIComponent(pkg.version).replaceAll('%3A', ':')
+  return `${pkg.purl.split('/', 2).join('/')}/${encodeURIComponent(pkg.name)}@${version}?${distro}`
+}
+
+// The packages of many images in one CycloneDX list, the name and the version as they are and not as the purl escapes them.
+export function osvList(packages: OsvListed[]): string {
+  const components = packages.map((pkg, index) => ({ type: 'library', 'bom-ref': String(index), name: pkg.name, version: pkg.version, purl: osvListPurl(pkg) }))
+  return JSON.stringify({ bomFormat: 'CycloneDX', specVersion: '1.5', version: 1, components })
+}
+
+// The findings of each package of a list, by its key, a package without a finding included.
+export function readOsvMatches(text: string): Map<string, Finding[]> {
+  const output = JSON.parse(text) as OsvOutput
+  return new Map((output.results ?? []).flatMap((result) => (result.packages ?? []).map((entry) => [osvKey(entry.package), findingsOf(entry)] as const)))
 }
 
 // What osv-scanner read in one file, a lock file, a binary, a package.json or a list.

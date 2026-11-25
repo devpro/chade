@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { forgeOf, mainRemote, parseRemoteUrls, type Remote } from './remote.js'
+import { technologiesOf } from './technologies.js'
 import { trimTrailing } from './text.js'
 
 export interface Result {
@@ -49,6 +50,8 @@ export interface Repository extends Status {
   fetchedAt?: string
   // Absent for a repository without a remote, or with several and none of them origin or tracked.
   remote?: Remote
+  // The identifiers of the technologies, absent when git cannot list the files.
+  technologies?: string[]
   error?: string
 }
 
@@ -163,6 +166,26 @@ export async function readRepository(root: Root, relative: string[], run: Run): 
   return repository
 }
 
+// The files that git tracks, with / between the folders on all systems.
+export async function trackedFiles(root: Root, relative: string[], run: Run): Promise<string[] | undefined> {
+  const result = await run(root.git, ['-C', repositoryPath(root, relative), 'ls-files', '-z'], { cwd: root.cwd, timeoutMs: GIT_TIMEOUT_MS })
+  return result.code === 0 ? result.stdout.split('\0').filter(Boolean) : undefined
+}
+
+// The page reads the list twice a minute, and the files change only with the commit checked out, so each commit is read once.
+const technologies = new Map<string, { head: string; found: string[] }>()
+
+export async function readTechnologies(root: Root, relative: string[], run: Run, head: string | undefined): Promise<string[] | undefined> {
+  const key = `${root.system}\n${repositoryPath(root, relative)}`
+  const known = technologies.get(key)
+  if (known && known.head === head) return known.found
+  const files = await trackedFiles(root, relative, run)
+  if (!files) return undefined
+  const found = technologiesOf(files)
+  if (head !== undefined) technologies.set(key, { head, found })
+  return found
+}
+
 export async function listRepositories(roots: Root[], run: Run): Promise<Listing> {
   const warnings: string[] = []
   const jobs: { root: Root; relative: string[] }[] = []
@@ -178,7 +201,10 @@ export async function listRepositories(roots: Root[], run: Run): Promise<Listing
   const worker = async (): Promise<void> => {
     while (next < jobs.length) {
       const index = next++
-      repositories[index] = await readRepository(jobs[index].root, jobs[index].relative, run)
+      const { root, relative } = jobs[index]
+      const repository = await readRepository(root, relative, run)
+      if (repository.error === undefined) repository.technologies = await readTechnologies(root, relative, run, repository.head)
+      repositories[index] = repository
     }
   }
   await Promise.all(Array.from({ length: CONCURRENCY }, worker))

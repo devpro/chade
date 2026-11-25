@@ -1,7 +1,8 @@
 import { existsSync } from 'node:fs'
 import { realpath } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { cutPatch, DEFAULT_COMMITS, DIFF_OPTIONS, MAX_COMMITS, readCommit, type Diff, type Git } from './history.js'
+import { readChangedFiles, readFilePatch, type FilePatch } from './changes.js'
+import { DEFAULT_COMMITS, MAX_COMMITS, readCommit, type Diff, type Git } from './history.js'
 import { findRepositories, GIT_TIMEOUT_MS, repositoryPath, type Root, type Run } from './repositories.js'
 import { RequestError } from './server.js'
 
@@ -32,27 +33,15 @@ export interface Store {
   error?: string
 }
 
-export interface StoredChange {
-  // Path in the store, the folder of the machine first.
-  path: string
-  // The earlier path of a renamed file.
-  from?: string
-  // The letter git gives the change: A, M, D, R.
-  status: string
-}
-
 // What a snapshot changed since the one before it on the same machine.
 export interface SnapshotDetail extends Diff {
   // The snapshot compared with, absent for the first one of a machine, which is compared with nothing.
   previous?: string
-  // Every file changed, which the patch may hold only a part of when it is cut.
-  changes: StoredChange[]
 }
 
 export interface StoredFile {
   path: string
   content: string
-  truncated: boolean
   binary: boolean
 }
 
@@ -88,20 +77,6 @@ export function parseSnapshots(text: string): Snapshot[] {
     snapshots.push({ hash, author, date, subject: subject.join('\0') })
   }
   return snapshots
-}
-
-// Reads the output of git diff --name-status -z, where a renamed file comes as its earlier path then its new one.
-export function parseStoredChanges(text: string): StoredChange[] {
-  const changes: StoredChange[] = []
-  const entries = text.split('\0')
-  for (let index = 0; index + 1 < entries.length; index++) {
-    const status = entries[index][0]
-    if (status === 'R' || status === 'C') {
-      changes.push({ path: entries[index + 2], from: entries[index + 1], status })
-      index += 2
-    } else changes.push({ path: entries[++index], status })
-  }
-  return changes
 }
 
 export async function readStore(store: string, run: Run, limit = DEFAULT_COMMITS): Promise<Store> {
@@ -155,18 +130,24 @@ async function locate(store: string, run: Run, machine: string, commit: string):
   return git
 }
 
+// What compares a snapshot with the one before it on the same machine, with paths from the store, wherever the store is in its repository.
+async function comparison(git: Git, machine: string, commit: string): Promise<{ previous: string; command: string[] }> {
+  const previous = (await output(git, ['rev-list', '-1', '--skip=1', commit, '--', machine])).trim()
+  return { previous, command: ['diff', '--relative', previous || EMPTY_TREE, commit] }
+}
+
 export async function readSnapshot(store: string, run: Run, machine: string, commit: string): Promise<SnapshotDetail> {
   const git = await locate(store, run, machine, commit)
-  const previous = (await output(git, ['rev-list', '-1', '--skip=1', commit, '--', machine])).trim()
-  // Relative to the store, as the paths of the files are, wherever the store is in its repository.
-  const compare = ['diff', '--relative', '--find-renames']
-  const range = [previous || EMPTY_TREE, commit, '--', machine]
-  const [details, changes, patch] = await Promise.all([
-    readCommit(git, commit),
-    output(git, [...compare, '--name-status', '-z', ...range]),
-    output(git, [...compare, ...DIFF_OPTIONS, ...range]),
-  ])
-  return { commit: details, ...(previous ? { previous } : {}), changes: parseStoredChanges(changes), ...cutPatch(patch) }
+  const { previous, command } = await comparison(git, machine, commit)
+  const [details, files] = await Promise.all([readCommit(git, commit), readChangedFiles(git, command, [machine])])
+  return { commit: details, ...(previous ? { previous } : {}), files }
+}
+
+// What a snapshot changed of one file.
+export async function readSnapshotPatch(store: string, run: Run, machine: string, commit: string, path: string): Promise<FilePatch> {
+  const git = await locate(store, run, machine, commit)
+  const { command } = await comparison(git, machine, commit)
+  return readFilePatch(git, command, path, [machine])
 }
 
 // Every file a machine had at a snapshot, changed by it or not.
@@ -181,7 +162,6 @@ export async function readSnapshotFile(store: string, run: Run, machine: string,
   if (!files.includes(path)) throw new RequestError(404, `${path} is not a file of that snapshot`)
   const content = await output(gitOf(store, run), ['show', `${commit}:./${path}`])
   // Text holds no NUL, and a page has no use for the bytes of anything else.
-  if (content.includes('\0')) return { path, content: '', truncated: false, binary: true }
-  const cut = cutPatch(content)
-  return { path, content: cut.patch, truncated: cut.truncated, binary: false }
+  if (content.includes('\0')) return { path, content: '', binary: true }
+  return { path, content, binary: false }
 }

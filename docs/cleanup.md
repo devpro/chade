@@ -22,7 +22,13 @@ The report measures, and changes nothing:
 - Docker data and what of it is unused
 - on Linux and WSL, the swap, the timers that trim the disk, the systemd journal, snap revisions kept for a rollback
 - the caches of the tools, the Claude Code sessions, and the size of the repositories under `repos`
+- on Windows, the temporary files of the user
 - what the last `chade scan` found, malicious packages, vulnerabilities and what nothing uses
+
+On WSL, the report measures Windows and the distribution, each in its own sections.
+Docker is the one of the distribution there.
+A command of a Windows section runs from a Windows prompt, since the same command in WSL acts on Linux.
+`chade clean` on WSL cleans the distribution only.
 
 Each finding comes with the command or setting that fixes it, and a link to its step below.
 `--json` prints the report as JSON.
@@ -211,14 +217,15 @@ Cache                    | Clear
 `~/.cache/ms-playwright` | `npx playwright uninstall --all`, then the browsers each project installs
 `~/.vscode-server`       | Old versions under `~/.vscode-server/bin`, unused extensions from VS Code
 
-On Windows, the same tools keep their caches under the profile, `%LOCALAPPDATA%` being `~/AppData/Local`, and are cleared with the same commands.
+On Windows, the same tools keep their caches under the profile, and the same commands clear them, from a Windows prompt.
 
 Cache                           | Clear
 --------------------------------|--------------------------------------------------------------------------
-`~/AppData/Local/npm-cache`     | `npm cache clean --force`
-`~/.nuget/packages`             | `dotnet nuget locals all --clear`
-`~/AppData/Local/pnpm/store`    | `pnpm store prune`, which keeps the packages a project still references
-`~/AppData/Local/ms-playwright` | `npx playwright uninstall --all`, then the browsers each project installs
+`%LOCALAPPDATA%\npm-cache`      | `npm cache clean --force`
+`%USERPROFILE%\.nuget\packages` | `dotnet nuget locals all --clear`
+`%LOCALAPPDATA%\pnpm\store`     | `pnpm store prune`, which keeps the packages a project still references
+`%LOCALAPPDATA%\ms-playwright`  | `npx playwright uninstall --all`, then the browsers each project installs
+`%LOCALAPPDATA%\Temp`           | Storage Sense or Disk Cleanup, in the settings of Windows
 
 ## Packages and images
 

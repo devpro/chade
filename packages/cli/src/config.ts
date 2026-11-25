@@ -33,6 +33,13 @@ export interface ScanConfig {
 
 export const DEFAULT_SCAN: ScanConfig = { unusedDays: 30, skip: [] }
 
+export interface InventoryConfig {
+  // Repositories that the inventory leaves out, or folders of them.
+  skip: string[]
+  // Tools that the catalog of chade does not have.
+  tools: { name: string; github: string }[]
+}
+
 export interface Config {
   store: string
   machine?: string
@@ -42,7 +49,8 @@ export interface Config {
   cleanup: (string | CustomStep)[]
   // Absent when the configuration leaves the defaults.
   scan?: ScanConfig
-  // The scan and the report run once a day while the server of the web interface runs, unless false.
+  inventory?: InventoryConfig
+  // The scan, the inventory and the report run once a day while the server of the web interface runs, unless false.
   daily?: boolean
 }
 
@@ -53,7 +61,7 @@ export function configPath(env: NodeJS.ProcessEnv, home: string): string {
 export function parseConfig(text: string, home: string): Config {
   const raw: unknown = parse(text) ?? {}
   if (!isObject(raw)) throw new Error('the configuration is not a YAML mapping')
-  checkKeys(raw, ['store', 'machine', 'linux', 'windows', 'redact', 'cleanup', 'scan', 'daily'], 'the configuration')
+  checkKeys(raw, ['store', 'machine', 'linux', 'windows', 'redact', 'cleanup', 'scan', 'inventory', 'daily'], 'the configuration')
   if (typeof raw.store !== 'string' || raw.store === '') throw new Error('store is required, the path of the git repository snapshots are written to')
   const store = expandHome(raw.store, home)
   if (!isAbsolute(store)) throw new Error(`store ${raw.store} is not an absolute path`)
@@ -76,6 +84,7 @@ export function parseConfig(text: string, home: string): Config {
     redact,
     cleanup: parseCleanup(raw.cleanup),
     ...(raw.scan === undefined || raw.scan === null ? {} : { scan: parseScan(raw.scan) }),
+    ...(raw.inventory === undefined || raw.inventory === null ? {} : { inventory: parseInventory(raw.inventory) }),
     ...(raw.daily === undefined || raw.daily === null ? {} : { daily: parseDaily(raw.daily) }),
   }
 }
@@ -83,6 +92,18 @@ export function parseConfig(text: string, home: string): Config {
 function parseDaily(raw: unknown): boolean {
   if (typeof raw !== 'boolean') throw new Error('daily is true or false')
   return raw
+}
+
+function parseInventory(raw: unknown): InventoryConfig {
+  if (!isObject(raw)) throw new Error('inventory is a mapping of skip and tools')
+  checkKeys(raw, ['skip', 'tools'], 'inventory')
+  const tools = list(raw.tools, 'inventory.tools').map((entry) => {
+    if (!isObject(entry) || typeof entry.name !== 'string' || typeof entry.github !== 'string' || !/^[\w.-]+\/[\w.-]+$/.test(entry.github)) {
+      throw new Error('inventory.tools: a tool has a name, and github is its repository, owner/name')
+    }
+    return { name: entry.name, github: entry.github }
+  })
+  return { skip: stringList(raw.skip, 'inventory.skip'), tools }
 }
 
 function parseScan(raw: unknown): ScanConfig {

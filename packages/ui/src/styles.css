@@ -109,7 +109,8 @@ main {
   margin-bottom: 12px;
 }
 
-#tabs {
+#tabs,
+#report-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
@@ -852,6 +853,7 @@ td.ci {
   margin: 12px 0 6px;
   font-size: 15px;
   line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .pane-detail h3 {
@@ -863,6 +865,7 @@ td.ci {
   color: var(--muted);
   font: 13px/1.5 system-ui, sans-serif;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .facts {
@@ -972,6 +975,18 @@ td.ci {
 .line .text {
   padding-left: 8px;
   white-space: pre;
+}
+
+/* It stays in view at the edge, as the end of the text shown can be far to the right. */
+.line-rest {
+  position: sticky;
+  right: 0;
+  padding: 0 8px;
+  border: 0;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
 }
 
 .line.add {
@@ -1505,9 +1520,21 @@ a.tab {
 
 /* A command longer than the card goes on under itself, indented, so the next command still reads as one. */
 .commands div {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.commands div + div {
+  margin-top: 4px;
+}
+
+.commands code {
   padding-left: 2ch;
   text-indent: -2ch;
   overflow-wrap: anywhere;
+  font: inherit;
 }
 
 .guide {
@@ -1516,12 +1543,14 @@ a.tab {
 }
 
 #report-state.measuring,
+#updates-state.measuring,
 #security-state.measuring {
   color: var(--accent);
 }
 
 /* The security page: a tab for each kind of place, filtered by system and level, each place opened on its packages. */
-#security-tabs {
+#security-tabs,
+#updates-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
@@ -1529,7 +1558,8 @@ a.tab {
   border-bottom: 1px solid var(--border);
 }
 
-#security-toggles {
+#security-toggles,
+#updates-toggles {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1537,7 +1567,8 @@ a.tab {
   margin-right: auto;
 }
 
-#security-filter {
+#security-filter,
+#updates-filter {
   flex: 1 1 260px;
   max-width: 380px;
   padding: 6px 10px;
@@ -1548,7 +1579,9 @@ a.tab {
   font: inherit;
 }
 
-#security-filter[hidden] {
+#security-filter[hidden],
+#updates-filter[hidden],
+.chips[hidden] {
   display: none;
 }
 
@@ -1781,7 +1814,9 @@ a.tab {
 }
 
 .copy {
-  padding: 1px 8px;
+  display: inline-flex;
+  flex: none;
+  padding: 3px 5px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--surface);
@@ -2007,13 +2042,13 @@ a.tab {
 #docs-page p,
 #docs-page ul,
 #docs-page ol,
-#docs-page pre,
+#docs-page .code-block,
 #docs-page blockquote,
 #docs-page .table-wrap {
   margin: 0 0 12px;
 }
 
-#docs-page li > pre,
+#docs-page li > .code-block,
 #docs-page li > p {
   margin: 8px 0;
 }
@@ -2022,8 +2057,19 @@ a.tab {
   color: var(--accent);
 }
 
+.code-block {
+  position: relative;
+}
+
+.code-block .copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+
 #docs-page pre {
-  padding: 10px 14px;
+  margin: 0;
+  padding: 10px 44px 10px 14px;
   border-radius: 8px;
   background: var(--background);
   overflow-x: auto;
@@ -2079,4 +2125,272 @@ a.tab {
     position: static;
     max-height: none;
   }
+}
+
+/* The chips that filter the list by technology. */
+#technologies {
+  margin-bottom: 12px;
+}
+
+/* The technologies and the updates of a repository, at the end of its left pane. */
+.technology-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 2px 8px 4px;
+}
+
+.technology {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--quiet-soft);
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.about .updates {
+  padding: 2px 8px;
+  color: var(--accent);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.about .updates.fixes {
+  color: var(--warn);
+}
+
+.about .updates:hover {
+  text-decoration: underline;
+}
+
+/* The updates page: each update takes one line, and opens on the places that use it. */
+#updates-content a {
+  color: var(--accent);
+}
+
+#updates-content table {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+#updates-content td:last-child {
+  width: 32%;
+}
+
+#updates-content td,
+#updates-content .command code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+#updates-content td {
+  vertical-align: top;
+}
+
+#updates-content tbody tr {
+  cursor: auto;
+}
+
+#updates-content .version {
+  font: 12.5px var(--mono);
+}
+
+.uses {
+  margin: 0;
+  padding: 0 14px 6px;
+  list-style: none;
+}
+
+.uses li + li {
+  border-top: 1px solid var(--border);
+}
+
+.uses li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 6px 0;
+}
+
+.uses .use-file {
+  color: var(--muted);
+  font: 12px var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.tool-note {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.apt-line {
+  margin: 0 0 12px;
+  color: var(--muted);
+}
+
+.update summary .place-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 4px 16px;
+  flex: 1;
+}
+
+.update + .update {
+  margin-top: 4px;
+}
+
+/* The same width on each line, so the columns align from one update to the next. */
+.update summary .place-facts {
+  flex: 0 0 270px;
+  justify-content: flex-end;
+}
+
+#inventory-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+#inventory-content table {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+#inventory-content tbody tr {
+  cursor: auto;
+}
+
+#inventory-content a {
+  color: var(--accent);
+}
+
+.technology-name {
+  font-weight: 600;
+}
+
+/* The logs: the newest line first, the start and the end of a job in full colour. */
+#logs-jobs {
+  margin-bottom: 12px;
+}
+
+.log {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  font: 12.5px var(--mono);
+}
+
+.log tbody tr {
+  cursor: auto;
+}
+
+.log td {
+  padding: 4px 12px;
+  border: 0;
+  color: var(--muted);
+}
+
+.log .log-text {
+  width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.log tr.mark .log-text {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.log tr.bad .log-text {
+  color: var(--bad);
+}
+
+#finder {
+  width: min(640px, calc(100vw - 40px));
+  margin: 12vh auto auto;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 30%);
+}
+
+#finder::backdrop {
+  background: rgb(0 0 0 / 25%);
+}
+
+#finder-input {
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  outline: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 15px;
+}
+
+#finder-results {
+  max-height: min(420px, 60vh);
+  overflow-y: auto;
+  padding: 6px;
+}
+
+#finder-results:empty,
+#finder-note:empty {
+  display: none;
+}
+
+#finder-note {
+  margin: 0;
+  padding: 14px 16px;
+  color: var(--muted);
+}
+
+.finder-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.finder-option[aria-selected='true'] {
+  background: var(--accent-soft);
+}
+
+.finder-name {
+  flex: none;
+  max-width: 50%;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.finder-option .path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.finder-system {
+  flex: none;
+  color: var(--muted);
+  font-size: 12px;
 }

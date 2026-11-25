@@ -30,6 +30,13 @@ export function address(values: Record<string, string | undefined>): string {
   return `#${values.page}${query}`
 }
 
+// Writes what a page shows in its address, so a reload or a copied address shows the same.
+// It adds no step to the history, as a filter is not another page.
+export function keepAddress(values: Record<string, string | undefined>): void {
+  const next = address(values)
+  if (next !== (location.hash || '#')) history.replaceState(null, '', location.pathname + (next === '#' ? '' : next))
+}
+
 // The token arrives in the fragment of the address chade ui opens, and leaves the address bar and the history at once.
 function takeToken(): string | null {
   const params = route()

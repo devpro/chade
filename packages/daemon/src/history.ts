@@ -1,5 +1,6 @@
+import { readChangedFiles, readFilePatch, readUntrackedFiles, readUntrackedPatch, type ChangedFile, type FilePatch } from './changes.js'
 import { mainRemote, webAddress } from './remote.js'
-import { GIT_TIMEOUT_MS, readRepository, repositoryPath, type Repository, type Root, type Run } from './repositories.js'
+import { GIT_TIMEOUT_MS, readRepository, readTechnologies, repositoryPath, type Repository, type Root, type Run } from './repositories.js'
 import { RequestError } from './server.js'
 
 export interface Commit {
@@ -63,16 +64,11 @@ export interface LastCommit {
 
 export interface Diff {
   commit?: { hash: string; author: string; email: string; date: string; message: string }
-  patch: string
-  // The patch was cut, being larger than a page can show.
-  truncated: boolean
+  files: ChangedFile[]
 }
 
 export const DEFAULT_COMMITS = 300
 export const MAX_COMMITS = 5000
-export const MAX_PATCH = 2 * 1024 * 1024
-// Untracked files are read one git command each, so a folder of generated files is not read whole.
-const MAX_UNTRACKED = 200
 
 export type Git = (args: string[]) => Promise<{ code: number; stdout: string; stderr: string }>
 
@@ -189,6 +185,7 @@ export async function repositoryDetail(root: Root, relative: string[], run: Run,
   const commits = parseCommits(log.stdout)
   const detail: Detail = { repository, branches, tags: parseTags(tags.stdout), commits: commits.slice(0, count), more: commits.length > count, changes: parseChanges(status.stdout) }
   if (repository.head) detail.last = { message: message.stdout.trim(), pushed: unpushed.stdout.trim() === '' }
+  repository.technologies = await readTechnologies(root, relative, run, repository.head)
   const web = await readWeb(git, repository.branch)
   if (web) detail.web = web
   return detail
@@ -229,28 +226,13 @@ export async function branchLoss(root: Root, relative: string[], run: Run, name:
 // Prints HEAD when no remote branch holds it yet, and nothing once it is pushed.
 export const UNPUSHED = ['rev-list', '--max-count=1', 'HEAD', '--not', '--remotes']
 
-export const DIFF_OPTIONS = ['--patch', '--no-color', '--no-ext-diff', '--no-textconv', '--find-renames']
-
-// The files git does not track yet, each as a patch that adds its every line.
-async function untrackedPatch(git: Git): Promise<Diff> {
+// The names of the files git does not track yet.
+async function untrackedPaths(git: Git): Promise<string[]> {
   const status = await git(['status', '--porcelain=v1', '-z', '--untracked-files=all'])
   if (status.code !== 0) throw new Error((status.stderr || status.stdout).trim().split('\n')[0])
-  // The names come from git itself, never from the request.
-  const files = parseChanges(status.stdout)
+  return parseChanges(status.stdout)
     .filter((file) => file.unstaged === '?')
     .map((file) => file.path)
-  const diff: Diff = { patch: '', truncated: files.length > MAX_UNTRACKED }
-  for (const file of files.slice(0, MAX_UNTRACKED)) {
-    // Comparing with nothing exits with 1, as any comparison that finds a difference.
-    const result = await git(['diff', '--no-index', ...DIFF_OPTIONS, '--', '/dev/null', file])
-    if (result.code > 1) continue
-    if (diff.patch.length + result.stdout.length > MAX_PATCH) {
-      diff.truncated = true
-      break
-    }
-    diff.patch += result.stdout
-  }
-  return diff
 }
 
 // Who made a commit, when, and its whole message.
@@ -261,26 +243,27 @@ export async function readCommit(git: Git, hash: string): Promise<NonNullable<Di
   return { hash: full, author, email, date, message: message.join('\0').trim() }
 }
 
-// A patch no larger than a page can show, cut at the end of a line, so the last one shown is whole.
-export function cutPatch(patch: string): { patch: string; truncated: boolean } {
-  if (patch.length <= MAX_PATCH) return { patch, truncated: false }
-  return { patch: patch.slice(0, patch.lastIndexOf('\n', MAX_PATCH) + 1), truncated: true }
+// What compares a commit with its first parent, what is staged with it, or what is changed with what is staged.
+function comparison(target: string): string[] {
+  if (target === 'staged') return ['diff', '--cached']
+  if (target === 'unstaged') return ['diff']
+  // A full hash and nothing else, so the value never reads as an option or a path.
+  if (!/^[0-9a-f]{40}$/.test(target)) throw new Error('the target of a diff is staged, unstaged, untracked or the full hash of a commit')
+  return ['show', '--format=', '--diff-merges=first-parent', target]
 }
 
-// The patch of a commit against its first parent, or of what is staged, of what is changed and not staged, or of the files not tracked.
+// The files of a commit, of what is staged, of what is changed and not staged, or those not tracked.
 export async function repositoryDiff(root: Root, relative: string[], run: Run, target: string): Promise<Diff> {
   const git = gitOf(root, relative, run)
-  const diff: Diff = { patch: '', truncated: false }
-  let result
-  if (target === 'untracked') return untrackedPatch(git)
-  if (target === 'staged') result = await git(['diff', '--cached', ...DIFF_OPTIONS])
-  else if (target === 'unstaged') result = await git(['diff', ...DIFF_OPTIONS])
-  else {
-    // A full hash and nothing else, so the value never reads as an option or a path.
-    if (!/^[0-9a-f]{40}$/.test(target)) throw new Error('the target of a diff is staged, unstaged, untracked or the full hash of a commit')
-    diff.commit = await readCommit(git, target)
-    result = await git(['show', '--format=', '--diff-merges=first-parent', ...DIFF_OPTIONS, target])
-  }
-  if (result.code !== 0) throw new Error((result.stderr || result.stdout).trim().split('\n')[0])
-  return { ...diff, ...cutPatch(result.stdout) }
+  if (target === 'untracked') return { files: await readUntrackedFiles(git, await untrackedPaths(git)) }
+  const command = comparison(target)
+  if (command[0] === 'diff') return { files: await readChangedFiles(git, command) }
+  const [commit, files] = await Promise.all([readCommit(git, target), readChangedFiles(git, command)])
+  return { commit, files }
+}
+
+// The changes of one of those files.
+export async function repositoryFilePatch(root: Root, relative: string[], run: Run, target: string, path: string): Promise<FilePatch> {
+  const git = gitOf(root, relative, run)
+  return target === 'untracked' ? readUntrackedPatch(git, await untrackedPaths(git), path) : readFilePatch(git, comparison(target), path)
 }

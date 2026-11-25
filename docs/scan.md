@@ -14,12 +14,12 @@ chade scan
 
 Each system of the machine is read by its own tools, Windows and the distribution both on WSL.
 
-Place                     | What is read                                                                                                                      | Unused when
---------------------------|-----------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------
-Installed for the user    | Global npm and pnpm packages, each Node.js of nvm, pipx, dotnet tools, Go binaries                                                | A Node.js of nvm on Linux is neither the default nor the one running chade
-Installed in a repository | `node_modules`, `.terraform`, `.venv`, and `obj/project.assets.json` of a restored .NET project, under the `repos` of each system | Nothing happened in the repository for 30 days, see below
-Cache                     | The npx cache, the NuGet cache, the Terraform plugin cache                                                                        | Always for npx and NuGet, which their tool fills again
-Container image           | Every image Docker holds                                                                                                          | No container, running or stopped, was created from it
+Place                     | What is read                                                                                                                              | Unused when
+--------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------
+Installed for the user    | Global npm and pnpm packages, each Node.js of nvm, pipx, dotnet tools, Go binaries, those of `/usr/local/bin` and `~/.local/bin` included | A Node.js of nvm on Linux is neither the default nor the one running chade
+Installed in a repository | `node_modules`, `.terraform`, `.venv`, and `obj/project.assets.json` of a restored .NET project, under the `repos` of each system         | Nothing happened in the repository for 30 days, see below
+Cache                     | The npx cache, the NuGet cache, the Terraform plugin cache                                                                                | Always for npx and NuGet, which their tool fills again
+Container image           | Every image Docker holds                                                                                                                  | No container, running or stopped, was created from it
 
 Every place is read by each scanner installed on its system, as each one misses what another finds, and a missing one only takes its layer away.
 What several scanners report of one advisory is one finding, which names them all, as [Scanners](#scanners) says.
@@ -30,6 +30,7 @@ Every finding is in `chade scan --json`, and on the Security page of the [web in
 
 The scan is saved to `scan.json`, beside the [configuration](configuration.md), where `chade report` and the web interface read it.
 The server of the web interface runs it [once a day](web-interface.md#daily-runs).
+The terminal shows each step with its time, and the [Logs](web-interface.md#logs) page shows the same.
 A part left out keeps what the last scan found of it.
 `chade scan` exits with 1 when a malicious package is on the disk, so a script running it does not miss one.
 
@@ -110,19 +111,53 @@ A WSL started before an install does not see the new `PATH` of Windows, so chade
 
 ## Vulnerability databases
 
-The list of the packages never leaves the machine: each scanner downloads its database, and matches the packages on the machine.
+The `baseimage` plugin of osv-scanner, which sends the identifiers of the layers of an image to a server, is disabled.
+The scan does not send the list of the packages: each scanner downloads its database, and matches the packages on the machine.
+The [inventory](inventory.md) is different: it sends names of packages, images and tools to their registries to know the newest versions.
+The same names go to the same registries when the user runs `npm outdated` or `docker pull`.
+[Shared data](inventory.md#shared-data) lists what each registry receives.
 
 Scanner     | Database                                                                          | Updated
 ------------|-----------------------------------------------------------------------------------|---------------------------------
-osv-scanner | The OSV database of each ecosystem it meets, `~/.cache/osv-scalibr`, about 260 MB | By each scan
+osv-scanner | The OSV database of each ecosystem it meets, `~/.cache/osv-scalibr`, about 1.3 GB | By each scan
 trivy       | The database of Aqua, `~/.cache/trivy`, its Java database only for a jar          | Once per scan
-grype       | The database of Anchore, `~/.cache/grype`                                         | By grype, when it is out of date
+grype       | The database of Anchore, `~/.cache/grype`                                         | Once before the images, and by grype for the packages
 
 `--offline` reads them as they are: an ecosystem osv-scanner never downloaded makes it fail, and the others still run.
-An image read less than a day before by the same scanners is not read again, its ID saying its content.
+Each scan matches every image against the databases it has just updated.
+The [images](#images) section says what is kept between two scans.
+A database that cannot be updated, without a network for example, matches as it was, and the scan names it under Scanners.
+An ecosystem without a database is a failure for the images that hold it, and never an image without a finding.
 
 A package is malicious when OSV names it so, with an identifier starting with `MAL-` or the weakness CWE-506, so osv-scanner is the scanner not to go without.
 A malicious package may have run at its install, so it is removed rather than updated, and the machine looked at.
+
+## Images
+
+The packages of an image do not change while its ID is the same, so the scan does not read all of it again.
+The findings are never kept.
+
+Scanner     | Between two scans                                                                            | At each scan
+------------|----------------------------------------------------------------------------------------------|-------------------------------------------------------------
+osv-scanner | The list of the packages of each image, in `image-lists`, beside the configuration           | Matches the lists of all the images, one call per database
+trivy       | Its own cache of the layers, in `~/.cache/trivy`                                             | Matches each image, and reads the layers it does not know
+grype       | Nothing, as its list does not give the same findings for a Go binary                         | Reads each image
+
+A list is kept with the ID of the image, and the name and the version of osv-scanner, so a new version reads the image again.
+A list that cannot be read makes chade read the image again, and the list of an image that Docker no longer holds is deleted.
+
+osv-scanner reads an image in full, as one call that reads and matches, at each scan when a list would lose findings:
+
+- It holds rpm packages of Red Hat or SUSE.
+- A package of its list does not come back from the match as the image names it.
+- Its list cannot be read.
+
+Up to 4 images are read at the same time, one for each 2 GB of free memory, and one at a time when the memory is low.
+trivy locks its cache, so it reads one image at a time.
+With less than 8 GB of free memory, the scanners also run one after the other.
+The match of the packages of Ubuntu takes more than 2 GB and some minutes, as its database holds more than 8 GB of text.
+
+The temporary files of the images are deleted at the end of the scan, and those of a scan that was killed by a scan of a later day.
 
 ## Unused
 
@@ -158,5 +193,5 @@ Key          | Content
 - Only Go binaries say what they hold, so another binary is not read.
 - Docker Desktop shares one engine between Windows and WSL, so the images are read once, by Linux.
 - Only the images of Docker are read, not those of podman.
-- A first scan of many images takes a quarter of an hour, osv-scanner exporting each one, and the next ones read only what changed.
+- A scan of 74 images, 10 of them of Ubuntu, takes about 9 minutes the first time and 6 minutes after, on a machine with 22 processors.
 - A folder of a repository deeper than four levels is not looked for.

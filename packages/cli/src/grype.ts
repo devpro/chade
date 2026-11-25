@@ -15,6 +15,11 @@ export function grypeImageArgs(imageId: string): string[] {
   return [`docker:${imageId}`, '--output', 'json', '--quiet']
 }
 
+// The database alone, updated once before the images are read.
+export function grypeDatabaseArgs(): string[] {
+  return ['db', 'update', '--quiet']
+}
+
 // The database is updated by grype itself before it reads, unless told not to.
 export const GRYPE_OFFLINE = { GRYPE_DB_AUTO_UPDATE: 'false', GRYPE_CHECK_FOR_APP_UPDATE: 'false' }
 

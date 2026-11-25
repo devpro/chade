@@ -13,10 +13,13 @@
       <h1><a href="#">chade</a></h1>
       <span id="machine"></span>
       <nav id="pages" aria-label="Pages">
-        <a href="#" data-view="repositories">Repositories</a>
+        <a href="#" data-view="repositories" title="Press r on any page to open a repository">Repositories</a>
         <a href="#store" data-view="store">Store</a>
         <a href="#report" data-view="report">Report</a>
         <a href="#security" data-view="security">Security</a>
+        <a href="#updates" data-view="updates">Updates</a>
+        <a href="#inventory" data-view="inventory">Inventory</a>
+        <a href="#logs" data-view="logs">Logs</a>
         <a href="#docs" data-view="docs">Docs</a>
       </nav>
       <span id="scanned"></span>
@@ -34,6 +37,7 @@
           <label><input id="attention" type="checkbox" /> Only those with something to do</label>
           <span id="summary"></span>
         </div>
+        <div id="technologies" class="chips" role="group" aria-label="Technology" hidden></div>
         <ul id="warnings"></ul>
         <div id="content"></div>
       </section>
@@ -93,6 +97,9 @@
           <span id="report-state" class="path"></span>
           <span class="hint">In a terminal: <code>chade report</code> prints this report, <code>chade clean</code> cleans up</span>
         </div>
+        <div class="bar">
+          <nav id="report-tabs" role="tablist" aria-label="Systems measured"></nav>
+        </div>
         <div id="report-sections"></div>
       </section>
       <section id="security" class="page" hidden>
@@ -110,12 +117,43 @@
         </div>
         <div id="security-content"></div>
       </section>
+      <section id="updates" class="page" hidden>
+        <div class="bar">
+          <h2>Updates</h2>
+          <span id="updates-state" class="path"></span>
+          <button id="updates-run" class="action" type="button" title="Read the tools and the dependencies again, and ask the registries for the newest versions">Check</button>
+          <span class="hint">In a terminal: <code>chade inventory</code></span>
+        </div>
+        <nav id="updates-tabs" role="tablist" aria-label="Kinds of update"></nav>
+        <div id="updates-filters" class="bar">
+          <div id="updates-toggles"></div>
+          <input id="updates-filter" type="search" placeholder="Filter by name, repository or file" aria-label="Filter the updates" />
+        </div>
+        <div id="updates-content"></div>
+      </section>
+      <section id="inventory" hidden>
+        <div class="bar">
+          <nav id="inventory-tabs" role="tablist" aria-label="Systems of the machine"></nav>
+        </div>
+        <div id="inventory-content"></div>
+      </section>
+      <section id="logs" hidden>
+        <div id="logs-jobs" class="chips" role="group" aria-label="Job"></div>
+        <div id="logs-content"></div>
+      </section>
       <section id="docs" hidden>
         <nav id="docs-nav" aria-label="Documentation"></nav>
         <article id="docs-page"></article>
         <nav id="docs-toc" aria-label="On this page"></nav>
       </section>
     </main>
+    <dialog id="finder" aria-label="Open a repository">
+      <div class="finder-box">
+        <input id="finder-input" type="text" role="combobox" placeholder="Open a repository" aria-label="Name of the repository" aria-autocomplete="list" aria-controls="finder-results" aria-expanded="false" autocomplete="off" spellcheck="false" autofocus />
+        <div id="finder-results" role="listbox" aria-label="Repositories"></div>
+        <p id="finder-note" role="status"></p>
+      </div>
+    </dialog>
     <div id="notice" role="status" hidden>
       <strong id="notice-title"></strong>
       <pre id="notice-text"></pre>

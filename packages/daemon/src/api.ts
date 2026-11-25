@@ -1,13 +1,15 @@
 import { join } from 'node:path'
 import { runAction, type ActionRequest } from './actions.js'
-import { branchLoss, repositoryDetail, repositoryDiff } from './history.js'
+import { branchLoss, repositoryDetail, repositoryDiff, repositoryFilePatch } from './history.js'
 import { existsSync } from 'node:fs'
 import { pathKey, readChecks, readRepositories, type IstarciServer, type RepositoryCheck } from './istarci.js'
 import { findRepositories, findRepository, listRepositories, repositoryPath, type Root, type Run } from './repositories.js'
+import { updateCounts, type Inventory } from './inventory.js'
+import type { LogLine } from './log.js'
 import type { Report } from './report.js'
 import type { Scan } from './scan.js'
 import { RequestError, type ServerOptions } from './server.js'
-import { readSnapshot, readSnapshotFile, readSnapshotFiles, readStore, storeRepository } from './store.js'
+import { readSnapshot, readSnapshotFile, readSnapshotFiles, readSnapshotPatch, readStore, storeRepository } from './store.js'
 
 export interface ApiOptions {
   version: string
@@ -22,6 +24,10 @@ export interface ApiOptions {
   savedReport?: () => Promise<Report | undefined>
   // The last scan chade scan saved, and a new one, which takes minutes.
   scan?: { read: () => Promise<Scan | undefined>; run: () => Promise<Scan> }
+  // The last inventory saved, and a new one, which asks the registries.
+  inventory?: { read: () => Promise<Inventory | undefined>; run: () => Promise<Inventory> }
+  // The last lines of the log of the jobs.
+  logs?: () => Promise<LogLine[]>
   // Where IstarCI answers on this machine, asked at each call, and absent when it is not set up.
   istarci?: () => Promise<IstarciServer | undefined>
   run: Run
@@ -33,6 +39,7 @@ export function createActions(options: ApiOptions): NonNullable<ServerOptions['a
   const busy = new Set<string>()
   // A scan asked while one runs is that one, as two would read the same disk twice at once.
   let scanning: Promise<Scan> | undefined
+  let listing: Promise<Inventory> | undefined
   return {
     scan: async () => {
       if (!options.scan) throw new RequestError(404, 'this server does not scan')
@@ -41,6 +48,14 @@ export function createActions(options: ApiOptions): NonNullable<ServerOptions['a
         scanning = undefined
       })
       return { version: options.version, ...(await scanning) }
+    },
+    inventory: async () => {
+      if (!options.inventory) throw new RequestError(404, 'this server makes no inventory')
+      const inventory = options.inventory
+      listing ??= inventory.run().finally(() => {
+        listing = undefined
+      })
+      return { version: options.version, ...(await listing) }
     },
     action: async (body) => {
       if (typeof body !== 'object' || body === null) throw new RequestError(400, 'the request names a repository and an action')
@@ -128,7 +143,8 @@ export function createApi(options: ApiOptions): ServerOptions['api'] {
       const { root, relative } = await repository(query)
       const target = query.get('target') ?? ''
       if (!/^(staged|unstaged|untracked|[0-9a-f]{40})$/.test(target)) throw new RequestError(400, 'the target of a diff is staged, unstaged, untracked or the full hash of a commit')
-      return repositoryDiff(root, relative, options.run, target)
+      const path = query.get('file')
+      return path ? repositoryFilePatch(root, relative, options.run, target, path) : repositoryDiff(root, relative, options.run, target)
     },
     store: async (query) => {
       const folder = await options.store()
@@ -138,6 +154,8 @@ export function createApi(options: ApiOptions): ServerOptions['api'] {
     },
     snapshot: async (query) => {
       const { machine, commit } = snapshot(query)
+      const path = query.get('path')
+      if (path) return readSnapshotPatch(await options.store(), options.run, machine, commit, path)
       return readSnapshot(await options.store(), options.run, machine, commit)
     },
     'snapshot-files': async (query) => {
@@ -149,6 +167,14 @@ export function createApi(options: ApiOptions): ServerOptions['api'] {
       const scan = await options.scan?.read()
       return { version: options.version, machine: options.machine, ...(scan ? { scan } : {}) }
     },
+    // The last inventory. A read of the page never asks a registry.
+    inventory: async () => {
+      const inventory = await options.inventory?.read()
+      return { version: options.version, machine: options.machine, ...(inventory ? { inventory } : {}) }
+    },
+    logs: async () => ({ version: options.version, machine: options.machine, scannedAt: new Date().toISOString(), lines: (await options.logs?.()) ?? [] }),
+    // The counts alone, as the list reads them twice a minute.
+    updates: async () => ({ updates: updateCounts((await options.inventory?.read())?.dependencies ?? []) }),
     // The saved report unless asked to measure again, a page opening on what the day measured.
     report: async (query) => {
       const saved = query.get('fresh') === '1' ? undefined : await options.savedReport?.()
