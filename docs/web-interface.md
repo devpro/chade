@@ -10,6 +10,18 @@ Its server runs in the background, on `http://127.0.0.1:7843`: the first `chade 
 
 The top of every page names the machine and links to the eight pages: Repositories, Store, Report, Security, Updates, Inventory, Logs and Docs.
 
+## Open a repository
+
+`r` opens a search over the repositories of all the systems, from any page.
+The letter stays a letter while a text field has the focus.
+
+Key      | Effect
+---------|--------------------------------------------------------------------------------------------
+Letters  | Keep the repositories whose name or path holds every word, the best match of the name first
+`↓` `↑`  | Select a repository
+`Enter`  | Opens the page of the repository selected, as a click does
+`Escape` | Closes the search, as a click outside of it does
+
 ## Server
 
 Command               | Effect

@@ -13,7 +13,7 @@
       <h1><a href="#">chade</a></h1>
       <span id="machine"></span>
       <nav id="pages" aria-label="Pages">
-        <a href="#" data-view="repositories">Repositories</a>
+        <a href="#" data-view="repositories" title="Press r on any page to open a repository">Repositories</a>
         <a href="#store" data-view="store">Store</a>
         <a href="#report" data-view="report">Report</a>
         <a href="#security" data-view="security">Security</a>
@@ -147,6 +147,13 @@
         <nav id="docs-toc" aria-label="On this page"></nav>
       </section>
     </main>
+    <dialog id="finder" aria-label="Open a repository">
+      <div class="finder-box">
+        <input id="finder-input" type="text" role="combobox" placeholder="Open a repository" aria-label="Name of the repository" aria-autocomplete="list" aria-controls="finder-results" aria-expanded="false" autocomplete="off" spellcheck="false" autofocus />
+        <div id="finder-results" role="listbox" aria-label="Repositories"></div>
+        <p id="finder-note" role="status"></p>
+      </div>
+    </dialog>
     <div id="notice" role="status" hidden>
       <strong id="notice-title"></strong>
       <pre id="notice-text"></pre>

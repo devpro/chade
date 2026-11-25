@@ -102,6 +102,12 @@ export function badges(list: Badge[], tag = 'td'): HTMLElement {
 // What the list read last, which the inventory shows without a wait.
 export const listState = (): State | undefined => state
 
+// Reads the repositories for any page, and leaves the list as it is drawn.
+export async function readState(): Promise<State> {
+  state = await get<State>('state')
+  return state
+}
+
 // The address of the list with its filter, which the page of a repository returns to.
 export function listAddress(): string {
   return address(addressValues())
@@ -241,7 +247,7 @@ export const list = {
     render()
   },
   async reload(): Promise<{ machine: string; version: string; scannedAt: string }> {
-    state = await get<State>('state')
+    const read = await readState()
     render()
     void get<{ checks: { system: string; path: string; check: RepositoryCheck }[] }>('latest-checks')
       .then(({ checks }) => {
@@ -250,6 +256,6 @@ export const list = {
       })
       // IstarCI is no part of the list, which a read of it that fails leaves as it was.
       .catch(() => undefined)
-    return state
+    return read
   },
 }

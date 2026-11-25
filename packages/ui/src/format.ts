@@ -65,6 +65,29 @@ export function matches(repository: Repository, filter: string): boolean {
   return words.every((word) => text.includes(word))
 }
 
+// How well a name answers the words typed: 0 is the same name, 4 is a word found in the path only.
+function rank(repository: Repository, words: string[]): number {
+  const name = repository.name.toLowerCase()
+  const text = words.join(' ')
+  // A repository in a folder of its system is named after both, as group/feature.
+  const last = name.slice(name.lastIndexOf('/') + 1)
+  if (name === text || last === text) return 0
+  if (name.startsWith(text) || last.startsWith(text)) return 1
+  if (words.every((word) => name.split(/[^\p{L}\p{N}]+/u).some((part) => part.startsWith(word)))) return 2
+  return words.every((word) => name.includes(word)) ? 3 : 4
+}
+
+// The repositories whose name or path holds every word, the best match first.
+// The system chosen goes first when two repositories match as well.
+export function find(repositories: Repository[], text: string, system?: string): Repository[] {
+  const words = text.toLowerCase().split(/\s+/).filter(Boolean)
+  return repositories
+    .filter((repository) => words.every((word) => `${repository.name} ${repository.path}`.toLowerCase().includes(word)))
+    .map((repository) => ({ repository, rank: words.length === 0 ? 0 : rank(repository, words), away: repository.system === system ? 0 : 1 }))
+    .sort((a, b) => a.rank - b.rank || a.away - b.away)
+    .map(({ repository }) => repository)
+}
+
 export function summary(repositories: Repository[]): string {
   const count = (test: (repository: Repository) => boolean) => repositories.filter(test).length
   const parts = [`${repositories.length} ${repositories.length === 1 ? 'repository' : 'repositories'}`]
