@@ -24,39 +24,41 @@ const COMPARE_OPTIONS = ['--no-color', '--no-ext-diff', '--no-textconv', '--find
 const LIST_OPTIONS = ['--raw', '--numstat', '-z', ...COMPARE_OPTIONS]
 const PATCH_OPTIONS = ['--patch', ...COMPARE_OPTIONS]
 
+// Reads the entry of --raw at the index, and gives the index of its last part.
+function readRaw(entries: string[], at: number, files: Map<string, ChangedFile>): number {
+  const status = entries[at].slice(entries[at].lastIndexOf(' ') + 1)[0]
+  if (status === 'R' || status === 'C') {
+    const [from, path] = entries.slice(at + 1, at + 3)
+    files.set(path, { path, from, status, binary: false })
+    return at + 2
+  }
+  const path = entries[at + 1]
+  // A file in conflict has no two sides to compare, and is listed a second time as changed.
+  if (files.get(path)?.status !== 'U') files.set(path, { path, status, binary: false })
+  return at + 1
+}
+
+// Reads the entry of --numstat at the index, and gives the index of its last part.
+function readCounts(entries: string[], at: number, files: Map<string, ChangedFile>): number {
+  const [additions, deletions, ...rest] = entries[at].split('\t')
+  const renamed = deletions !== undefined && rest.join('\t') === ''
+  const file = files.get(renamed ? entries[at + 2] : rest.join('\t'))
+  if (file && additions === '-') file.binary = true
+  else if (file) Object.assign(file, { additions: Number(additions), deletions: Number(deletions) })
+  return renamed ? at + 2 : at
+}
+
 // Reads the output of --raw --numstat -z, one entry of each for a file.
 // A renamed file has its earlier path then its new one after the entry.
 export function parseChangedFiles(text: string): ChangedFile[] {
   const files = new Map<string, ChangedFile>()
-  const unmerged = new Set<string>()
   const entries = text.split('\0')
-  for (let index = 0; index < entries.length; index++) {
-    const entry = entries[index]
-    if (entry.startsWith(':')) {
-      const status = entry.slice(entry.lastIndexOf(' ') + 1)[0]
-      const from = status === 'R' || status === 'C' ? entries[++index] : undefined
-      const path = entries[++index]
-      // A file in conflict has no two sides to compare.
-      if (status === 'U') unmerged.add(path)
-      else files.set(path, { path, ...(from === undefined ? {} : { from }), status, binary: false })
-      continue
-    }
-    const [additions, deletions, ...rest] = entry.split('\t')
-    if (deletions === undefined) continue
-    let path = rest.join('\t')
-    if (path === '') {
-      index += 2
-      path = entries[index]
-    }
-    const file = files.get(path)
-    if (!file) continue
-    if (additions === '-') file.binary = true
-    else {
-      file.additions = Number(additions)
-      file.deletions = Number(deletions)
-    }
+  let index = 0
+  while (index < entries.length) {
+    const last = entries[index].startsWith(':') ? readRaw(entries, index, files) : readCounts(entries, index, files)
+    index = last + 1
   }
-  return [...files.values()].filter((file) => !unmerged.has(file.path))
+  return [...files.values()].filter((file) => file.status !== 'U')
 }
 
 // Comparing with nothing exits with 1, as any comparison that finds a difference.
