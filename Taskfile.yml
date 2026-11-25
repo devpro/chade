@@ -90,7 +90,7 @@ tasks:
   sonar:
     desc: Fail when the local Sonar analysis of the commit checked out has an open finding, old or new, after its IstarCI run
     cmds:
-      - scripts/check_sonar_findings.sh
+      - istarci quality --json | node scripts/check_sonar_findings.mjs
 
   # ── Publication ─────────────────────────────────────────────────────────────
 

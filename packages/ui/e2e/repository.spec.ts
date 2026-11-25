@@ -320,12 +320,11 @@ test('the list of uncommitted changes and the file shown keep their scroll posit
   const folder = join(server.root, 'sandbox', 'long')
   const names = Array.from({ length: 80 }, (_, index) => `new-${String(index).padStart(2, '0')}.txt`)
   const top = (view: Locator): Promise<number> => view.evaluate((shown) => shown.scrollTop)
-  const refresh = async (): Promise<void> => {
-    const answer = page.waitForResponse((response) => response.url().includes('/api/diff') && response.url().includes('file='))
+  // The elements on the page before a refresh are marked, and the refresh is drawn when none is left.
+  const refresh = async (views: Locator[]): Promise<void> => {
+    for (const view of views) await view.evaluate((shown) => shown.firstElementChild?.setAttribute('data-old', ''))
     await page.getByRole('button', { name: 'Refresh' }).click()
-    await answer
-    await expect(page.getByRole('button', { name: 'Refresh' })).toBeEnabled()
-    await page.waitForTimeout(300)
+    for (const view of views) await expect(view.locator('[data-old]')).toHaveCount(0)
   }
   for (const name of names) writeFileSync(join(folder, name), 'line\n'.repeat(400))
   try {
@@ -340,13 +339,13 @@ test('the list of uncommitted changes and the file shown keep their scroll posit
       expect(before).toBe(900)
       await long.openFile(name)
       await expect(long.comparison.added).toHaveCount(400)
-      await page.waitForTimeout(300)
+      await expect(long.changes.locator('.file-link.selected')).toContainText(name)
       expect(await top(long.changes)).toBe(before)
       // A file just chosen starts from its first line.
       expect(await top(long.comparison.view)).toBe(0)
       await long.comparison.view.evaluate((view) => (view.scrollTop = 600))
     }
-    await refresh()
+    await refresh([long.changes, long.comparison.view])
     expect(await top(long.changes)).toBe(900)
     expect(await top(long.comparison.view)).toBe(600)
   } finally {
